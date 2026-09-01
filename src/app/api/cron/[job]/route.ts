@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { warmupDb } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getOwnerUserId } from "@/lib/owner";
+import { activityAnalyzerAgent } from "@/modules/agents/activity-analyzer-agent";
 import { chiefOfStaffAgent } from "@/modules/agents/chief-of-staff-agent";
 import { learningAgent } from "@/modules/agents/learning-agent";
 
@@ -24,6 +25,18 @@ const JOBS: Record<string, (userId: string) => Promise<{ id: string; status: str
         trigger: "schedule",
         triggerKey: new Date().toISOString().slice(0, 10),
         force: true,
+      });
+      return { id: run.id, status: run.status };
+    },
+    "daily-activity": async (userId) => {
+      // analyse the previous day's sessions
+      const d = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+      const run = await activityAnalyzerAgent.run({
+        userId,
+        trigger: "schedule",
+        triggerKey: `activity-${d}`,
+        force: true,
+        input: { date: d },
       });
       return { id: run.id, status: run.status };
     },

@@ -1,0 +1,34 @@
+{
+  "_comment": "Merge this into ~/.claude/settings.json (or a project's .claude/settings.json). Replace NODE_BIN and COLLECTOR with absolute paths. `node collector/install.ts` does this for you.",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "NODE_BIN COLLECTOR/src/index.ts session-start" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command", "command": "NODE_BIN COLLECTOR/src/index.ts file-activity" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "NODE_BIN COLLECTOR/src/index.ts checkpoint" }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          { "type": "command", "command": "NODE_BIN COLLECTOR/src/index.ts session-end" }
+        ]
+      }
+    ]
+  }
+}

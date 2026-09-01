@@ -1,0 +1,14 @@
+{
+  "name": "personal-ai-activity-collector",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local Claude Code activity collector for Personal Growth AI OS. Zero dependencies — runs on Node 22.18+ native TypeScript.",
+  "scripts": {
+    "install-hooks": "node install.ts",
+    "sync": "node src/index.ts sync"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}

@@ -198,3 +198,15 @@ export const businessStatusEnum = pgEnum("business_status", [
   "validated",
   "dropped",
 ]);
+
+export const activitySourceEnum = pgEnum("activity_source", ["claude_code"]);
+
+export const activityEventTypeEnum = pgEnum("activity_event_type", [
+  "coding_session",
+]);
+
+export const activityStatusEnum = pgEnum("activity_status", [
+  "received",
+  "analyzed",
+  "failed",
+]);

@@ -50,6 +50,13 @@
       "when": 1788275476773,
       "tag": "0006_tiresome_bill_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788275973494,
+      "tag": "0007_left_arclight",
+      "breakpoints": true
     }
   ]
 }

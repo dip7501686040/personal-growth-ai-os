@@ -8,7 +8,7 @@
  *   Phase 6   – content_items, content_sources   ✓
  *   Phase 7   – business_opportunities   ✓
  *   Phase 8   – daily_briefings   ✓
- *   Phase 2.5 – activity_events, activity_analyses, ingest_tokens  (deferred to after Phase 8)
+ *   Phase 2.5 – activity_events, activity_analyses, ingest_tokens   ✓
  *   Phase 6   – content_items, content_sources
  *   Phase 7   – business_opportunities
  *   Phase 8   – daily_briefings
@@ -25,3 +25,4 @@ export * from "./career";
 export * from "./content";
 export * from "./business";
 export * from "./briefing";
+export * from "./activity";

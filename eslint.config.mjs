@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Standalone Node package with its own tsconfig / runtime model.
+    "collector/**",
+    "drizzle/**",
   ]),
 ]);
 
