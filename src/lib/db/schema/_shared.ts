@@ -165,3 +165,23 @@ export const careerRecommendationEnum = pgEnum("career_recommendation", [
   "maybe",
   "no",
 ]);
+
+export const contentStatusEnum = pgEnum("content_status", [
+  "idea",
+  "draft",
+  "ready_for_review",
+  "approved",
+  "published",
+]);
+
+export const contentPlatformEnum = pgEnum("content_platform", ["linkedin"]);
+
+export const contentSourceTypeEnum = pgEnum("content_source_type", [
+  "learning_session",
+  "project_feature",
+  "dsa_attempt",
+  "dsa_weakness",
+  "skill_levelup",
+  "activity_analysis",
+  "manual",
+]);

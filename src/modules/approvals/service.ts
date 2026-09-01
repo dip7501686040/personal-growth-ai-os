@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { approvals, type Approval, type NewApproval } from "@/lib/db/schema";
 import { setEvidenceStatus } from "@/modules/skills/service";
 import { setOpportunityStatus } from "@/modules/career/service";
+import { updateContentItem } from "@/modules/content/service";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -76,6 +77,16 @@ export async function resolveApproval(
     const ctx = (approval.context ?? {}) as { opportunityId?: string };
     if (ctx.opportunityId) {
       await setOpportunityStatus(userId, ctx.opportunityId, "applied");
+    }
+  }
+
+  if (approval.actionType === "publish_content") {
+    const ctx = (approval.context ?? {}) as { contentItemId?: string };
+    if (ctx.contentItemId) {
+      await updateContentItem(userId, ctx.contentItemId, {
+        // approved = cleared to post; the user still posts manually and marks published.
+        status: decision === "approved" ? "approved" : "ready_for_review",
+      });
     }
   }
 
