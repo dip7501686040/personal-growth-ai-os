@@ -2,6 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { approvals, type Approval, type NewApproval } from "@/lib/db/schema";
 import { setEvidenceStatus } from "@/modules/skills/service";
+import { setOpportunityStatus } from "@/modules/career/service";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -68,6 +69,13 @@ export async function resolveApproval(
         ctx.evidenceId,
         decision === "approved" ? "accepted" : "rejected",
       );
+    }
+  }
+
+  if (approval.actionType === "apply_job" && decision === "approved") {
+    const ctx = (approval.context ?? {}) as { opportunityId?: string };
+    if (ctx.opportunityId) {
+      await setOpportunityStatus(userId, ctx.opportunityId, "applied");
     }
   }
 

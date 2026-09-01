@@ -6,6 +6,8 @@ export interface AgentContext {
   userId: string;
   agentRunId: string;
   trigger: AgentTrigger;
+  /** Per-run input for target-specific agents (e.g. { opportunityId }). */
+  input: Record<string, unknown>;
   /** Append a line to the run's event log. */
   log: (
     message: string,
@@ -33,6 +35,8 @@ export interface AgentRunOptions {
   triggerKey?: string;
   /** Re-run even if a completed run exists for this triggerKey. */
   force?: boolean;
+  /** Per-run input for target-specific agents (e.g. { opportunityId }). */
+  input?: Record<string, unknown>;
 }
 
 export type { AgentName };

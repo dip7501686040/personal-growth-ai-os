@@ -39,6 +39,7 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
 
   async run(opts: AgentRunOptions): Promise<AgentRun> {
     const { userId, trigger, triggerKey, force } = opts;
+    const input = opts.input ?? {};
 
     if (triggerKey && !force) {
       const [existing] = await db
@@ -65,6 +66,7 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
         status: "triggered",
         triggerSource: trigger,
         triggerKey: triggerKey ?? null,
+        inputSummary: input as object,
         startedAt: new Date(),
       })
       .returning();
@@ -73,6 +75,7 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
       userId,
       agentRunId: run.id,
       trigger,
+      input,
       log: (message, o) =>
         this.event(run.id, userId, message, o?.level ?? "info", o?.step, o?.data),
     };

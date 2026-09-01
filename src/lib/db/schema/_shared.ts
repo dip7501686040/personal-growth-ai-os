@@ -151,3 +151,17 @@ export const projectSkillRoleEnum = pgEnum("project_skill_role", [
   "used",
   "demonstrated",
 ]);
+
+export const careerStatusEnum = pgEnum("career_status", [
+  "new",
+  "analyzed",
+  "applied",
+  "rejected",
+  "archived",
+]);
+
+export const careerRecommendationEnum = pgEnum("career_recommendation", [
+  "yes",
+  "maybe",
+  "no",
+]);

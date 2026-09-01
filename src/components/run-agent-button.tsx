@@ -9,10 +9,12 @@ export function RunAgentButton({
   agent,
   label = "Run now",
   size = "sm",
+  input,
 }: {
   agent: string;
   label?: string;
   size?: "sm" | "default";
+  input?: Record<string, unknown>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -21,7 +23,11 @@ export function RunAgentButton({
   async function run() {
     setBusy(true);
     try {
-      const res = await fetch(`/api/agents/${agent}/run`, { method: "POST" });
+      const res = await fetch(`/api/agents/${agent}/run`, {
+        method: "POST",
+        headers: input ? { "content-type": "application/json" } : undefined,
+        body: input ? JSON.stringify(input) : undefined,
+      });
       const data = (await res.json()) as {
         status?: string;
         error?: string | null;
