@@ -7,6 +7,7 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", phase: "Phase 9" },
+  { href: "/skills", label: "Skills", phase: "Phase 2" },
   { href: "/learning", label: "Learning", phase: "Phase 3" },
   { href: "/projects", label: "Projects", phase: "Phase 4" },
   { href: "/career", label: "Career", phase: "Phase 5" },

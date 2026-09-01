@@ -5,6 +5,7 @@ import { env } from "@/lib/env";
 /** Route prefixes that require an authenticated user. */
 const PROTECTED_PREFIXES = [
   "/dashboard",
+  "/skills",
   "/learning",
   "/projects",
   "/career",
