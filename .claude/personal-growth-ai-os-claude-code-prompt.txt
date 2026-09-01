@@ -1,0 +1,1856 @@
+# PROJECT: Personal Growth AI OS (MVP)
+
+You are a senior staff engineer and AI systems architect.
+
+Help me build an MVP of a Personal AI Operating System that coordinates my learning, projects, career, content creation, small business opportunities, and evidence from my real development work.
+
+IMPORTANT: This is an MVP for ONE USER ONLY. Do NOT over-engineer, introduce microservices, Kubernetes, complex distributed systems, or unnecessary infrastructure.
+
+Before writing implementation code, first analyze the requirements and create a practical architecture and implementation plan.
+
+---
+
+# CORE PRODUCT VISION
+
+The application is a personal AI operating system where multiple specialized agents work together.
+
+The key principle is:
+
+MY LEARNING → MY PROJECTS → MY PROOF OF WORK → MY JOB PROFILE → MY CONTENT → MY BUSINESS OPPORTUNITIES
+
+These must NOT operate independently.
+
+Every agent should share relevant context through a central database.
+
+For example:
+
+- If I learn RabbitMQ, Kubernetes, AI Agents, or System Design, the Project Agent should consider those skills when recommending projects.
+- If I implement something in a project, the Career Agent should know that I have ACTUALLY implemented it.
+- The Job Agent must only recommend jobs based primarily on skills I can prove through real projects or experience.
+- The Content Agent should generate content ideas based on things I actually learned, built, struggled with, or solved.
+- DSA practice should support my software engineering interview goals and pattern recognition weaknesses.
+- Business opportunities should leverage technologies and skills I actually possess.
+- Claude Code development activity should become evidence of actual work completed, not merely self-reported learning.
+
+The system should build a continuously evolving "Proof of Skills" profile.
+
+The system should feel like one connected intelligence system, NOT six separate chatbots.
+
+---
+
+# MVP AGENTS
+
+## 1. LEARNING AGENT
+
+Purpose:
+Help me improve as a software engineer.
+
+It should track:
+
+- Topics I am learning
+- Technologies
+- System design concepts
+- DSA practice
+- Problems solved
+- Problems failed
+- Time taken
+- Hints used
+- Patterns involved
+- Confidence level
+
+Important focus:
+
+I do NOT want random LeetCode question recommendations.
+
+The agent should focus on DSA PATTERN RECOGNITION.
+
+Example patterns:
+
+- Sliding Window
+- Two Pointers
+- Binary Search
+- BFS
+- DFS
+- Graph Traversal
+- Dynamic Programming
+- Backtracking
+- Heap / Priority Queue
+- Intervals
+- Monotonic Stack
+
+The agent should identify weaknesses such as:
+
+"You can implement BFS but struggle to identify when a problem requires graph traversal."
+
+Then recommend practice accordingly.
+
+### Learning Agent Output
+
+Daily learning plan:
+
+1. DSA practice
+2. System Design topic
+3. Technology/topic learning
+4. Revision recommendations
+
+The agent should explain WHY each recommendation was made.
+
+The Learning Agent should also consider what I recently implemented through real project work and recommend the next logical learning step.
+
+Example:
+
+I studied:
+RabbitMQ
+
+Real development evidence shows:
+Implemented retry mechanism
+
+Recommendation:
+"You have implemented RabbitMQ basics. Next learn idempotent consumers and message ordering."
+
+---
+
+## 2. PROJECT / PROOF OF WORK AGENT
+
+Purpose:
+
+Convert learning into real projects.
+
+The Project Agent should know:
+
+- Skills currently being learned
+- Skills already implemented
+- DSA/system design concepts
+- Career goals
+- Existing projects
+- Real development activity captured from Claude Code
+
+It should identify gaps.
+
+Example:
+
+Skills learned:
+
+- NestJS
+- RabbitMQ
+- PostgreSQL
+- Docker
+- Kubernetes
+
+But portfolio lacks:
+
+- Distributed system proof
+- AI Agent architecture
+
+Recommendation:
+
+Build an AI Agent Orchestration Platform.
+
+The Project Agent should:
+
+- Suggest project ideas
+- Explain why the project is valuable
+- Map project features to skills
+- Track implementation progress
+- Record completed features
+- Record technologies ACTUALLY used
+
+IMPORTANT:
+
+A skill should NOT be considered "Proven" simply because I marked it as learned.
+
+Skill levels:
+
+INTERESTED
+LEARNING
+PRACTICED
+IMPLEMENTED
+PROVEN
+
+Only IMPLEMENTED and PROVEN skills should strongly influence the Job Agent.
+
+Real development evidence can support skill progression, but should not blindly promote a skill without reasonable evidence.
+
+---
+
+## 3. CAREER / JOB AGENT
+
+Purpose:
+
+Find relevant jobs and opportunities.
+
+CRITICAL RULE:
+
+The Job Agent must NOT recommend jobs simply because a job contains trendy technologies.
+
+It should compare the job requirements against my actual Proof of Skills profile.
+
+Example:
+
+Job requires:
+
+- Node.js
+- Kubernetes
+- AWS
+- Kafka
+
+My profile:
+
+Node.js → PROVEN
+Kubernetes → IMPLEMENTED
+AWS → LEARNING
+Kafka → NOT KNOWN
+
+The agent should produce an honest analysis.
+
+Example:
+
+Match Score: 72%
+
+Strong matches:
+- Node.js
+- Backend architecture
+- Docker
+
+Partial:
+- Kubernetes
+
+Missing:
+- Kafka
+- Production AWS
+
+Recommendation:
+Worth applying if willing to learn missing skills.
+
+The agent must distinguish:
+
+PROVEN MATCH
+PARTIAL MATCH
+ASPIRATIONAL MATCH
+
+Do not inflate my qualifications.
+
+The Career Agent should prioritize evidence-backed skills, including real project features and Claude Code development activity.
+
+For MVP, job discovery can initially use manually entered job URLs/descriptions instead of building complex scraping.
+
+The agent should:
+
+- Analyze job description
+- Match against Proof of Skills
+- Explain gaps
+- Suggest whether to apply
+- Suggest what project/work could close important gaps
+
+---
+
+## 4. CONTENT AGENT
+
+Purpose:
+
+Create "build in public" content based on my REAL activity.
+
+Inputs:
+
+- Learning sessions
+- DSA milestones
+- Project milestones
+- Problems encountered
+- Architecture decisions
+- Interesting bugs
+- System design learning
+- Real development activity captured from Claude Code
+
+The Content Agent should NOT generate generic motivational content.
+
+It should detect genuine content opportunities.
+
+Example:
+
+I implemented:
+
+"Human-in-the-loop approval workflow for AI agents"
+
+Content Agent suggests:
+
+LinkedIn:
+"What I learned while preventing AI agents from taking uncontrolled actions"
+
+The agent should maintain a Content Queue.
+
+Content status:
+
+IDEA
+DRAFT
+READY_FOR_REVIEW
+APPROVED
+PUBLISHED
+
+For MVP:
+Generate content drafts only.
+
+Support only:
+LinkedIn
+
+DO NOT automatically publish to social media.
+
+All publishing requires human approval.
+
+---
+
+## 5. BUSINESS OPPORTUNITY AGENT
+
+Purpose:
+
+Find small realistic software/AI opportunities that I can build and sell.
+
+Target:
+
+Local businesses and small businesses.
+
+Examples:
+
+- Restaurant appointment automation
+- WhatsApp inquiry automation
+- Inventory dashboard
+- AI FAQ bot
+- Booking management
+- Simple CRM
+- Lead management
+- Notification automation
+
+The Business Agent should consider:
+
+1. What skills I already have
+2. What I can realistically build
+3. Local/small business problems
+4. Low-complexity MVP opportunities
+
+It should generate opportunities like:
+
+PROBLEM:
+Small clinics manually handle appointment inquiries.
+
+POSSIBLE SOLUTION:
+WhatsApp + appointment management automation.
+
+MY SKILL MATCH:
+85%
+
+TECH STACK:
+Appropriate technologies based on my proven skills
+
+MVP COMPLEXITY:
+Medium
+
+MONETIZATION POSSIBILITY:
+Monthly subscription or setup fee
+
+IMPORTANT:
+
+Do not generate unrealistic startup ideas.
+
+Focus on small, buildable solutions that a solo developer could potentially sell.
+
+For MVP, opportunities can be generated through AI research/manual input. Do not build complex automated web scraping.
+
+---
+
+## 6. CHIEF OF STAFF AGENT
+
+This is the coordinating agent.
+
+It should NOT independently control everything.
+
+Its job:
+
+Collect outputs from all agents.
+
+Example:
+
+Learning Agent:
+You learned RabbitMQ.
+
+Project Agent:
+RabbitMQ should be implemented in your project.
+
+Real Activity:
+Implemented RabbitMQ retry mechanism.
+
+Project completed:
+Event-driven notification system.
+
+Career Agent:
+This strengthens applications for backend/distributed system roles.
+
+Content Agent:
+Create content around RabbitMQ architecture.
+
+Business Agent:
+Potential small-business notification automation opportunity.
+
+The Chief of Staff connects these dots.
+
+It produces:
+
+DAILY BRIEFING
+
+Example:
+
+TODAY'S PRIORITIES
+
+1. Complete idempotency handling
+   Why: Yesterday's RabbitMQ implementation should be extended into stronger production-grade proof.
+
+2. Solve 2 Graph pattern problems
+   Why: Pattern recognition weakness.
+
+3. Review Backend Engineer opportunity
+   Match: 82%.
+
+4. Review LinkedIn draft
+   Based on yesterday's implementation.
+
+The Chief of Staff should understand the difference between:
+
+PLANNED WORK
+
+and
+
+ACTUAL WORK COMPLETED
+
+Claude Code activity is one source of ACTUAL WORK evidence.
+
+The Chief of Staff should prioritize but NEVER automatically change my plans without approval.
+
+---
+
+# MOST IMPORTANT CONCEPT: SHARED SKILL GRAPH
+
+Build a central skill/proof system.
+
+Example conceptual relationship:
+
+Skill
+ ↓
+Learning Activity
+ ↓
+Practice
+ ↓
+Project Implementation
+ ↓
+Development Activity Evidence
+ ↓
+Proof
+ ↓
+Career Relevance
+ ↓
+Content Opportunity
+ ↓
+Business Opportunity
+
+Use PostgreSQL relational modeling for MVP.
+
+Suggested entities:
+
+skills
+skill_evidence
+learning_sessions
+dsa_problems
+dsa_attempts
+dsa_patterns
+
+projects
+project_features
+project_skills
+
+career_opportunities
+career_matches
+career_skill_gaps
+
+content_items
+content_sources
+
+business_opportunities
+
+activity_events
+
+agent_runs
+agent_events
+approvals
+
+daily_briefings
+
+Do NOT create unnecessary tables. Simplify where appropriate.
+
+---
+
+# HUMAN IN THE LOOP
+
+Every agent can:
+
+1. Research
+2. Analyze
+3. Recommend
+4. Prepare drafts
+
+But important actions require approval.
+
+Approval statuses:
+
+PENDING
+APPROVED
+REJECTED
+
+Examples requiring approval:
+
+- Changing learning priorities
+- Starting a major project
+- Applying to a job
+- Publishing content
+- Contacting a potential business client
+- Important skill promotion when evidence is ambiguous
+
+For MVP:
+
+Build a central Approval Inbox.
+
+Each approval should contain:
+
+- Agent
+- Action
+- Reason
+- Context
+- Expected outcome
+
+Actions:
+
+Approve
+Reject
+Provide Feedback
+
+---
+
+# AGENT RUN MODEL
+
+All agents must follow a common lifecycle:
+
+TRIGGERED
+↓
+RUNNING
+↓
+GATHERING_CONTEXT
+↓
+ANALYZING
+↓
+RECOMMENDING
+↓
+WAITING_FOR_APPROVAL (if needed)
+↓
+COMPLETED
+
+or
+
+FAILED
+
+Persist important state in PostgreSQL.
+
+Do NOT rely on in-memory state.
+
+Every agent run should have:
+
+- agent name
+- status
+- trigger source
+- input/context summary
+- current step
+- result
+- timestamps
+- estimated AI usage if available
+
+---
+
+# SYSTEM DESIGN REQUIREMENTS
+
+Use a Modular Monolith architecture.
+
+Do NOT use microservices.
+
+Architecture:
+
+Next.js Full Stack Application
+│
+├── Dashboard
+├── Agent Modules
+├── API Routes / Server Actions
+├── Agent Orchestrator
+├── LLM Provider
+├── Tool Layer
+├── Approval System
+├── Activity Ingestion Module
+└── Database Layer
+
+External services:
+
+Supabase
+├── PostgreSQL
+├── Auth
+├── Realtime
+└── Storage
+
+AI Providers:
+
+Gemini
+OpenAI
+
+IMPORTANT:
+
+Create an LLM provider abstraction.
+
+Example:
+
+LLMProvider Interface
+
+generate()
+generateStructured()
+
+Implement:
+
+GeminiProvider
+OpenAIProvider
+
+The application should NOT be tightly coupled to one AI provider.
+
+Also design a clean Tool abstraction so MCP can be added later, but DO NOT implement MCP in MVP.
+
+---
+
+# COST CONTROL
+
+This is a personal application.
+
+AI usage must be controlled.
+
+Rules:
+
+1. Do not call an LLM when deterministic code can solve the problem.
+
+2. Store AI-generated results.
+
+3. Avoid repeatedly analyzing identical data.
+
+4. Add basic usage tracking.
+
+Track:
+
+agent
+model
+input tokens if available
+output tokens if available
+estimated cost if available
+
+5. Allow model configuration per agent.
+
+Example:
+
+Learning Agent → Gemini
+Career Agent → Gemini
+Complex analysis → OpenAI
+
+6. Do NOT call AI after every Claude Code file edit.
+
+Instead accumulate meaningful development activity and analyze it in batches, such as a daily analysis.
+
+For MVP, do NOT build complicated cost optimization.
+
+Just build a clean abstraction and basic tracking.
+
+---
+
+# SCHEDULING
+
+For MVP:
+
+Do NOT build a complex distributed queue.
+
+Use simple scheduled triggers.
+
+Possible schedules:
+
+Morning:
+Chief of Staff daily briefing
+
+Daily:
+Learning Agent analysis
+Development activity analysis
+
+Optional:
+Career Agent run
+
+Agent runs should also be manually triggerable.
+
+Design scheduling behind an abstraction so it can later move to:
+
+- Supabase Cron
+- Vercel Cron
+- Inngest
+- Trigger.dev
+- Dedicated queue
+
+But do NOT integrate all of these.
+
+Choose ONE simple MVP-compatible approach.
+
+---
+
+# REALTIME OBSERVABILITY
+
+Dashboard should show:
+
+AGENTS
+
+Learning Agent
+Status: Idle
+
+Project Agent
+Status: Working
+
+Career Agent
+Status: Completed
+
+Content Agent
+Status: Waiting Approval
+
+Business Agent
+Status: Idle
+
+Also show Agent Activity Timeline.
+
+Example:
+
+10:00 Learning Agent started
+10:02 DSA pattern weakness detected
+10:05 Project Agent analyzed skill gaps
+10:08 Content opportunity created
+
+Also show recent real development activity.
+
+Example:
+
+Yesterday:
+Claude Code session completed
+Project: AI Notification System
+Files changed: 8
+Duration: 2h 10m
+
+For MVP, use Supabase Realtime where useful.
+
+Do NOT build complex distributed tracing.
+
+---
+
+# MVP DASHBOARD
+
+Build these pages:
+
+1. Dashboard
+2. Learning
+3. Projects
+4. Career
+5. Content
+6. Business Opportunities
+7. Approval Inbox
+8. Agent Activity
+
+Dashboard should show:
+
+- Today's priorities
+- Agent statuses
+- Pending approvals
+- Recent activity
+- Recent development activity
+- Skill growth summary
+- Current projects
+- Content queue
+
+---
+
+# DSA MODULE REQUIREMENTS
+
+This is important.
+
+The goal is PATTERN RECOGNITION improvement.
+
+For each problem store:
+
+- Title
+- Source URL
+- Difficulty
+- Patterns
+- Topic
+- Date attempted
+- Time taken
+- Solved or not
+- Number of hints
+- Notes
+- Confidence before solving
+- Confidence after solving
+
+The AI should periodically analyze attempts.
+
+Example output:
+
+WEAK PATTERN:
+Graph modeling
+
+OBSERVATION:
+You can solve BFS problems after identifying the graph, but frequently fail to recognize when a matrix should be modeled as a graph.
+
+RECOMMENDATION:
+Practice:
+- Grid traversal
+- Connected components
+- Multi-source BFS
+
+Do NOT automatically scrape LeetCode for MVP.
+
+Allow manual problem entry.
+
+---
+
+# PROJECT MODULE REQUIREMENTS
+
+Each project should contain:
+
+- Name
+- Description
+- Problem solved
+- Architecture
+- Technologies
+- Features
+- Status
+
+Each completed feature can be connected to skills.
+
+Example:
+
+Feature:
+RabbitMQ retry mechanism
+
+Skills demonstrated:
+
+- RabbitMQ
+- Message queues
+- Retry patterns
+- Dead letter queues
+- Distributed systems
+
+Project progress may also be informed by captured real development activity, but important changes should remain reviewable.
+
+This data should feed:
+
+Career Agent
+Content Agent
+Business Agent
+
+---
+
+# CAREER MODULE REQUIREMENTS
+
+For MVP:
+
+Manual job input.
+
+Input:
+
+- Job URL optional
+- Company
+- Role
+- Job description
+
+AI analyzes the job against:
+
+- Proven skills
+- Implemented skills
+- Learning skills
+- Existing projects
+- Evidence from actual development activity
+
+Output:
+
+Overall Match Score
+
+PROVEN MATCHES
+IMPLEMENTED MATCHES
+PARTIAL MATCHES
+MISSING SKILLS
+
+HONEST RECOMMENDATION
+
+Should I apply?
+
+YES
+MAYBE
+NO
+
+Explain why.
+
+Do NOT automate applications.
+
+---
+
+# CONTENT MODULE REQUIREMENTS
+
+Content should be connected to real events.
+
+Create a "Content Opportunity" from:
+
+- Learning milestone
+- Project feature
+- Interesting mistake
+- Architecture decision
+- DSA insight
+- Meaningful development activity
+- Interesting bug fix
+
+Allow:
+
+Generate LinkedIn draft
+
+For MVP, support only:
+
+LinkedIn
+
+Do NOT build Instagram, YouTube, Twitter publishing integrations yet.
+
+---
+
+# BUSINESS MODULE REQUIREMENTS
+
+Allow the user to define:
+
+- Location/market
+- Business type
+- Known problems
+
+AI should generate realistic opportunities.
+
+Store:
+
+Problem
+Target customer
+Proposed solution
+Skill match
+Complexity
+Estimated build scope
+Potential monetization model
+
+For MVP:
+
+Research and recommendations only.
+
+Do NOT automate outreach or lead scraping.
+
+---
+
+# CLAUDE CODE ACTIVITY CAPTURE
+
+## PURPOSE
+
+This application should automatically capture meaningful development activity from Claude Code running locally on my Mac.
+
+IMPORTANT:
+
+This is a single-user MVP.
+
+Claude Code runs on my personal Mac.
+
+The main application is hosted remotely:
+
+Next.js → Vercel
+Database/Auth/Realtime → Supabase
+
+My Mac acts as an optional local activity collector.
+
+Do NOT require my Mac to be online for normal cloud agents to work.
+
+The Mac integration is only responsible for capturing local Claude Code development activity when I am working.
+
+---
+
+# CLAUDE CODE ACTIVITY GOAL
+
+The system should automatically capture evidence of what I actually work on using Claude Code.
+
+Example:
+
+I work with Claude Code on:
+
+AI Notification System
+
+During a coding session:
+
+- Implement RabbitMQ retry mechanism
+- Add Dead Letter Queue
+- Fix consumer failure handling
+- Modify notification worker
+
+The Personal AI OS should understand:
+
+RAW EVIDENCE:
+
+Project:
+AI Notification System
+
+Files changed:
+notification.consumer.ts
+retry.service.ts
+
+Git commits:
+abc123
+
+Session duration:
+2 hours
+
+Then later AI analyzes accumulated evidence:
+
+WORK SUMMARY:
+
+Implemented resilient asynchronous message processing.
+
+Skills potentially demonstrated:
+
+- RabbitMQ
+- Event-driven architecture
+- Retry patterns
+- Dead Letter Queues
+
+IMPORTANT:
+
+Raw activity is NOT automatically proof of mastery.
+
+AI-generated conclusions should be treated as:
+
+SUGGESTED EVIDENCE
+
+The user can later approve or reject important skill updates.
+
+---
+
+# CLAUDE CODE ACTIVITY ARCHITECTURE
+
+Use this architecture:
+
+                    MY MAC
+
+                Claude Code
+                     │
+                     │ Hooks
+                     ▼
+           Local Activity Collector
+                     │
+             ┌───────┴────────┐
+             │                │
+             ▼                ▼
+        Local Queue      HTTPS Sync
+        (offline safe)        │
+                              ▼
+                    Personal AI OS API
+                       (Next.js/Vercel)
+                              │
+                              ▼
+                          Supabase
+                              │
+                              ▼
+                       Raw Activities
+                              │
+                              ▼
+                     Daily AI Analysis
+                              │
+               ┌──────────────┼──────────────┐
+               ▼              ▼              ▼
+          Learning Agent  Project Agent  Content Agent
+                              │
+                              ▼
+                          Career Agent
+
+---
+
+# IMPORTANT ACTIVITY CAPTURE PRINCIPLE
+
+Do NOT send every Claude conversation message or every prompt to the cloud.
+
+Avoid:
+
+- Full chat history capture
+- Every prompt
+- Every AI response
+- Sensitive terminal output
+
+Instead capture meaningful engineering metadata and evidence.
+
+Prioritize:
+
+1. Files changed
+2. Project worked on
+3. Git status
+4. Git commits
+5. High-level session summary where available
+6. Session timestamps
+7. Session duration
+
+---
+
+# CLAUDE CODE HOOKS
+
+Create a small local integration that can be configured with Claude Code hooks.
+
+The exact Claude Code hook configuration should follow the currently supported Claude Code hook mechanism.
+
+The integration should conceptually support:
+
+## SESSION_START
+
+Purpose:
+Record that a development session has started.
+
+Capture:
+
+- Session ID if available
+- Timestamp
+- Current working directory
+- Detected project
+- Git repository information
+
+## FILE_ACTIVITY
+
+Triggered when meaningful file modifications occur.
+
+Do NOT create a database event for every individual keystroke.
+
+Aggregate activity locally.
+
+Capture:
+
+- Files created
+- Files modified
+- Files deleted
+- Project
+- Timestamp
+
+The collector should aggregate these events into a session.
+
+## SESSION_CHECKPOINT
+
+When Claude finishes a meaningful task or stops.
+
+Capture:
+
+- Current git diff summary
+- Files changed
+- Git status
+- Recent commits if available
+
+Do NOT upload full source code by default.
+
+Only upload metadata and summarized evidence.
+
+## SESSION_END
+
+Finalize the development session.
+
+Capture:
+
+- Start timestamp
+- End timestamp
+- Duration
+- Files changed
+- Git commits
+- Git diff statistics
+- Project information
+
+Create one consolidated RAW_ACTIVITY record.
+
+---
+
+# LOCAL ACTIVITY COLLECTOR
+
+Build a lightweight local companion script/tool.
+
+Suggested technology:
+
+Node.js + TypeScript
+
+Keep it extremely simple.
+
+Suggested structure:
+
+personal-ai-activity-collector/
+
+├── src/
+│   ├── index.ts
+│   ├── hooks.ts
+│   ├── collector.ts
+│   ├── git.ts
+│   ├── project-detector.ts
+│   ├── queue.ts
+│   └── sync.ts
+│
+├── data/
+│   └── pending-events.jsonl
+│
+├── config/
+│   └── config.json
+│
+└── README.md
+
+The collector should NOT be a complex daemon for MVP.
+
+It should be executable through Claude Code hooks.
+
+---
+
+# PROJECT DETECTION
+
+The local collector should detect projects using:
+
+1. Git repository root
+2. package.json name
+3. Folder name
+
+Allow manual project mapping.
+
+Example:
+
+config.json
+
+{
+  "projects": {
+    "/path/to/ai-notification-system": "project-uuid",
+    "/path/to/personal-ai-os": "project-uuid"
+  }
+}
+
+Do NOT hardcode machine-specific paths in application code.
+
+---
+
+# OFFLINE-FIRST EVENT QUEUE
+
+The local collector must not lose activity if:
+
+- Internet is temporarily unavailable
+- Vercel API is unavailable
+- Supabase is temporarily unavailable
+
+Flow:
+
+Claude Code Hook
+      ↓
+Create local event
+      ↓
+Store locally first
+      ↓
+Attempt HTTPS sync
+      │
+   ┌──┴──┐
+   │     │
+SUCCESS  FAILED
+   │     │
+   ▼     ▼
+Remove   Keep event
+local    for retry
+event
+
+Use a simple local JSONL file for MVP.
+
+Do NOT introduce:
+
+- Redis
+- RabbitMQ
+- Kafka
+- Local database
+
+A simple append-only JSONL queue is sufficient.
+
+---
+
+# CLOUD ACTIVITY API
+
+Create a secure endpoint in the Next.js application.
+
+Example conceptual route:
+
+POST /api/activity/ingest
+
+The API should receive raw activity.
+
+Example:
+
+{
+  "source": "claude_code",
+  "eventType": "coding_session",
+  "projectId": "...",
+  "startedAt": "...",
+  "endedAt": "...",
+  "durationSeconds": 7200,
+
+  "files": {
+    "created": [],
+    "modified": [
+      "src/retry.service.ts",
+      "src/consumer.ts"
+    ],
+    "deleted": []
+  },
+
+  "git": {
+    "branch": "feature/retry",
+    "commits": [
+      {
+        "hash": "abc123",
+        "message": "Implement retry handling"
+      }
+    ],
+    "stats": {
+      "filesChanged": 8,
+      "insertions": 250,
+      "deletions": 40
+    }
+  }
+}
+
+Validate all input using Zod.
+
+Do not trust the client.
+
+---
+
+# LOCAL COLLECTOR AUTHENTICATION
+
+Because the activity collector runs on my Mac and communicates with the cloud application, implement a simple secure authentication mechanism.
+
+For MVP:
+
+Use a dedicated ingestion API token.
+
+Requirements:
+
+- Token stored locally in environment variables
+- Never commit token to Git
+- Token validated server-side
+- Ability to revoke/rotate token later
+
+Do NOT build OAuth for this MVP.
+
+Do NOT expose Supabase service role keys to the local collector.
+
+---
+
+# RAW ACTIVITY DATA MODEL
+
+Add a minimal table/entity for raw development activity.
+
+Suggested conceptual fields:
+
+activity_events
+
+id
+user_id
+project_id
+
+source
+
+event_type
+
+session_id
+
+started_at
+ended_at
+duration_seconds
+
+files_created
+files_modified
+files_deleted
+
+git_branch
+git_commits
+git_stats
+
+status
+
+created_at
+
+Status:
+
+RECEIVED
+ANALYZED
+FAILED
+
+Keep the schema flexible but do NOT over-normalize the MVP.
+
+JSON columns are acceptable for:
+
+- File lists
+- Git commit metadata
+- Git statistics
+
+---
+
+# DAILY ACTIVITY ANALYSIS
+
+IMPORTANT COST OPTIMIZATION:
+
+Do NOT call Gemini/OpenAI after every file edit.
+
+Instead:
+
+Raw Activities
+      │
+      │ accumulate
+      ▼
+Daily Analysis Job
+      │
+      ▼
+AI Activity Analyzer
+      │
+      ▼
+Daily Engineering Summary
+
+The AI analyzer receives the day's relevant activity.
+
+Example input:
+
+Project:
+AI Notification System
+
+Files modified:
+8
+
+Git commits:
+2
+
+Commit messages:
+- Add RabbitMQ retry logic
+- Handle dead letter messages
+
+The AI should generate STRUCTURED OUTPUT.
+
+Example:
+
+{
+  "summary": "Implemented resilient message retry and dead letter handling.",
+  "workCategories": [
+    "backend",
+    "distributed_system"
+  ],
+  "suggestedSkills": [
+    {
+      "skill": "RabbitMQ",
+      "confidence": 0.85,
+      "reason": "Implemented retry and DLQ handling"
+    },
+    {
+      "skill": "Retry Patterns",
+      "confidence": 0.9,
+      "reason": "Implemented consumer retry flow"
+    }
+  ],
+  "potentialProof": [
+    "Implemented asynchronous retry and dead letter queue handling"
+  ],
+  "contentOpportunities": [
+    "What I learned implementing reliable message retries"
+  ]
+}
+
+Use Zod structured schemas for AI output.
+
+---
+
+# EVIDENCE AND SKILL PROTECTION
+
+CRITICAL:
+
+Claude Code activity must NOT automatically upgrade skills.
+
+Wrong:
+
+Claude modified Kubernetes YAML
+↓
+System says Kubernetes = PROVEN
+
+Correct:
+
+Raw Activity
+      ↓
+AI Analysis
+      ↓
+Suggested Evidence
+      ↓
+Evidence linked to Project
+      ↓
+Optional User Approval
+      ↓
+Skill status updated
+
+Skill progression remains:
+
+INTERESTED
+LEARNING
+PRACTICED
+IMPLEMENTED
+PROVEN
+
+Define reasonable rules.
+
+Example:
+
+Raw Claude Code activity alone:
+
+May support IMPLEMENTED
+
+Multiple real project features + evidence:
+
+May support PROVEN
+
+Do not automatically inflate skill levels.
+
+---
+
+# INTEGRATION WITH EXISTING AGENTS
+
+Claude Code activity must become a shared context source.
+
+Add it to the central intelligence flow:
+
+Claude Code Activity
+        ↓
+Raw Activity Store
+        ↓
+Daily AI Analysis
+        ↓
+Skill Evidence
+        │
+ ┌──────┼─────────────┬──────────────┐
+ ▼      ▼             ▼              ▼
+Learning Project     Career         Content
+Agent    Agent       Agent          Agent
+
+---
+
+# FUTURE MCP INTEGRATION
+
+Do NOT implement MCP in MVP.
+
+However, design the tool layer so MCP can be added later.
+
+Future architecture:
+
+Claude Code
+    │
+    ├── Hooks
+    │     ↓
+    │ Activity Capture
+    │
+    └── MCP
+          ↓
+     Personal AI OS
+
+Possible future MCP tools:
+
+getCurrentSkills()
+
+getCurrentProject()
+
+getLearningGoals()
+
+recordMilestone()
+
+getProjectContext()
+
+The MCP layer is FUTURE scope.
+
+For MVP:
+
+Hooks are used for passive activity capture.
+
+MCP is NOT required.
+
+---
+
+# TECH STACK
+
+Use:
+
+Frontend + Backend:
+Next.js (latest stable)
+TypeScript
+
+UI:
+Tailwind CSS
+shadcn/ui
+
+Database/Auth/Realtime:
+Supabase
+
+ORM:
+Choose ONE:
+- Drizzle OR Prisma
+
+Choose the simpler option for this project and explain why.
+
+AI:
+Google Gemini API
+OpenAI API
+
+Validation:
+Zod
+
+State:
+Prefer server-side state.
+Do NOT introduce Redux unless clearly necessary.
+
+Local Activity Collector:
+Node.js + TypeScript
+
+Deployment target:
+
+Vercel
+Supabase
+
+---
+
+# SYSTEM DESIGN DOCUMENTATION
+
+Before implementation, create:
+
+/docs/system-design.md
+
+Include:
+
+1. High-level architecture
+2. Component responsibilities
+3. Data flow
+4. Agent execution lifecycle
+5. Shared skill/proof graph design
+6. Human-in-the-loop flow
+7. Database design
+8. AI provider abstraction
+9. Scheduling approach
+10. Failure handling
+11. Cost control strategy
+12. Claude Code activity capture architecture
+13. Local collector and cloud sync flow
+14. Future MCP integration path
+15. Future scaling path
+
+Also create:
+
+/docs/mvp-scope.md
+
+Clearly separate:
+
+MVP NOW
+
+vs
+
+FUTURE
+
+---
+
+# IMPORTANT MVP LIMITATIONS
+
+DO NOT BUILD:
+
+- Microservices
+- Kubernetes
+- Docker orchestration
+- RabbitMQ
+- Kafka
+- Redis
+- BullMQ
+- Complex autonomous multi-agent conversations
+- Vector database
+- RAG pipeline
+- Long-term autonomous memory
+- Browser automation
+- Job scraping
+- Automatic job applications
+- Social media publishing
+- Payment system
+- Multi-user collaboration
+- Mobile application
+- Complex notification system
+- Complex workflow engine
+- Full Claude conversation synchronization
+- Prompt history storage
+- AI response history storage
+- Source code upload from Claude Code
+- Full git diff upload
+- Continuous file system monitoring daemon
+- Real-time keystroke tracking
+- Complex background service
+- Multi-device synchronization
+- GitHub integration
+- Automatic skill promotion
+- Automatic project completion detection
+- Automatic content publishing
+- MCP implementation
+
+Do NOT introduce these unless absolutely required.
+
+---
+
+# DEVELOPMENT APPROACH
+
+Work incrementally.
+
+PHASE 0:
+Analyze requirements and create system design.
+
+STOP and show me:
+
+- Architecture
+- Database schema proposal
+- Module structure
+- Agent interaction design
+- Activity capture architecture
+- MVP boundaries
+
+Do NOT implement everything immediately.
+
+PHASE 1:
+Project setup + Supabase + Authentication.
+
+PHASE 2:
+Shared Skill / Proof of Work system.
+
+PHASE 2.5:
+Claude Code Activity Capture.
+
+Build:
+
+1. Raw activity database model.
+2. Secure activity ingestion API.
+3. Local Node.js activity collector.
+4. Claude Code hook configuration.
+5. Local JSONL offline queue.
+6. Sync and retry mechanism.
+7. Basic activity dashboard view.
+
+Do NOT add AI analysis after every event.
+
+After activity capture works:
+
+Integrate daily activity analysis into:
+
+- Learning Agent
+- Project Agent
+- Content Agent
+- Career Agent
+
+At the end of this phase:
+
+1. Explain how hooks work.
+2. Show the local collector setup.
+3. Show how to configure a project.
+4. Explain offline queue behavior.
+5. Explain security model.
+6. Provide manual test instructions.
+7. STOP and wait for approval.
+
+PHASE 3:
+Learning + DSA Agent.
+
+PHASE 4:
+Project Agent.
+
+PHASE 5:
+Career Agent.
+
+PHASE 6:
+Content Agent.
+
+PHASE 7:
+Business Opportunity Agent.
+
+PHASE 8:
+Chief of Staff + Daily Briefing.
+
+PHASE 9:
+Approval Inbox + Realtime Agent Activity.
+
+At the end of every phase:
+
+1. Explain what was implemented.
+2. Explain architectural decisions.
+3. List limitations.
+4. Suggest tests.
+5. STOP and wait for approval before moving forward.
+
+---
+
+# CODING RULES
+
+1. TypeScript strict mode.
+2. Keep modules independent.
+3. Use dependency injection where appropriate.
+4. Never expose API keys to client-side code.
+5. Validate all external input.
+6. Use structured AI outputs with Zod schemas.
+7. Log agent failures.
+8. Make agent runs idempotent where practical.
+9. Keep functions small and testable.
+10. Prefer simple code over clever abstractions.
+11. Add comments only where logic is non-obvious.
+12. Do not create abstractions for hypothetical future needs.
+13. Do not let AI-generated claims automatically become skill proof without evidence rules.
+
+---
+
+# SUCCESS CRITERIA FOR MVP
+
+The MVP is successful if I can:
+
+1. Log my learning and DSA practice.
+2. See AI analysis of my DSA pattern weaknesses.
+3. Track skills from LEARNING → IMPLEMENTED → PROVEN.
+4. Create projects and map features to skills.
+5. Automatically capture meaningful development activity from Claude Code running on my Mac.
+6. Store raw development activity safely even during temporary connectivity failures.
+7. Analyze daily development activity and convert it into suggested evidence.
+8. Analyze a manually entered job against REAL proof of skills.
+9. Generate LinkedIn content ideas from actual learning/project work.
+10. Get realistic small-business software ideas based on my skills.
+11. See all agent activity in one dashboard.
+12. Receive a daily prioritized briefing.
+13. Approve or reject important AI recommendations.
+14. Run entirely as a single-user application with minimal infrastructure cost.
+
+The system should feel like one connected intelligence system, NOT six separate chatbots.
+
+The unique core loop should be:
+
+LEARN
+  ↓
+PRACTICE DSA + SYSTEM DESIGN
+  ↓
+BUILD PROJECT
+  ↓
+CAPTURE ACTUAL DEVELOPMENT ACTIVITY
+  ↓
+PROVE SKILLS
+  ↓
+MATCH BETTER JOBS
+  ↓
+CREATE REAL CONTENT
+  ↓
+IDENTIFY SMALL BUSINESS OPPORTUNITIES
+  ↓
+LEARN WHAT IS MISSING
+  └──────────────→ LEARN AGAIN
+
+Start with PHASE 0 only.
+
+Do not write implementation code until the system design and MVP scope have been presented.
