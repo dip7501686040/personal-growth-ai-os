@@ -27,6 +27,8 @@ const serverEnvSchema = z.object({
   // Postgres connection string used by Drizzle (Supabase pooler, port 6543).
   DATABASE_URL: z.string().min(1),
   APP_URL: z.url(),
+  // Comma-separated list of emails permitted to sign in (single-user app).
+  ALLOWED_EMAILS: z.string().min(1),
 });
 
 const parsed = serverEnvSchema.safeParse({
@@ -35,6 +37,7 @@ const parsed = serverEnvSchema.safeParse({
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   DATABASE_URL: process.env.DATABASE_URL,
   APP_URL: resolveAppUrl(),
+  ALLOWED_EMAILS: process.env.ALLOWED_EMAILS,
 });
 
 if (!parsed.success) {
@@ -48,3 +51,14 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+/** Normalized set of emails allowed to sign in. */
+export const allowedEmails: ReadonlySet<string> = new Set(
+  env.ALLOWED_EMAILS.split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+export function isAllowedEmail(email: string): boolean {
+  return allowedEmails.has(email.trim().toLowerCase());
+}
