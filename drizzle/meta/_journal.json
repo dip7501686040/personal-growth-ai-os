@@ -43,6 +43,13 @@
       "when": 1788274869515,
       "tag": "0005_tricky_johnny_blaze",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788275476773,
+      "tag": "0006_tiresome_bill_hollister",
+      "breakpoints": true
     }
   ]
 }

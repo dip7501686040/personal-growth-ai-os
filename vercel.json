@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/daily-learning",
       "schedule": "30 2 * * *"
+    },
+    {
+      "path": "/api/cron/morning-briefing",
+      "schedule": "0 3 * * *"
     }
   ]
 }

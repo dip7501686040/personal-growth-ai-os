@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { warmupDb } from "@/lib/db";
 import { env } from "@/lib/env";
 import { getOwnerUserId } from "@/lib/owner";
+import { chiefOfStaffAgent } from "@/modules/agents/chief-of-staff-agent";
 import { learningAgent } from "@/modules/agents/learning-agent";
 
 export const maxDuration = 60;
@@ -14,6 +15,15 @@ const JOBS: Record<string, (userId: string) => Promise<{ id: string; status: str
         userId,
         trigger: "schedule",
         triggerKey: new Date().toISOString().slice(0, 10),
+      });
+      return { id: run.id, status: run.status };
+    },
+    "morning-briefing": async (userId) => {
+      const run = await chiefOfStaffAgent.run({
+        userId,
+        trigger: "schedule",
+        triggerKey: new Date().toISOString().slice(0, 10),
+        force: true,
       });
       return { id: run.id, status: run.status };
     },
