@@ -29,7 +29,16 @@ const serverEnvSchema = z.object({
   APP_URL: z.url(),
   // Comma-separated list of emails permitted to sign in (single-user app).
   ALLOWED_EMAILS: z.string().min(1),
+  // AI providers — optional; agents degrade gracefully when a key is absent.
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  // Shared secret for Vercel Cron routes.
+  CRON_SECRET: z.string().min(1).optional(),
+  // The single owner's auth.users id — lets cron skip an auth-schema lookup.
+  OWNER_USER_ID: z.uuid().optional(),
 });
+
+const optional = (v: string | undefined) => (v && v.length > 0 ? v : undefined);
 
 const parsed = serverEnvSchema.safeParse({
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -38,6 +47,10 @@ const parsed = serverEnvSchema.safeParse({
   DATABASE_URL: process.env.DATABASE_URL,
   APP_URL: resolveAppUrl(),
   ALLOWED_EMAILS: process.env.ALLOWED_EMAILS,
+  GEMINI_API_KEY: optional(process.env.GEMINI_API_KEY),
+  OPENAI_API_KEY: optional(process.env.OPENAI_API_KEY),
+  CRON_SECRET: optional(process.env.CRON_SECRET),
+  OWNER_USER_ID: optional(process.env.OWNER_USER_ID),
 });
 
 if (!parsed.success) {

@@ -121,6 +121,35 @@ export async function createSkill(
   return row;
 }
 
+/** Returns the skill with this name (by slug), creating it if absent. */
+export async function upsertSkillByName(
+  userId: string,
+  name: string,
+  category: SkillCategory,
+): Promise<Skill> {
+  const slug = slugify(name);
+  const [existing] = await db
+    .select()
+    .from(skills)
+    .where(and(eq(skills.userId, userId), eq(skills.slug, slug)))
+    .limit(1);
+  if (existing) return existing;
+
+  const [row] = await db
+    .insert(skills)
+    .values({ userId, name: name.trim(), slug, category })
+    .onConflictDoNothing({ target: [skills.userId, skills.slug] })
+    .returning();
+  if (row) return row;
+
+  const [after] = await db
+    .select()
+    .from(skills)
+    .where(and(eq(skills.userId, userId), eq(skills.slug, slug)))
+    .limit(1);
+  return after;
+}
+
 /** Recomputes level + confidence from accepted evidence. */
 export async function recomputeSkill(
   userId: string,

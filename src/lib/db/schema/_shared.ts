@@ -108,3 +108,26 @@ export const approvalActionEnum = pgEnum("approval_action", [
   "publish_content",
   "contact_client",
 ]);
+
+export const learningCategoryEnum = pgEnum("learning_category", [
+  "technology",
+  "system_design",
+  "dsa",
+  "revision",
+]);
+
+export const dsaDifficultyEnum = pgEnum("dsa_difficulty", [
+  "easy",
+  "medium",
+  "hard",
+]);
+
+export const dsaFailureReasonEnum = pgEnum("dsa_failure_reason", [
+  "none",
+  "could_not_identify_pattern",
+  "knew_pattern_impl_bug",
+  "tle",
+  "other",
+]);
+
+export const llmProviderEnum = pgEnum("llm_provider", ["gemini", "openai"]);

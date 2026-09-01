@@ -8,6 +8,13 @@
       "when": 1788266212403,
       "tag": "0000_hot_misty_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788267882217,
+      "tag": "0001_black_dark_beast",
+      "breakpoints": true
     }
   ]
 }
