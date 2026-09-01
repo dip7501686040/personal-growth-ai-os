@@ -2,7 +2,9 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -35,6 +37,20 @@ if (existsSync(settingsPath)) {
   copyFileSync(settingsPath, backup);
   console.log("Backed up existing settings to", backup);
   settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+
+  // keep only the 3 most recent backups
+  const dir = dirname(settingsPath);
+  const old = readdirSync(dir)
+    .filter((f) => f.startsWith("settings.json.bak-"))
+    .sort()
+    .slice(0, -3);
+  for (const f of old) {
+    try {
+      rmSync(join(dir, f));
+    } catch {
+      // ignore
+    }
+  }
 }
 
 const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;

@@ -1,4 +1,5 @@
 import { config, debug } from "./config.ts";
+import { pruneQueue } from "./maintenance.ts";
 import { readQueue, rewriteQueue } from "./queue.ts";
 
 type SendResult = "ok" | "retry" | "drop";
@@ -34,6 +35,7 @@ async function send(event: unknown): Promise<SendResult> {
 
 /** Tries to send every queued event; keeps only the ones that should be retried. */
 export async function drainQueue(): Promise<void> {
+  pruneQueue();
   const events = readQueue();
   if (events.length === 0) return;
   const keep: unknown[] = [];

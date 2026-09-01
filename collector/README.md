@@ -95,6 +95,21 @@ event (bad token / bad payload); everything else is retried.
 
 ---
 
+## Disk usage — it cleans up after itself
+
+Everything lives under `collector/data/` and is bounded:
+
+- **`data/pending-events.jsonl`** — one line per session waiting to upload.
+  Lines are removed as soon as they're sent. On every drain the queue is pruned:
+  events older than 30 days are dropped, and it's capped at the last 1000.
+  A successfully uploaded session leaves **nothing** locally.
+- **`data/sessions/*.json`** — one tiny file per in-progress session, deleted on
+  `SessionEnd`. If Claude Code is force-quit and `SessionEnd` never fires, the
+  orphan is swept on the next `SessionStart` (or `… sync`) once it's >24h old.
+- **`~/.claude/settings.json.bak-*`** — `install.ts` keeps only the 3 newest.
+
+To wipe everything: `rm -rf collector/data`.
+
 ## Security
 
 - The token lives only in `collector/.env` (gitignored). It is sent as

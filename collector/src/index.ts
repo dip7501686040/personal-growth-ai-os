@@ -4,6 +4,7 @@ import {
   onSessionEnd,
   onSessionStart,
 } from "./hooks.ts";
+import { sweepStaleSessions } from "./maintenance.ts";
 import { drainQueue } from "./sync.ts";
 
 const commands: Record<string, () => Promise<void>> = {
@@ -11,7 +12,10 @@ const commands: Record<string, () => Promise<void>> = {
   "file-activity": onFileActivity,
   checkpoint: onCheckpoint,
   "session-end": onSessionEnd,
-  sync: drainQueue,
+  sync: async () => {
+    sweepStaleSessions();
+    await drainQueue();
+  },
 };
 
 const name = process.argv[2] ?? "";

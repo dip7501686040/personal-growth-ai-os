@@ -9,6 +9,7 @@ import {
   type SessionState,
 } from "./collector.ts";
 import * as git from "./git.ts";
+import { sweepStaleSessions } from "./maintenance.ts";
 import { detectProject } from "./project-detector.ts";
 import { enqueue } from "./queue.ts";
 import { drainQueue } from "./sync.ts";
@@ -43,6 +44,7 @@ function readStdin(): Promise<HookInput> {
 }
 
 export async function onSessionStart(): Promise<void> {
+  sweepStaleSessions();
   const h = await readStdin();
   const sessionId = h.session_id || randomUUID();
   const cwd = h.cwd || process.cwd();
