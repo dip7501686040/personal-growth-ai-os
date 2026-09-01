@@ -185,3 +185,16 @@ export const contentSourceTypeEnum = pgEnum("content_source_type", [
   "activity_analysis",
   "manual",
 ]);
+
+export const businessComplexityEnum = pgEnum("business_complexity", [
+  "low",
+  "medium",
+  "high",
+]);
+
+export const businessStatusEnum = pgEnum("business_status", [
+  "idea",
+  "exploring",
+  "validated",
+  "dropped",
+]);

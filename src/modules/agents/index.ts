@@ -1,4 +1,5 @@
 import type { BaseAgent } from "./base-agent";
+import { businessAgent } from "./business-agent";
 import { careerAgent } from "./career-agent";
 import { contentAgent } from "./content-agent";
 import { learningAgent } from "./learning-agent";
@@ -10,6 +11,7 @@ export const AGENTS: Record<string, BaseAgent> = {
   project: projectAgent,
   career: careerAgent,
   content: contentAgent,
+  business: businessAgent,
 };
 
 export function getAgent(name: string): BaseAgent | null {
