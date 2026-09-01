@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -10,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useActionToast } from "@/components/use-action-toast";
+import { createClient } from "@/lib/supabase/client";
 import {
   resolveApprovalAction,
   type ActionState,
@@ -26,6 +29,8 @@ export type ApprovalRow = {
   createdAt: string;
   decidedAt: string | null;
   feedback: string | null;
+  /** Link to the thing this approval is about, when we can resolve one. */
+  link?: string;
 };
 
 function ResolveForm({ approvalId }: { approvalId: string }) {
@@ -69,7 +74,32 @@ function ResolveForm({ approvalId }: { approvalId: string }) {
   );
 }
 
-export function ApprovalList({ approvals }: { approvals: ApprovalRow[] }) {
+export function ApprovalList({
+  userId,
+  approvals,
+}: {
+  userId: string;
+  approvals: ApprovalRow[];
+}) {
+  const router = useRouter();
+
+  // Approvals can be created by an agent or resolved elsewhere; refresh the
+  // server data when the table changes rather than hand-merging every field.
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`approvals-${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "approvals", filter: `user_id=eq.${userId}` },
+        () => router.refresh(),
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, router]);
+
   const pending = approvals.filter((a) => a.status === "pending");
   const decided = approvals.filter((a) => a.status !== "pending");
 
@@ -90,6 +120,14 @@ export function ApprovalList({ approvals }: { approvals: ApprovalRow[] }) {
                   {(a.agentName ?? "system").replace(/_/g, " ")} ·{" "}
                   {a.actionType.replace(/_/g, " ")} ·{" "}
                   {new Date(a.createdAt).toLocaleString()}
+                  {a.link && (
+                    <>
+                      {" · "}
+                      <Link href={a.link} className="underline">
+                        view
+                      </Link>
+                    </>
+                  )}
                 </p>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
@@ -118,7 +156,14 @@ export function ApprovalList({ approvals }: { approvals: ApprovalRow[] }) {
             {decided.map((a) => (
               <div key={a.id} className="px-4 py-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <span>{a.title}</span>
+                  <span>
+                    {a.title}
+                    {a.link && (
+                      <Link href={a.link} className="ml-2 text-xs underline">
+                        view
+                      </Link>
+                    )}
+                  </span>
                   <span
                     className={
                       a.status === "approved"

@@ -1,14 +1,20 @@
-import { requireUserId } from "@/lib/user";
+import { requireUser } from "@/lib/auth";
 import {
   countPendingEvents,
   listAnalyses,
   listIngestTokens,
   listRecentEvents,
 } from "@/modules/activity/service";
-import { getLatestRun } from "@/modules/agents/runs";
+import {
+  getAgentStatusBoard,
+  getLatestRun,
+  getRecentTimeline,
+} from "@/modules/agents/runs";
 import { TokenManager } from "@/components/activity/token-manager";
 import { SessionsList } from "@/components/activity/sessions-list";
 import { AnalysesList } from "@/components/activity/analyses-list";
+import { AgentStatusBoard } from "@/components/activity/agent-status-board";
+import { AgentTimeline } from "@/components/activity/agent-timeline";
 import { RunAgentButton } from "@/components/run-agent-button";
 import {
   Card,
@@ -21,29 +27,56 @@ import {
 export const metadata = { title: "Agent Activity" };
 
 export default async function ActivityPage() {
-  const userId = await requireUserId();
-  const [events, analyses, tokens, pending, lastRun] = await Promise.all([
-    listRecentEvents(userId, 30),
-    listAnalyses(userId, 14),
-    listIngestTokens(userId),
-    countPendingEvents(userId),
-    getLatestRun(userId, "activity_analyzer"),
-  ]);
+  const user = await requireUser();
+  const userId = user.id;
+  const [statusBoard, timeline, events, analyses, tokens, pending, lastRun] =
+    await Promise.all([
+      getAgentStatusBoard(userId),
+      getRecentTimeline(userId, 40),
+      listRecentEvents(userId, 30),
+      listAnalyses(userId, 14),
+      listIngestTokens(userId),
+      countPendingEvents(userId),
+      getLatestRun(userId, "activity_analyzer"),
+    ]);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Agent Activity</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Real development activity captured from Claude Code on your Mac, and the
-          daily analysis that turns it into suggested evidence.
+          Live agent status, a run timeline, and the real development activity
+          captured from Claude Code on your Mac.
         </p>
       </div>
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base">Agent status</CardTitle>
+          <CardDescription>Updates live via Supabase Realtime.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AgentStatusBoard userId={userId} initial={statusBoard} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Activity timeline</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AgentTimeline
+            userId={userId}
+            initialEntries={timeline.entries}
+            initialRunAgentMap={timeline.runAgentMap}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-base">Daily analysis</CardTitle>
+            <CardTitle className="text-base">Daily development-activity analysis</CardTitle>
             <RunAgentButton agent="activity_analyzer" label="Analyze today" />
           </div>
           <CardDescription>

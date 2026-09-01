@@ -6,27 +6,33 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { requireUserId } from "@/lib/user";
+import { requireUser } from "@/lib/auth";
 import { listSkills } from "@/modules/skills/service";
 import { listApprovals } from "@/modules/approvals/service";
 import { listProjects } from "@/modules/projects/service";
 import { listContentItems } from "@/modules/content/service";
 import { getLatestBriefing } from "@/modules/briefing/service";
+import { getAgentStatusBoard } from "@/modules/agents/runs";
+import { listRecentEvents } from "@/modules/activity/service";
 import { SKILL_LEVELS } from "@/modules/skills/levels";
 import { LevelBadge } from "@/components/skills/level-badge";
 import { BriefingCard } from "@/components/briefing/briefing-card";
+import { AgentStatusBoard } from "@/components/activity/agent-status-board";
 
 export const metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
-  const userId = await requireUserId();
-  const [skills, pendingApprovals, projects, content, briefing] =
+  const user = await requireUser();
+  const userId = user.id;
+  const [skills, pendingApprovals, projects, content, briefing, statusBoard, recentSessions] =
     await Promise.all([
       listSkills(userId),
       listApprovals(userId, { status: "pending" }),
       listProjects(userId),
       listContentItems(userId),
       getLatestBriefing(userId),
+      getAgentStatusBoard(userId),
+      listRecentEvents(userId, 3),
     ]);
 
   const byLevel = SKILL_LEVELS.map((level) => ({
@@ -49,6 +55,21 @@ export default async function DashboardPage() {
       </div>
 
       <BriefingCard briefing={briefing} />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Agents</CardTitle>
+          <CardDescription>
+            Live · full timeline on{" "}
+            <Link href="/activity" className="underline">
+              Agent Activity
+            </Link>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AgentStatusBoard userId={userId} initial={statusBoard} />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
@@ -136,6 +157,36 @@ export default async function DashboardPage() {
                   </span>
                 ))}
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recent development activity</CardTitle>
+            <CardDescription>From Claude Code on your Mac</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentSessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nothing captured yet —{" "}
+                <Link href="/activity" className="underline">
+                  set up the collector
+                </Link>
+                .
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1 text-sm">
+                {recentSessions.map((e) => (
+                  <li key={e.id} className="flex justify-between gap-2">
+                    <span className="truncate">{e.projectName ?? "unknown"}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {new Date(e.startedAt).toLocaleDateString()} ·{" "}
+                      {Math.round(e.durationSeconds / 60)}m
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </CardContent>
         </Card>
