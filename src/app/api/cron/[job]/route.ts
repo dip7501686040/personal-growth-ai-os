@@ -4,6 +4,8 @@ import { env } from "@/lib/env";
 import { getOwnerUserId } from "@/lib/owner";
 import { learningAgent } from "@/modules/agents/learning-agent";
 
+export const maxDuration = 60;
+
 /** job name → handler. Vercel Cron GETs these on a schedule (see vercel.json). */
 const JOBS: Record<string, (userId: string) => Promise<{ id: string; status: string }>> =
   {

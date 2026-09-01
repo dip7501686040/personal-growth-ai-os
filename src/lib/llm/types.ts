@@ -23,6 +23,12 @@ export interface GenerateOptions {
   /** 0–1; lower = more deterministic. */
   temperature?: number;
   maxOutputTokens?: number;
+  /**
+   * Gemini 3+ reasoning effort. Defaults to "low" — our agent tasks are
+   * structured extraction/planning, and "high" adds 30–80s of latency.
+   * Ignored by providers that don't support it.
+   */
+  thinkingLevel?: "low" | "high";
 }
 
 export interface GenerateStructuredOptions<T> extends GenerateOptions {

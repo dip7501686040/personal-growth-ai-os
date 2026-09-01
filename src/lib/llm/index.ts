@@ -21,11 +21,11 @@ export const AGENT_MODEL_DEFAULTS: Record<
   AgentName,
   { provider: LlmProviderName; model: string }
 > = {
-  learning: { provider: "gemini", model: "gemini-2.5-flash" },
-  project: { provider: "gemini", model: "gemini-2.5-flash" },
-  content: { provider: "gemini", model: "gemini-2.5-flash" },
-  business: { provider: "gemini", model: "gemini-2.5-flash" },
-  chief_of_staff: { provider: "gemini", model: "gemini-2.5-flash" },
+  learning: { provider: "gemini", model: "gemini-3.6-flash" },
+  project: { provider: "gemini", model: "gemini-3.6-flash" },
+  content: { provider: "gemini", model: "gemini-3.6-flash" },
+  business: { provider: "gemini", model: "gemini-3.6-flash" },
+  chief_of_staff: { provider: "gemini", model: "gemini-3.6-flash" },
   career: { provider: "openai", model: "gpt-4.1-mini" },
   activity_analyzer: { provider: "openai", model: "gpt-4.1-mini" },
 };

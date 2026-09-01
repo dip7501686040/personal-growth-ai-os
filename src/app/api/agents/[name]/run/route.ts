@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import { getAgent } from "@/modules/agents";
 
+export const maxDuration = 60;
+
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ name: string }> },

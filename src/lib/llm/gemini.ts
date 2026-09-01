@@ -11,6 +11,12 @@ import {
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta";
 
+/** Strip ```json … ``` fences if the model adds them despite JSON mode. */
+function stripFences(s: string): string {
+  const m = s.match(/^\s*```(?:json)?\s*([\s\S]*?)\s*```\s*$/);
+  return m ? m[1] : s;
+}
+
 interface GeminiResponse {
   candidates?: {
     content?: { parts?: { text?: string }[] };
@@ -78,7 +84,8 @@ export class GeminiProvider implements LLMProvider {
       contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
       generationConfig: {
         temperature: opts.temperature ?? 0.4,
-        maxOutputTokens: opts.maxOutputTokens ?? 2048,
+        maxOutputTokens: opts.maxOutputTokens ?? 4096,
+        thinkingConfig: { thinkingLevel: opts.thinkingLevel ?? "low" },
       },
     });
   }
@@ -86,22 +93,34 @@ export class GeminiProvider implements LLMProvider {
   async generateStructured<T>(
     opts: GenerateStructuredOptions<T>,
   ): Promise<GenerateStructuredResult<T>> {
+    // JSON mode + schema-in-prompt, NOT responseSchema: with Gemini 3 the
+    // strict `responseSchema` path adds ~50s of latency. We validate the
+    // result with Zod below, which is the real enforcement.
+    const schemaHint = `Respond with a single JSON object, no markdown fences, matching this JSON schema:\n${JSON.stringify(
+      toGeminiSchema(opts.schema),
+    )}`;
+
     const { text, usage } = await this.call(opts.model, {
       ...(opts.system
         ? { system_instruction: { parts: [{ text: opts.system }] } }
         : {}),
-      contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: `${opts.prompt}\n\n${schemaHint}` }],
+        },
+      ],
       generationConfig: {
         temperature: opts.temperature ?? 0.3,
-        maxOutputTokens: opts.maxOutputTokens ?? 2048,
+        maxOutputTokens: opts.maxOutputTokens ?? 4096,
+        thinkingConfig: { thinkingLevel: opts.thinkingLevel ?? "low" },
         responseMimeType: "application/json",
-        responseSchema: toGeminiSchema(opts.schema),
       },
     });
 
     let parsed: unknown;
     try {
-      parsed = JSON.parse(text);
+      parsed = JSON.parse(stripFences(text));
     } catch {
       throw new LlmError("Gemini structured output was not valid JSON", "gemini");
     }
