@@ -131,3 +131,23 @@ export const dsaFailureReasonEnum = pgEnum("dsa_failure_reason", [
 ]);
 
 export const llmProviderEnum = pgEnum("llm_provider", ["gemini", "openai"]);
+
+export const projectStatusEnum = pgEnum("project_status", [
+  "idea",
+  "planning",
+  "building",
+  "paused",
+  "completed",
+]);
+
+export const featureStatusEnum = pgEnum("feature_status", [
+  "planned",
+  "in_progress",
+  "done",
+]);
+
+export const projectSkillRoleEnum = pgEnum("project_skill_role", [
+  "planned",
+  "used",
+  "demonstrated",
+]);

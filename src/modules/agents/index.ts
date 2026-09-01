@@ -1,9 +1,11 @@
 import type { BaseAgent } from "./base-agent";
 import { learningAgent } from "./learning-agent";
+import { projectAgent } from "./project-agent";
 
 /** Agents that can be triggered (manually or by cron). Grows each phase. */
 export const AGENTS: Record<string, BaseAgent> = {
   learning: learningAgent,
+  project: projectAgent,
 };
 
 export function getAgent(name: string): BaseAgent | null {
