@@ -11,13 +11,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { requestMagicLink, type LoginState } from "./actions";
+import {
+  requestMagicLink,
+  signInWithPassword,
+  type LoginState,
+} from "./actions";
 
 export default function LoginPage() {
-  const [state, formAction, pending] = useActionState<LoginState, FormData>(
-    requestMagicLink,
+  const [pwState, pwAction, pwPending] = useActionState<LoginState, FormData>(
+    signInWithPassword,
     null,
   );
+  const [linkState, linkAction, linkPending] = useActionState<
+    LoginState,
+    FormData
+  >(requestMagicLink, null);
+
+  const state = pwState ?? linkState;
+  const pending = pwPending || linkPending;
 
   return (
     <div className="flex min-h-svh items-center justify-center bg-background p-4">
@@ -25,11 +36,11 @@ export default function LoginPage() {
         <CardHeader>
           <CardTitle>Personal Growth AI OS</CardTitle>
           <CardDescription>
-            Sign in with a magic link. No password required.
+            Sign in with your password, or get a one-time magic link.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="flex flex-col gap-4">
+          <form action={pwAction} className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -41,9 +52,28 @@ export default function LoginPage() {
                 required
               />
             </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+              />
+            </div>
+
             <Button type="submit" disabled={pending}>
-              {pending ? "Sending…" : "Send magic link"}
+              {pwPending ? "Signing in…" : "Sign in"}
             </Button>
+            <Button
+              type="submit"
+              variant="ghost"
+              formAction={linkAction}
+              disabled={pending}
+            >
+              {linkPending ? "Sending…" : "Email me a magic link instead"}
+            </Button>
+
             {state && (
               <p
                 className={

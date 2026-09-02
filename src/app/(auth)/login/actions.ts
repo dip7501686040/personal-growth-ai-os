@@ -1,10 +1,16 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { env, isAllowedEmail } from "@/lib/env";
 
 const schema = z.object({ email: z.email("Enter a valid email address.") });
+
+const passwordSchema = z.object({
+  email: z.email("Enter a valid email address."),
+  password: z.string().min(1, "Enter your password."),
+});
 
 export type LoginState = { ok: boolean; message: string } | null;
 
@@ -46,4 +52,34 @@ export async function requestMagicLink(
   }
 
   return SENT;
+}
+
+const BAD_CREDS = {
+  ok: false,
+  message: "Invalid email or password.",
+} as const;
+
+export async function signInWithPassword(
+  _prev: LoginState,
+  formData: FormData,
+): Promise<LoginState> {
+  const parsed = passwordSchema.safeParse({
+    email: formData.get("email"),
+    password: formData.get("password"),
+  });
+  if (!parsed.success) {
+    return { ok: false, message: parsed.error.issues[0]?.message ?? "Invalid input." };
+  }
+
+  // Single-user app: same generic error whether the email is allowlisted or not.
+  if (!isAllowedEmail(parsed.data.email)) return BAD_CREDS;
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: parsed.data.email,
+    password: parsed.data.password,
+  });
+  if (error) return BAD_CREDS;
+
+  redirect("/dashboard");
 }
