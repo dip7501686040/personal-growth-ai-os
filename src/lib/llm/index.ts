@@ -1,12 +1,14 @@
 import { eq, and } from "drizzle-orm";
 import type { ZodType } from "zod";
 import { db } from "@/lib/db";
-import { agentModelConfig } from "@/lib/db/schema";
+import { agentEvents, agentModelConfig, agentRuns } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { cacheKey, getCached, putCached } from "./cache";
 import { GeminiProvider } from "./gemini";
+import { MODEL_LADDER, type ModelChoice } from "./models";
 import { OpenAIProvider } from "./openai";
 import { estimateCostUsd } from "./pricing";
+import { hasHeadroom } from "./quota";
 import { recordUsage } from "./usage";
 import {
   LlmError,
@@ -16,19 +18,7 @@ import {
 } from "./types";
 
 export type { AgentName } from "./types";
-
-export const AGENT_MODEL_DEFAULTS: Record<
-  AgentName,
-  { provider: LlmProviderName; model: string }
-> = {
-  learning: { provider: "gemini", model: "gemini-3.6-flash" },
-  project: { provider: "gemini", model: "gemini-3.6-flash" },
-  content: { provider: "gemini", model: "gemini-3.6-flash" },
-  business: { provider: "gemini", model: "gemini-3.6-flash" },
-  chief_of_staff: { provider: "gemini", model: "gemini-3.6-flash" },
-  career: { provider: "openai", model: "gpt-4.1-mini" },
-  activity_analyzer: { provider: "openai", model: "gpt-4.1-mini" },
-};
+export { AGENT_MODEL_DEFAULTS, MODEL_LADDER } from "./models";
 
 export function hasProviderKey(name: LlmProviderName): boolean {
   return name === "gemini" ? !!env.GEMINI_API_KEY : !!env.OPENAI_API_KEY;
@@ -47,11 +37,15 @@ function getProvider(name: LlmProviderName): LLMProvider {
   return new OpenAIProvider(env.OPENAI_API_KEY);
 }
 
-/** Reads the per-agent model config, creating the default row on first use. */
-export async function resolveModelConfig(
+const sameChoice = (a: ModelChoice, b: ModelChoice) =>
+  a.provider === b.provider && a.model === b.model;
+
+/** Optional user override (from agent_model_config) first, then the agent ladder. */
+async function buildLadder(
   userId: string,
   agent: AgentName,
-): Promise<{ provider: LlmProviderName; model: string }> {
+): Promise<ModelChoice[]> {
+  const ladder: ModelChoice[] = [];
   const [row] = await db
     .select()
     .from(agentModelConfig)
@@ -62,14 +56,39 @@ export async function resolveModelConfig(
       ),
     )
     .limit(1);
-  if (row) return { provider: row.provider, model: row.model };
+  if (row) ladder.push({ provider: row.provider, model: row.model });
+  for (const c of MODEL_LADDER[agent]) {
+    if (!ladder.some((x) => sameChoice(x, c))) ladder.push(c);
+  }
+  return ladder;
+}
 
-  const def = AGENT_MODEL_DEFAULTS[agent];
-  await db
-    .insert(agentModelConfig)
-    .values({ userId, agentName: agent, provider: def.provider, model: def.model })
-    .onConflictDoNothing();
-  return def;
+export interface ResolvedModel {
+  provider: LlmProviderName;
+  model: string;
+  /** True when every laddered model is out of API key / daily quota / credit. */
+  exhausted: boolean;
+}
+
+/**
+ * Picks the best model for an agent that still has an API key and daily-request
+ * (Gemini free-tier RPD) / credit (OpenAI) headroom. Falls through the ladder;
+ * marks `exhausted` when nothing is available so the agent uses its
+ * deterministic fallback.
+ */
+export async function resolveModelConfig(
+  userId: string,
+  agent: AgentName,
+): Promise<ResolvedModel> {
+  const ladder = await buildLadder(userId, agent);
+  for (const c of ladder) {
+    if (!hasProviderKey(c.provider)) continue;
+    if (await hasHeadroom(userId, c)) {
+      return { provider: c.provider, model: c.model, exhausted: false };
+    }
+  }
+  const firstKeyed = ladder.find((c) => hasProviderKey(c.provider)) ?? ladder[0];
+  return { provider: firstKeyed.provider, model: firstKeyed.model, exhausted: true };
 }
 
 export interface RunStructuredArgs<T> {
@@ -92,72 +111,162 @@ export interface RunStructuredResult<T> {
   model: string;
 }
 
+async function logLine(
+  runId: string | null | undefined,
+  userId: string,
+  message: string,
+  level: "info" | "warn" | "error" = "info",
+): Promise<void> {
+  if (!runId) return;
+  try {
+    await db
+      .insert(agentEvents)
+      .values({ agentRunId: runId, userId, level, step: "analyzing", message });
+  } catch {
+    // logging must never break a run
+  }
+}
+
+async function setRunModel(
+  runId: string | null | undefined,
+  provider: LlmProviderName,
+  model: string,
+): Promise<void> {
+  if (!runId) return;
+  try {
+    await db
+      .update(agentRuns)
+      .set({ modelUsed: `${provider}/${model}` })
+      .where(eq(agentRuns.id, runId));
+  } catch {
+    // ignore
+  }
+}
+
 /**
- * The single entry point agents use for structured LLM calls. Resolves the
- * per-agent provider/model, serves from cache when possible, records usage,
- * and validates the output against the Zod schema.
+ * The single entry point agents use for structured LLM calls. Walks the agent's
+ * model ladder: skips models with no key / no quota, serves from cache, calls
+ * the provider, and on a rate-limit (HTTP 429/5xx) falls back to the next model.
  */
 export async function runStructured<T>(
   args: RunStructuredArgs<T>,
 ): Promise<RunStructuredResult<T>> {
-  const { provider, model } = await resolveModelConfig(args.userId, args.agent);
   const useCache = args.cache !== false;
+  const ladder = (await buildLadder(args.userId, args.agent)).filter((c) =>
+    hasProviderKey(c.provider),
+  );
+  if (ladder.length === 0) {
+    throw new LlmError("No AI provider API key configured", "gemini");
+  }
 
-  const key = cacheKey({
-    agent: args.agent,
-    provider,
-    model,
-    system: args.system,
-    prompt: args.prompt,
-    schema: args.schemaName,
-  });
+  let lastError: unknown;
 
-  if (useCache) {
-    const hit = await getCached(key);
-    if (hit != null) {
-      const parsed = args.schema.safeParse(hit);
-      if (parsed.success) {
-        await recordUsage({
-          userId: args.userId,
-          agentRunId: args.agentRunId ?? null,
-          agentName: args.agent,
-          provider,
-          model,
-          usage: { inputTokens: 0, outputTokens: 0 },
-          estimatedCostUsd: 0,
-          cached: true,
-        });
-        return { data: parsed.data, cached: true, provider, model };
+  for (let i = 0; i < ladder.length; i++) {
+    const { provider, model } = ladder[i];
+    const isLast = i === ladder.length - 1;
+
+    if (!isLast && !(await hasHeadroom(args.userId, ladder[i]))) {
+      await logLine(
+        args.agentRunId,
+        args.userId,
+        `${provider}/${model} out of daily quota — trying next`,
+        "warn",
+      );
+      continue;
+    }
+
+    const key = cacheKey({
+      agent: args.agent,
+      provider,
+      model,
+      system: args.system,
+      prompt: args.prompt,
+      schema: args.schemaName,
+    });
+
+    if (useCache) {
+      const hit = await getCached(key);
+      if (hit != null) {
+        const parsed = args.schema.safeParse(hit);
+        if (parsed.success) {
+          await setRunModel(args.agentRunId, provider, model);
+          await logLine(
+            args.agentRunId,
+            args.userId,
+            `Using ${provider}/${model} — cached result`,
+          );
+          await recordUsage({
+            userId: args.userId,
+            agentRunId: args.agentRunId ?? null,
+            agentName: args.agent,
+            provider,
+            model,
+            usage: { inputTokens: 0, outputTokens: 0 },
+            estimatedCostUsd: 0,
+            cached: true,
+          });
+          return { data: parsed.data, cached: true, provider, model };
+        }
       }
+    }
+
+    await setRunModel(args.agentRunId, provider, model);
+    await logLine(
+      args.agentRunId,
+      args.userId,
+      `Calling ${provider}/${model}…`,
+    );
+
+    try {
+      const impl = getProvider(provider);
+      const result = await impl.generateStructured({
+        schema: args.schema,
+        schemaName: args.schemaName,
+        system: args.system,
+        prompt: args.prompt,
+        model,
+        temperature: args.temperature,
+      });
+
+      await logLine(
+        args.agentRunId,
+        args.userId,
+        `${provider}/${model} responded · ${result.usage.inputTokens ?? "?"}→${result.usage.outputTokens ?? "?"} tokens`,
+      );
+      await recordUsage({
+        userId: args.userId,
+        agentRunId: args.agentRunId ?? null,
+        agentName: args.agent,
+        provider,
+        model,
+        usage: result.usage,
+        estimatedCostUsd: estimateCostUsd(model, result.usage),
+        cached: false,
+      });
+      if (useCache) {
+        await putCached(args.userId, key, provider, model, result.data);
+      }
+      return { data: result.data, cached: false, provider, model };
+    } catch (err) {
+      lastError = err;
+      const status = err instanceof LlmError ? err.status : undefined;
+      const rateLimited = status === 429 || status === 503 || status === 500;
+      if (rateLimited && !isLast) {
+        await logLine(
+          args.agentRunId,
+          args.userId,
+          `${provider}/${model} rate-limited (HTTP ${status}) — falling back`,
+          "warn",
+        );
+        continue;
+      }
+      throw err;
     }
   }
 
-  const impl = getProvider(provider);
-  const result = await impl.generateStructured({
-    schema: args.schema,
-    schemaName: args.schemaName,
-    system: args.system,
-    prompt: args.prompt,
-    model,
-    temperature: args.temperature,
-  });
-
-  await recordUsage({
-    userId: args.userId,
-    agentRunId: args.agentRunId ?? null,
-    agentName: args.agent,
-    provider,
-    model,
-    usage: result.usage,
-    estimatedCostUsd: estimateCostUsd(model, result.usage),
-    cached: false,
-  });
-
-  if (useCache) {
-    await putCached(args.userId, key, provider, model, result.data);
-  }
-
-  return { data: result.data, cached: false, provider, model };
+  throw lastError instanceof Error
+    ? lastError
+    : new LlmError("All models exhausted or rate-limited", "gemini");
 }
 
 export { LlmError } from "./types";

@@ -178,7 +178,7 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
     const today = new Date().toISOString().slice(0, 10);
 
     const cfg = await resolveModelConfig(ctx.userId, "career");
-    if (!hasProviderKey(cfg.provider)) {
+    if (!hasProviderKey(cfg.provider) || cfg.exhausted) {
       await ctx.log(`${cfg.provider} API key not set — keyword match only`, {
         level: "warn",
         step: "analyzing",

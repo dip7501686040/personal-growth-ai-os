@@ -1,6 +1,11 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { agentEvents, agentRuns, type AgentRun } from "@/lib/db/schema";
+import {
+  agentEvents,
+  agentRuns,
+  aiUsage,
+  type AgentRun,
+} from "@/lib/db/schema";
 import type { AgentName } from "@/lib/llm";
 import type {
   AgentContext,
@@ -102,6 +107,17 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
       const outcome = await this.buildRecommendations(ctx, context, analysis);
       await ctx.log(outcome.summary, { step: "recommending" });
 
+      const usage = await this.sumUsage(run.id, userId);
+      if (usage.inputTokens + usage.outputTokens > 0) {
+        await ctx.log(
+          `Tokens: ${usage.inputTokens} in / ${usage.outputTokens} out` +
+            (usage.estimatedCostUsd
+              ? ` · ~$${usage.estimatedCostUsd.toFixed(4)}`
+              : ""),
+          { step: "completed" },
+        );
+      }
+
       const [finished] = await db
         .update(agentRuns)
         .set({
@@ -111,6 +127,11 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
             : "completed",
           result: outcome.result as object,
           finishedAt: new Date(),
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          estimatedCostUsd: usage.estimatedCostUsd
+            ? usage.estimatedCostUsd.toFixed(6)
+            : null,
         })
         .where(eq(agentRuns.id, run.id))
         .returning();
@@ -118,6 +139,7 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       await this.event(run.id, userId, message, "error", "failed");
+      const usage = await this.sumUsage(run.id, userId);
       const [failed] = await db
         .update(agentRuns)
         .set({
@@ -125,11 +147,40 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
           currentStep: "failed",
           error: message,
           finishedAt: new Date(),
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          estimatedCostUsd: usage.estimatedCostUsd
+            ? usage.estimatedCostUsd.toFixed(6)
+            : null,
         })
         .where(eq(agentRuns.id, run.id))
         .returning();
       return failed;
     }
+  }
+
+  /** Sums every LLM call recorded for this run (from ai_usage). */
+  private async sumUsage(
+    runId: string,
+    userId: string,
+  ): Promise<{
+    inputTokens: number;
+    outputTokens: number;
+    estimatedCostUsd: number;
+  }> {
+    const [row] = await db
+      .select({
+        i: sql<number>`coalesce(sum(${aiUsage.inputTokens}), 0)::int`,
+        o: sql<number>`coalesce(sum(${aiUsage.outputTokens}), 0)::int`,
+        c: sql<string>`coalesce(sum(${aiUsage.estimatedCostUsd}), 0)`,
+      })
+      .from(aiUsage)
+      .where(and(eq(aiUsage.userId, userId), eq(aiUsage.agentRunId, runId)));
+    return {
+      inputTokens: row?.i ?? 0,
+      outputTokens: row?.o ?? 0,
+      estimatedCostUsd: row ? Number(row.c) : 0,
+    };
   }
 
   private async event(

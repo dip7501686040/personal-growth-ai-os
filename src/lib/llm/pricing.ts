@@ -4,7 +4,12 @@ import type { TokenUsage } from "./types";
  * relying on these numbers. */
 const PRICES: Record<string, { in: number; out: number }> = {
   "gemini-3.6-flash": { in: 0.3, out: 2.5 },
+  "gemini-3.5-flash": { in: 0.3, out: 2.5 },
+  "gemini-3.5-flash-lite": { in: 0.1, out: 0.4 },
+  "gemini-3.1-flash-lite": { in: 0.1, out: 0.4 },
+  "gemini-flash-lite-latest": { in: 0.1, out: 0.4 },
   "gemini-2.5-flash": { in: 0.3, out: 2.5 },
+  "gemini-2.5-flash-lite": { in: 0.1, out: 0.4 },
   "gemini-2.5-pro": { in: 1.25, out: 10 },
   "gpt-4.1": { in: 2, out: 8 },
   "gpt-4.1-mini": { in: 0.4, out: 1.6 },

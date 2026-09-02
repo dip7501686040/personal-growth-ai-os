@@ -12,7 +12,7 @@ import { listApprovals } from "@/modules/approvals/service";
 import { listProjects } from "@/modules/projects/service";
 import { listContentItems } from "@/modules/content/service";
 import { getLatestBriefing } from "@/modules/briefing/service";
-import { getAgentStatusBoard } from "@/modules/agents/runs";
+import { getAgentConsole, getAgentStatusBoard } from "@/modules/agents/runs";
 import { listRecentEvents } from "@/modules/activity/service";
 import { SKILL_LEVELS } from "@/modules/skills/levels";
 import { LevelBadge } from "@/components/skills/level-badge";
@@ -24,16 +24,25 @@ export const metadata = { title: "Dashboard" };
 export default async function DashboardPage() {
   const user = await requireUser();
   const userId = user.id;
-  const [skills, pendingApprovals, projects, content, briefing, statusBoard, recentSessions] =
-    await Promise.all([
-      listSkills(userId),
-      listApprovals(userId, { status: "pending" }),
-      listProjects(userId),
-      listContentItems(userId),
-      getLatestBriefing(userId),
-      getAgentStatusBoard(userId),
-      listRecentEvents(userId, 3),
-    ]);
+  const [
+    skills,
+    pendingApprovals,
+    projects,
+    content,
+    briefing,
+    statusBoard,
+    recentSessions,
+    briefingConsole,
+  ] = await Promise.all([
+    listSkills(userId),
+    listApprovals(userId, { status: "pending" }),
+    listProjects(userId),
+    listContentItems(userId),
+    getLatestBriefing(userId),
+    getAgentStatusBoard(userId),
+    listRecentEvents(userId, 3),
+    getAgentConsole(userId, "chief_of_staff"),
+  ]);
 
   const byLevel = SKILL_LEVELS.map((level) => ({
     level,
@@ -54,7 +63,11 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <BriefingCard briefing={briefing} />
+      <BriefingCard
+        briefing={briefing}
+        userId={userId}
+        agentConsole={briefingConsole}
+      />
 
       <Card>
         <CardHeader>

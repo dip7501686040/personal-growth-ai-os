@@ -6,8 +6,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { RunAgentButton } from "@/components/run-agent-button";
+import { AgentRunConsole } from "@/components/agent-run-console";
 import type { DailyBriefing } from "@/lib/db/schema";
+import type { AgentConsoleData } from "@/modules/agents/runs";
 
 const CATEGORY_CLASS: Record<string, string> = {
   review: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
@@ -19,7 +20,15 @@ const CATEGORY_CLASS: Record<string, string> = {
   business: "bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-300",
 };
 
-export function BriefingCard({ briefing }: { briefing: DailyBriefing | null }) {
+export function BriefingCard({
+  briefing,
+  userId,
+  agentConsole,
+}: {
+  briefing: DailyBriefing | null;
+  userId: string;
+  agentConsole?: AgentConsoleData;
+}) {
   const priorities = (briefing?.priorities ?? []) as {
     title: string;
     why: string;
@@ -35,16 +44,19 @@ export function BriefingCard({ briefing }: { briefing: DailyBriefing | null }) {
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-base">Today&apos;s priorities</CardTitle>
-          <RunAgentButton agent="chief_of_staff" label="Refresh briefing" />
-        </div>
+      <CardHeader className="gap-3">
+        <CardTitle className="text-base">Today&apos;s priorities</CardTitle>
         <CardDescription>
           {briefing
             ? `${briefing.briefingDate} · ${briefing.summary}`
             : "Run the Chief of Staff to connect the agents into a plan."}
         </CardDescription>
+        <AgentRunConsole
+          agent="chief_of_staff"
+          userId={userId}
+          label="Refresh briefing"
+          initial={agentConsole}
+        />
       </CardHeader>
 
       {briefing && (

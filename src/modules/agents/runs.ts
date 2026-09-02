@@ -7,6 +7,7 @@ import {
   type AgentRun,
 } from "@/lib/db/schema";
 import type { AgentName } from "@/lib/llm";
+import { computeQuota, type QuotaSummary } from "@/lib/llm/quota";
 
 export async function getLatestRun(
   userId: string,
@@ -75,6 +76,18 @@ export async function getAgentStatusBoard(
   });
 }
 
+export async function getRun(
+  userId: string,
+  runId: string,
+): Promise<AgentRun | null> {
+  const [row] = await db
+    .select()
+    .from(agentRuns)
+    .where(and(eq(agentRuns.userId, userId), eq(agentRuns.id, runId)))
+    .limit(1);
+  return row ?? null;
+}
+
 export async function getRunEvents(
   userId: string,
   runId: string,
@@ -86,6 +99,75 @@ export async function getRunEvents(
       and(eq(agentEvents.userId, userId), eq(agentEvents.agentRunId, runId)),
     )
     .orderBy(agentEvents.ts);
+}
+
+export interface ConsoleLine {
+  id: string;
+  ts: string;
+  level: string;
+  step: string | null;
+  message: string;
+}
+
+export interface AgentConsoleData {
+  runId: string | null;
+  status: string;
+  model: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  error: string | null;
+  inputTokens: number | null;
+  outputTokens: number | null;
+  estimatedCostUsd: number | null;
+  quota: QuotaSummary | null;
+  lines: ConsoleLine[];
+}
+
+/** Latest run for one agent + its event log — seeds the live run console. */
+export async function getAgentConsole(
+  userId: string,
+  agentName: AgentName,
+): Promise<AgentConsoleData> {
+  const run = await getLatestRun(userId, agentName);
+  if (!run) {
+    return {
+      runId: null,
+      status: "never_run",
+      model: null,
+      startedAt: null,
+      finishedAt: null,
+      error: null,
+      inputTokens: null,
+      outputTokens: null,
+      estimatedCostUsd: null,
+      quota: null,
+      lines: [],
+    };
+  }
+  const [events, quota] = await Promise.all([
+    getRunEvents(userId, run.id),
+    computeQuota(userId, run.modelUsed),
+  ]);
+  return {
+    runId: run.id,
+    status: run.status,
+    model: run.modelUsed,
+    startedAt: run.startedAt?.toISOString() ?? null,
+    finishedAt: run.finishedAt?.toISOString() ?? null,
+    error: run.error,
+    inputTokens: run.inputTokens,
+    outputTokens: run.outputTokens,
+    estimatedCostUsd:
+      run.estimatedCostUsd != null ? Number(run.estimatedCostUsd) : null,
+    quota,
+    lines: events.map((e) => ({
+      id: e.id,
+      ts: e.ts.toISOString(),
+      level: e.level,
+      step: e.step,
+      message: e.message,
+    })),
+  };
 }
 
 export interface TimelineEntry {

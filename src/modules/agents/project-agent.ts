@@ -125,7 +125,7 @@ export class ProjectAgent extends BaseAgent<Context, ProjectAgentResult> {
     }
 
     const cfg = await resolveModelConfig(ctx.userId, "project");
-    if (!hasProviderKey(cfg.provider)) {
+    if (!hasProviderKey(cfg.provider) || cfg.exhausted) {
       await ctx.log(`${cfg.provider} API key not set — deterministic plan`, {
         level: "warn",
         step: "analyzing",

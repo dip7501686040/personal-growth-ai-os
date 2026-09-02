@@ -149,7 +149,7 @@ export class BusinessAgent extends BaseAgent<Context, BusinessAgentResult> {
     const today = new Date().toISOString().slice(0, 10);
     const cfg = await resolveModelConfig(ctx.userId, "business");
 
-    if (!hasProviderKey(cfg.provider)) {
+    if (!hasProviderKey(cfg.provider) || cfg.exhausted) {
       await ctx.log(`${cfg.provider} API key not set — template opportunities`, {
         level: "warn",
         step: "analyzing",

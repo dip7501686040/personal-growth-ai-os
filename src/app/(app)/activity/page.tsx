@@ -6,6 +6,7 @@ import {
   listRecentEvents,
 } from "@/modules/activity/service";
 import {
+  getAgentConsole,
   getAgentStatusBoard,
   getLatestRun,
   getRecentTimeline,
@@ -15,7 +16,7 @@ import { SessionsList } from "@/components/activity/sessions-list";
 import { AnalysesList } from "@/components/activity/analyses-list";
 import { AgentStatusBoard } from "@/components/activity/agent-status-board";
 import { AgentTimeline } from "@/components/activity/agent-timeline";
-import { RunAgentButton } from "@/components/run-agent-button";
+import { AgentRunConsole } from "@/components/agent-run-console";
 import {
   Card,
   CardContent,
@@ -29,16 +30,25 @@ export const metadata = { title: "Agent Activity" };
 export default async function ActivityPage() {
   const user = await requireUser();
   const userId = user.id;
-  const [statusBoard, timeline, events, analyses, tokens, pending, lastRun] =
-    await Promise.all([
-      getAgentStatusBoard(userId),
-      getRecentTimeline(userId, 40),
-      listRecentEvents(userId, 30),
-      listAnalyses(userId, 14),
-      listIngestTokens(userId),
-      countPendingEvents(userId),
-      getLatestRun(userId, "activity_analyzer"),
-    ]);
+  const [
+    statusBoard,
+    timeline,
+    events,
+    analyses,
+    tokens,
+    pending,
+    lastRun,
+    analyzerConsole,
+  ] = await Promise.all([
+    getAgentStatusBoard(userId),
+    getRecentTimeline(userId, 40),
+    listRecentEvents(userId, 30),
+    listAnalyses(userId, 14),
+    listIngestTokens(userId),
+    countPendingEvents(userId),
+    getLatestRun(userId, "activity_analyzer"),
+    getAgentConsole(userId, "activity_analyzer"),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -75,10 +85,9 @@ export default async function ActivityPage() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-base">Daily development-activity analysis</CardTitle>
-            <RunAgentButton agent="activity_analyzer" label="Analyze today" />
-          </div>
+          <CardTitle className="text-base">
+            Daily development-activity analysis
+          </CardTitle>
           <CardDescription>
             {pending} unanalysed session{pending === 1 ? "" : "s"}.
             {lastRun?.finishedAt
@@ -88,7 +97,13 @@ export default async function ActivityPage() {
             Skills page.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-4">
+          <AgentRunConsole
+            agent="activity_analyzer"
+            userId={userId}
+            label="Analyze today"
+            initial={analyzerConsole}
+          />
           <AnalysesList analyses={analyses} />
         </CardContent>
       </Card>

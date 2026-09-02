@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { requireUserId } from "@/lib/user";
 import { listContentItems } from "@/modules/content/service";
-import { getLatestRun } from "@/modules/agents/runs";
-import { RunAgentButton } from "@/components/run-agent-button";
+import { getAgentConsole, getLatestRun } from "@/modules/agents/runs";
+import { AgentRunConsole } from "@/components/agent-run-console";
 import { NewIdeaDialog } from "@/components/content/new-idea-dialog";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -18,9 +18,10 @@ const COLUMNS: { status: string; label: string }[] = [
 
 export default async function ContentPage() {
   const userId = await requireUserId();
-  const [items, run] = await Promise.all([
+  const [items, run, contentConsole] = await Promise.all([
     listContentItems(userId),
     getLatestRun(userId, "content"),
+    getAgentConsole(userId, "content"),
   ]);
 
   const lastNote =
@@ -38,15 +39,20 @@ export default async function ContentPage() {
             only — you post manually.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <NewIdeaDialog />
-          <RunAgentButton agent="content" label="Scan for content" />
-        </div>
+        <NewIdeaDialog />
       </div>
 
-      {lastNote && (
-        <p className="text-sm text-muted-foreground">Last run: {lastNote}</p>
-      )}
+      <div className="flex flex-col gap-1">
+        <AgentRunConsole
+          agent="content"
+          userId={userId}
+          label="Scan for content"
+          initial={contentConsole}
+        />
+        {lastNote && (
+          <p className="text-sm text-muted-foreground">Last run: {lastNote}</p>
+        )}
+      </div>
 
       {items.length === 0 ? (
         <Card>

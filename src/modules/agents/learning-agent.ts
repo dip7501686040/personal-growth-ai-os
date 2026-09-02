@@ -217,7 +217,7 @@ export class LearningAgent extends BaseAgent<Context, LearningAgentResult> {
     }
 
     const cfg = await resolveModelConfig(ctx.userId, "learning");
-    if (!hasProviderKey(cfg.provider)) {
+    if (!hasProviderKey(cfg.provider) || cfg.exhausted) {
       await ctx.log(`${cfg.provider} API key not set — deterministic plan`, {
         level: "warn",
         step: "analyzing",

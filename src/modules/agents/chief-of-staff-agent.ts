@@ -154,7 +154,7 @@ export class ChiefOfStaffAgent extends BaseAgent<BriefingContext, ChiefOfStaffRe
     const today = context.today;
     const cfg = await resolveModelConfig(ctx.userId, "chief_of_staff");
 
-    if (!hasProviderKey(cfg.provider)) {
+    if (!hasProviderKey(cfg.provider) || cfg.exhausted) {
       const d = deterministic(context);
       return {
         ...d,

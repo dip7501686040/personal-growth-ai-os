@@ -110,7 +110,7 @@ export class ActivityAnalyzerAgent extends BaseAgent<
     }
 
     const cfg = await resolveModelConfig(ctx.userId, "activity_analyzer");
-    if (!hasProviderKey(cfg.provider)) {
+    if (!hasProviderKey(cfg.provider) || cfg.exhausted) {
       return {
         date: context.date,
         eventCount: context.events.length,

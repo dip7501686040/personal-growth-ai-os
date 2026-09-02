@@ -207,7 +207,7 @@ export class ContentAgent extends BaseAgent<Context, ContentAgentResult> {
   ): Promise<ContentAgentResult> {
     const today = new Date().toISOString().slice(0, 10);
     const cfg = await resolveModelConfig(ctx.userId, "content");
-    const noKey = !hasProviderKey(cfg.provider);
+    const noKey = !hasProviderKey(cfg.provider) || cfg.exhausted;
 
     if (context.mode === "draft") {
       if (noKey) {

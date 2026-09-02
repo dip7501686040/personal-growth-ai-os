@@ -9,30 +9,32 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { RunAgentButton } from "@/components/run-agent-button";
+import { AgentRunConsole } from "@/components/agent-run-console";
 import { createFromIdeaAction } from "@/app/(app)/projects/actions";
 import type { ProjectAgentResult } from "@/modules/agents/project-agent";
+import type { AgentConsoleData } from "@/modules/agents/runs";
 
 export function ProjectAgentPanel({
   result,
   status,
+  userId,
+  agentConsole,
 }: {
   result: ProjectAgentResult | null;
   status?: string;
+  userId: string;
+  agentConsole?: AgentConsoleData;
 }) {
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="gap-3">
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-base">Project Agent</CardTitle>
-          <div className="flex items-center gap-2">
-            {result && (
-              <Badge variant="secondary">
-                {result.source === "ai" ? result.model ?? "ai" : "no-AI fallback"}
-              </Badge>
-            )}
-            <RunAgentButton agent="project" label="Run Project Agent" />
-          </div>
+          {result && (
+            <Badge variant="secondary">
+              {result.source === "ai" ? result.model ?? "ai" : "no-AI fallback"}
+            </Badge>
+          )}
         </div>
         <CardDescription>
           {result
@@ -41,6 +43,12 @@ export function ProjectAgentPanel({
               }${result.note ? ` · ${result.note}` : ""}`
             : "Run to get portfolio gaps and project ideas tied to your skills."}
         </CardDescription>
+        <AgentRunConsole
+          agent="project"
+          userId={userId}
+          label="Run Project Agent"
+          initial={agentConsole}
+        />
       </CardHeader>
 
       {result && (

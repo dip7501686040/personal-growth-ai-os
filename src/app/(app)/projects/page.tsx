@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUserId } from "@/lib/user";
 import { listProjects } from "@/modules/projects/service";
-import { getLatestRun } from "@/modules/agents/runs";
+import { getAgentConsole, getLatestRun } from "@/modules/agents/runs";
 import type { ProjectAgentResult } from "@/modules/agents/project-agent";
 import { ProjectAgentPanel } from "@/components/projects/project-agent-panel";
 import { NewProjectDialog } from "@/components/projects/new-project-dialog";
@@ -20,9 +20,10 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
 
 export default async function ProjectsPage() {
   const userId = await requireUserId();
-  const [projects, run] = await Promise.all([
+  const [projects, run, agentConsole] = await Promise.all([
     listProjects(userId),
     getLatestRun(userId, "project"),
+    getAgentConsole(userId, "project"),
   ]);
   const result = (run?.result ?? null) as ProjectAgentResult | null;
 
@@ -39,7 +40,12 @@ export default async function ProjectsPage() {
         <NewProjectDialog />
       </div>
 
-      <ProjectAgentPanel result={result} status={run?.status} />
+      <ProjectAgentPanel
+        result={result}
+        status={run?.status}
+        userId={userId}
+        agentConsole={agentConsole}
+      />
 
       <div className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-muted-foreground">

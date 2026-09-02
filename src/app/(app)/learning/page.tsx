@@ -3,11 +3,11 @@ import { requireUserId } from "@/lib/user";
 import { db } from "@/lib/db";
 import { skills } from "@/lib/db/schema";
 import { listLearningSessions } from "@/modules/learning/service";
-import { getLatestRun } from "@/modules/agents/runs";
+import { getAgentConsole, getLatestRun } from "@/modules/agents/runs";
 import type { LearningAgentResult } from "@/modules/agents/learning-agent";
 import { LearningPlanCard } from "@/components/learning/learning-plan-card";
 import { LogSessionForm } from "@/components/learning/log-session-form";
-import { RunAgentButton } from "@/components/run-agent-button";
+import { AgentRunConsole } from "@/components/agent-run-console";
 import {
   Card,
   CardContent,
@@ -20,8 +20,9 @@ export const metadata = { title: "Learning" };
 export default async function LearningPage() {
   const userId = await requireUserId();
 
-  const [run, sessions, skillRows] = await Promise.all([
+  const [run, agentConsole, sessions, skillRows] = await Promise.all([
     getLatestRun(userId, "learning"),
+    getAgentConsole(userId, "learning"),
     listLearningSessions(userId, 12),
     db
       .select({ id: skills.id, name: skills.name })
@@ -39,11 +40,16 @@ export default async function LearningPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3">
         <h2 className="text-sm font-semibold text-muted-foreground">
           Daily plan
         </h2>
-        <RunAgentButton agent="learning" label="Run Learning Agent" />
+        <AgentRunConsole
+          agent="learning"
+          userId={userId}
+          label="Run Learning Agent"
+          initial={agentConsole}
+        />
       </div>
 
       <LearningPlanCard
