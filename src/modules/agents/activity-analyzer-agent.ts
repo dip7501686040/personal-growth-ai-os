@@ -135,6 +135,7 @@ export class ActivityAnalyzerAgent extends BaseAgent<
       agentRunId: ctx.agentRunId,
       schema: ActivityAnalysisSchema,
       schemaName: "activity_analysis",
+      signal: ctx.signal,
       system: SYSTEM,
       prompt: [
         `Date: ${context.date}`,

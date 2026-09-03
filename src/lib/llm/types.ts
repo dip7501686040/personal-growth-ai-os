@@ -29,6 +29,8 @@ export interface GenerateOptions {
    * Ignored by providers that don't support it.
    */
   thinkingLevel?: "low" | "high";
+  /** Aborts the underlying HTTP request (used to stop a running agent). */
+  signal?: AbortSignal;
 }
 
 export interface GenerateStructuredOptions<T> extends GenerateOptions {

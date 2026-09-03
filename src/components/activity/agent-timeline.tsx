@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { fmtHm } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export interface TimelineEntry {
@@ -104,10 +105,7 @@ export function AgentTimeline({
             )}
           />
           <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-            {new Date(e.ts).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
+            {fmtHm(e.ts)}
           </span>
           <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-xs">
             {e.agent.replace(/_/g, " ")}

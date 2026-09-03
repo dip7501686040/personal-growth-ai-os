@@ -24,6 +24,7 @@ export class OpenAIProvider implements LLMProvider {
 
   private async call(
     body: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<{ text: string; usage: GenerateResult["usage"] }> {
     const res = await fetch(URL, {
       method: "POST",
@@ -32,6 +33,7 @@ export class OpenAIProvider implements LLMProvider {
         authorization: `Bearer ${this.apiKey}`,
       },
       body: JSON.stringify(body),
+      signal,
     });
 
     const json = (await res.json().catch(() => ({}))) as ChatResponse;
@@ -58,35 +60,41 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async generate(opts: GenerateOptions): Promise<GenerateResult> {
-    return this.call({
-      model: opts.model,
-      messages: [
-        ...(opts.system ? [{ role: "system", content: opts.system }] : []),
-        { role: "user", content: opts.prompt },
-      ],
-      temperature: opts.temperature ?? 0.4,
-    });
+    return this.call(
+      {
+        model: opts.model,
+        messages: [
+          ...(opts.system ? [{ role: "system", content: opts.system }] : []),
+          { role: "user", content: opts.prompt },
+        ],
+        temperature: opts.temperature ?? 0.4,
+      },
+      opts.signal,
+    );
   }
 
   async generateStructured<T>(
     opts: GenerateStructuredOptions<T>,
   ): Promise<GenerateStructuredResult<T>> {
-    const { text, usage } = await this.call({
-      model: opts.model,
-      messages: [
-        ...(opts.system ? [{ role: "system", content: opts.system }] : []),
-        { role: "user", content: opts.prompt },
-      ],
-      temperature: opts.temperature ?? 0.3,
-      response_format: {
-        type: "json_schema",
-        json_schema: {
-          name: opts.schemaName ?? "response",
-          strict: true,
-          schema: toOpenAiSchema(opts.schema),
+    const { text, usage } = await this.call(
+      {
+        model: opts.model,
+        messages: [
+          ...(opts.system ? [{ role: "system", content: opts.system }] : []),
+          { role: "user", content: opts.prompt },
+        ],
+        temperature: opts.temperature ?? 0.3,
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: opts.schemaName ?? "response",
+            strict: true,
+            schema: toOpenAiSchema(opts.schema),
+          },
         },
       },
-    });
+      opts.signal,
+    );
 
     let parsed: unknown;
     try {

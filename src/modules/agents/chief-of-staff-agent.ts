@@ -172,6 +172,7 @@ export class ChiefOfStaffAgent extends BaseAgent<BriefingContext, ChiefOfStaffRe
       agentRunId: ctx.agentRunId,
       schema: BriefingSchema,
       schemaName: "daily_briefing",
+      signal: ctx.signal,
       system: SYSTEM,
       prompt: digest(context),
       temperature: 0.3,

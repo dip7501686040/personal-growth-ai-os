@@ -239,6 +239,7 @@ export class ContentAgent extends BaseAgent<Context, ContentAgentResult> {
         agentRunId: ctx.agentRunId,
         schema: LinkedInDraftSchema,
         schemaName: "linkedin_draft",
+        signal: ctx.signal,
         system: DRAFT_SYSTEM,
         prompt: [
           `Working title: ${context.title}`,
@@ -315,6 +316,7 @@ export class ContentAgent extends BaseAgent<Context, ContentAgentResult> {
       agentRunId: ctx.agentRunId,
       schema: ContentOpportunitiesSchema,
       schemaName: "content_opportunities",
+      signal: ctx.signal,
       system: SCAN_SYSTEM,
       prompt: [
         `Recent real events:`,

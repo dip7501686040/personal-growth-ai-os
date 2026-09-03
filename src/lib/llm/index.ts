@@ -102,6 +102,15 @@ export interface RunStructuredArgs<T> {
   temperature?: number;
   /** When true (default), identical inputs are served from llm_cache. */
   cache?: boolean;
+  /** Aborts the provider call (used to stop a running agent). */
+  signal?: AbortSignal;
+}
+
+function isAbort(err: unknown): boolean {
+  return (
+    err instanceof Error &&
+    (err.name === "AbortError" || err.name === "TimeoutError")
+  );
 }
 
 export interface RunStructuredResult<T> {
@@ -162,6 +171,9 @@ export async function runStructured<T>(
   let lastError: unknown;
 
   for (let i = 0; i < ladder.length; i++) {
+    if (args.signal?.aborted) {
+      throw new DOMException("Run cancelled", "AbortError");
+    }
     const { provider, model } = ladder[i];
     const isLast = i === ladder.length - 1;
 
@@ -226,6 +238,7 @@ export async function runStructured<T>(
         prompt: args.prompt,
         model,
         temperature: args.temperature,
+        signal: args.signal,
       });
 
       await logLine(
@@ -248,6 +261,7 @@ export async function runStructured<T>(
       }
       return { data: result.data, cached: false, provider, model };
     } catch (err) {
+      if (isAbort(err) || args.signal?.aborted) throw err;
       lastError = err;
       const status = err instanceof LlmError ? err.status : undefined;
       const rateLimited = status === 429 || status === 503 || status === 500;

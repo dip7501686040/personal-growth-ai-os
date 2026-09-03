@@ -238,6 +238,7 @@ export class LearningAgent extends BaseAgent<Context, LearningAgentResult> {
       agentRunId: ctx.agentRunId,
       schema: LearningPlanSchema,
       schemaName: "learning_plan",
+      signal: ctx.signal,
       system: SYSTEM,
       prompt: buildPrompt(context, today),
       temperature: 0.3,

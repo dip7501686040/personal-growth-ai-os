@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { fmtDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export interface AgentStatusRow {
@@ -112,7 +113,7 @@ export function AgentStatusBoard({
           <span
             key={r.agent}
             className="inline-flex items-center gap-2 rounded-md border bg-card px-2.5 py-1.5 text-xs"
-            title={r.at ? new Date(r.at).toLocaleString() : undefined}
+            title={r.at ? fmtDateTime(r.at) : undefined}
           >
             <span
               className={cn("size-2 rounded-full", DOT_CLASS[label] ?? "bg-muted-foreground/40")}

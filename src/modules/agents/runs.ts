@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   agentEvents,
@@ -8,11 +8,51 @@ import {
 } from "@/lib/db/schema";
 import type { AgentName } from "@/lib/llm";
 import { computeQuota, type QuotaSummary } from "@/lib/llm/quota";
+import { WORKING_STATUSES } from "./types";
+
+/**
+ * A run older than this with no terminal state is considered abandoned. Every
+ * agent route caps at maxDuration = 60s, so anything still "working" well past
+ * that has been killed mid-flight (deploy, timeout, DB hang, dev restart).
+ */
+const STALE_AFTER_MS = 150_000;
+
+/**
+ * Marks runs that got stuck in a working status as failed, so the run console
+ * never shows a phantom "Analyzing…" forever. Best-effort; never throws.
+ */
+export async function reapStaleRuns(
+  userId: string,
+  agentName?: AgentName,
+): Promise<void> {
+  const cutoff = new Date(Date.now() - STALE_AFTER_MS);
+  try {
+    await db
+      .update(agentRuns)
+      .set({
+        status: "failed",
+        currentStep: "failed",
+        error: "Run stalled — the server stopped responding before it finished.",
+        finishedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(agentRuns.userId, userId),
+          agentName ? eq(agentRuns.agentName, agentName) : undefined,
+          inArray(agentRuns.status, [...WORKING_STATUSES]),
+          lt(agentRuns.startedAt, cutoff),
+        ),
+      );
+  } catch {
+    // cleanup must never break a page render
+  }
+}
 
 export async function getLatestRun(
   userId: string,
   agentName: AgentName,
 ): Promise<AgentRun | null> {
+  await reapStaleRuns(userId, agentName);
   const [row] = await db
     .select()
     .from(agentRuns)

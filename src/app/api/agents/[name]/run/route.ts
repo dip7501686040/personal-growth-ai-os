@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
+import { warmupDb } from "@/lib/db";
 import { getAgent } from "@/modules/agents";
 
 export const maxDuration = 60;
@@ -24,18 +25,38 @@ export async function POST(
     // no body
   }
 
-  const run = await agent.run({
-    userId: user.id,
-    trigger: "manual",
-    triggerKey: new Date().toISOString().slice(0, 10),
-    force: true,
-    input,
-  });
+  // Wake / recycle the DB connection before the run so a paused free-tier
+  // project doesn't leave the request hanging on the first query.
+  try {
+    await warmupDb();
+  } catch {
+    return NextResponse.json(
+      { error: "Database is waking up — try again in a moment." },
+      { status: 503 },
+    );
+  }
 
-  return NextResponse.json({
-    id: run.id,
-    status: run.status,
-    error: run.error,
-    summary: run.currentStep,
-  });
+  try {
+    // Manual runs are always "run now" — no idempotency key, so clicking the
+    // button twice (or after an earlier run stalled) never collides with the
+    // agent_runs (user, agent, trigger_key) unique index.
+    const run = await agent.run({
+      userId: user.id,
+      trigger: "manual",
+      input,
+      signal: req.signal,
+    });
+
+    return NextResponse.json({
+      id: run.id,
+      status: run.status,
+      error: run.error,
+      summary: run.currentStep,
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Agent run failed" },
+      { status: 500 },
+    );
+  }
 }

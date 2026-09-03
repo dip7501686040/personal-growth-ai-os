@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useActionToast } from "@/components/use-action-toast";
 import { LEVEL_LABEL, type SkillLevel } from "@/modules/skills/levels";
+import { fmtDate } from "@/lib/format";
 import {
   decideEvidenceAction,
   type ActionState,
@@ -114,7 +115,7 @@ export function EvidenceList({
               supports {LEVEL_LABEL[e.supportsLevel]} · {e.strength}
             </span>
             <span className="ml-auto text-muted-foreground">
-              {new Date(e.createdAt).toLocaleDateString()}
+              {fmtDate(e.createdAt)}
             </span>
           </div>
 

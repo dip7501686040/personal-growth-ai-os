@@ -1,0 +1,42 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug: agent (direct, end-to-end)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${env:HOME}/.nvm/versions/node/v24.20.0/bin/node",
+      "runtimeArgs": ["--import", "tsx", "--env-file=.env.local"],
+      "program": "${workspaceFolder}/scripts/debug-agent.ts",
+      "args": ["learning"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**", "${workspaceFolder}/node_modules/**"]
+    },
+    {
+      "name": "Next.js: debug server-side (HTTP flow)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "pnpm dev --inspect",
+      "cwd": "${workspaceFolder}",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
+      "name": "Next.js: debug client-side (run console UI)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:3000/learning",
+      "webRoot": "${workspaceFolder}"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Next.js: full stack (server + browser)",
+      "configurations": [
+        "Next.js: debug server-side (HTTP flow)",
+        "Next.js: debug client-side (run console UI)"
+      ]
+    }
+  ]
+}

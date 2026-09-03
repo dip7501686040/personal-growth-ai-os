@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDownIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { fmtNum, fmtTime } from "@/lib/format";
 import { createClient } from "@/lib/supabase/client";
 import type { AgentConsoleData, ConsoleLine } from "@/modules/agents/runs";
 import type { QuotaSummary } from "@/lib/llm/quota";
@@ -52,14 +53,6 @@ function dotFor(status: string): string {
 function fmtElapsed(ms: number): string {
   const s = Math.max(0, Math.round(ms / 1000));
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
-}
-
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
 }
 
 interface RawRun {
@@ -136,14 +129,31 @@ export function AgentRunConsole({
     initial?.quota ?? null,
   );
   const [now, setNow] = useState(() => Date.now());
+  const [stopped, setStopped] = useState(false);
+  const [slowStart, setSlowStart] = useState(false);
 
   const runIdRef = useRef<string | null>(initial?.runId ?? null);
   const seenIds = useRef<Set<string>>(
     new Set(initial?.lines?.map((l) => l.id) ?? []),
   );
   const bodyRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const timedOutRef = useRef(false);
+
+  // Give up on a request that never starts streaming (a truly wedged server).
+  const RUN_TIMEOUT_MS = 120_000;
+  // How long "starting" can take before we tell the user the DB is waking up.
+  const SLOW_START_MS = 6_000;
 
   const running = busy || WORKING.has(status);
+
+  // elapsed depends on the current wall clock — render it only on the client so
+  // SSR and the first client render agree (avoids a hydration mismatch)
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
 
   // elapsed-time ticker
   useEffect(() => {
@@ -223,8 +233,22 @@ export function AgentRunConsole({
     if (el) el.scrollTop = el.scrollHeight;
   }, [lines, open]);
 
+  function stop() {
+    abortRef.current?.abort();
+    setStopped(true);
+    setStatus("failed");
+    setBusy(false);
+    setFinishedAt(Date.now());
+    toast("Run stopped.");
+  }
+
   async function run() {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    timedOutRef.current = false;
     setBusy(true);
+    setStopped(false);
+    setSlowStart(false);
     setOpen(true);
     setLines([]);
     seenIds.current = new Set();
@@ -235,11 +259,18 @@ export function AgentRunConsole({
     setUsage(null);
     setQuota(null);
 
+    const slowTimer = setTimeout(() => setSlowStart(true), SLOW_START_MS);
+    const killTimer = setTimeout(() => {
+      timedOutRef.current = true;
+      controller.abort();
+    }, RUN_TIMEOUT_MS);
+
     try {
       const res = await fetch(`/api/agents/${agent}/run`, {
         method: "POST",
         headers: input ? { "content-type": "application/json" } : undefined,
         body: input ? JSON.stringify(input) : undefined,
+        signal: controller.signal,
       });
       const data = (await res.json()) as {
         id?: string;
@@ -277,25 +308,46 @@ export function AgentRunConsole({
       } else {
         toast.success("Run complete.");
       }
-    } catch {
-      toast.error("Could not reach the agent.");
-      setStatus("failed");
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        if (timedOutRef.current) {
+          toast.error(
+            "The run didn't start in time. The database may still be waking up — try again in a moment.",
+          );
+          setStatus("failed");
+          setFinishedAt(Date.now());
+        }
+        // otherwise the user hit Stop — stop() already updated the UI
+      } else {
+        toast.error("Could not reach the agent.");
+        setStatus("failed");
+      }
     } finally {
+      clearTimeout(slowTimer);
+      clearTimeout(killTimer);
+      setSlowStart(false);
       setBusy(false);
+      abortRef.current = null;
       router.refresh();
     }
   }
 
   const elapsed =
-    startedAt != null
+    mounted && startedAt != null
       ? fmtElapsed((running ? now : (finishedAt ?? now)) - startedAt)
       : null;
 
   return (
     <div className="flex flex-col gap-2">
-      <Button size={size} onClick={run} disabled={busy}>
-        {busy ? "Running…" : label}
-      </Button>
+      {busy ? (
+        <Button size={size} variant="destructive" onClick={stop}>
+          Stop run
+        </Button>
+      ) : (
+        <Button size={size} onClick={run}>
+          {label}
+        </Button>
+      )}
 
       <div className="rounded-md border bg-muted/40 font-mono text-xs">
         <button
@@ -304,10 +356,15 @@ export function AgentRunConsole({
           className="flex w-full items-center gap-2 border-b px-3 py-1.5 text-left"
         >
           <span
-            className={cn("size-2 shrink-0 rounded-full", dotFor(status))}
+            className={cn(
+              "size-2 shrink-0 rounded-full",
+              stopped ? DOT.waiting_for_approval : dotFor(status),
+            )}
           />
           <span className="font-medium">
-            {STATUS_LABEL[status] ?? status.replace(/_/g, " ")}
+            {stopped
+              ? "Stopped"
+              : (STATUS_LABEL[status] ?? status.replace(/_/g, " "))}
           </span>
           <span className="truncate text-muted-foreground">
             {model ? `· ${model}` : status === "never_run" ? "" : "· no model"}
@@ -336,7 +393,9 @@ export function AgentRunConsole({
           {lines.length === 0 ? (
             <p className="text-muted-foreground">
               {running
-                ? "Waiting for the first step…"
+                ? slowStart
+                  ? "Waking the database… the first run after the app's been idle can take up to a minute."
+                  : "Waiting for the first step…"
                 : "Run the agent to stream its steps here."}
             </p>
           ) : (
@@ -373,18 +432,18 @@ export function AgentRunConsole({
               <div className="flex items-center gap-3">
                 <span>
                   <span className="text-foreground tabular-nums">
-                    {usage.in.toLocaleString()}
+                    {fmtNum(usage.in)}
                   </span>{" "}
                   in
                 </span>
                 <span>
                   <span className="text-foreground tabular-nums">
-                    {usage.out.toLocaleString()}
+                    {fmtNum(usage.out)}
                   </span>{" "}
                   out
                 </span>
                 <span className="tabular-nums">
-                  {(usage.in + usage.out).toLocaleString()} total
+                  {fmtNum(usage.in + usage.out)} total
                 </span>
                 {usage.cost > 0 && (
                   <span className="ml-auto tabular-nums">
@@ -397,7 +456,7 @@ export function AgentRunConsole({
               <div className="tabular-nums">
                 Gemini free tier ({quota.model}) ·{" "}
                 {quota.gemini.requestsToday}/{quota.gemini.rpd} requests today ·
-                ~{quota.gemini.remainingToday.toLocaleString()} left · ≈
+                ~{fmtNum(quota.gemini.remainingToday)} left · ≈
                 {quota.gemini.runsPerMinute}/min
               </div>
             )}
@@ -406,8 +465,8 @@ export function AgentRunConsole({
                 OpenAI credit · ${quota.openai.spentUsd.toFixed(2)} / $
                 {quota.openai.budgetUsd.toFixed(2)} used · ~$
                 {quota.openai.remainingUsd.toFixed(2)} left · ≈
-                {quota.openai.runsLeftCredit.toLocaleString()} runs · ≈
-                {quota.openai.runsPerDayRate.toLocaleString()}/day (rate)
+                {fmtNum(quota.openai.runsLeftCredit)} runs · ≈
+                {fmtNum(quota.openai.runsPerDayRate)}/day (rate)
               </div>
             )}
           </div>

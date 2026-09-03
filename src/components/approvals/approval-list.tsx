@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { useActionToast } from "@/components/use-action-toast";
 import { createClient } from "@/lib/supabase/client";
+import { fmtDateTime } from "@/lib/format";
 import {
   resolveApprovalAction,
   type ActionState,
@@ -119,7 +120,7 @@ export function ApprovalList({
                 <p className="text-xs text-muted-foreground">
                   {(a.agentName ?? "system").replace(/_/g, " ")} ·{" "}
                   {a.actionType.replace(/_/g, " ")} ·{" "}
-                  {new Date(a.createdAt).toLocaleString()}
+                  {fmtDateTime(a.createdAt)}
                   {a.link && (
                     <>
                       {" · "}

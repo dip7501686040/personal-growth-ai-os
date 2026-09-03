@@ -179,6 +179,7 @@ export class BusinessAgent extends BaseAgent<Context, BusinessAgentResult> {
       agentRunId: ctx.agentRunId,
       schema: BusinessOpportunitiesSchema,
       schemaName: "business_opportunities",
+      signal: ctx.signal,
       system: SYSTEM,
       prompt: buildPrompt(context, today),
       temperature: 0.5,

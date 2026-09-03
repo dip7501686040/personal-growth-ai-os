@@ -2,12 +2,23 @@ import type { AgentName } from "@/lib/llm";
 
 export type AgentTrigger = "schedule" | "manual" | "chain";
 
+/** Non-terminal run statuses — a run in one of these has not finished. */
+export const WORKING_STATUSES = [
+  "triggered",
+  "running",
+  "gathering_context",
+  "analyzing",
+  "recommending",
+] as const;
+
 export interface AgentContext {
   userId: string;
   agentRunId: string;
   trigger: AgentTrigger;
   /** Per-run input for target-specific agents (e.g. { opportunityId }). */
   input: Record<string, unknown>;
+  /** Aborts long work (the LLM call) when the user stops the run. */
+  signal?: AbortSignal;
   /** Append a line to the run's event log. */
   log: (
     message: string,
@@ -37,6 +48,8 @@ export interface AgentRunOptions {
   force?: boolean;
   /** Per-run input for target-specific agents (e.g. { opportunityId }). */
   input?: Record<string, unknown>;
+  /** Abort signal — when it fires, the run stops and is marked cancelled. */
+  signal?: AbortSignal;
 }
 
 export type { AgentName };

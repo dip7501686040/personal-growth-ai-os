@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { fmtDate, fmtDateTime } from "@/lib/format";
 import {
   generateTokenAction,
   revokeTokenAction,
@@ -108,9 +109,9 @@ export function TokenManager({ tokens }: { tokens: TokenRow[] }) {
                 <span className="font-medium">{t.label}</span>
                 <span className="ml-2 text-xs text-muted-foreground">
                   {t.revokedAt
-                    ? `revoked ${new Date(t.revokedAt).toLocaleDateString()}`
+                    ? `revoked ${fmtDate(t.revokedAt)}`
                     : t.lastUsedAt
-                      ? `last used ${new Date(t.lastUsedAt).toLocaleString()}`
+                      ? `last used ${fmtDateTime(t.lastUsedAt)}`
                       : "never used"}
                 </span>
               </div>

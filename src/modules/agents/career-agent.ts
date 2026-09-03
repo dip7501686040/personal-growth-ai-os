@@ -199,6 +199,7 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
       agentRunId: ctx.agentRunId,
       schema: CareerMatchSchema,
       schemaName: "career_match",
+      signal: ctx.signal,
       system: SYSTEM,
       prompt: buildPrompt(context, today),
       temperature: 0.2,

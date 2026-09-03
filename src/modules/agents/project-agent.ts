@@ -146,6 +146,7 @@ export class ProjectAgent extends BaseAgent<Context, ProjectAgentResult> {
       agentRunId: ctx.agentRunId,
       schema: ProjectPlanSchema,
       schemaName: "project_plan",
+      signal: ctx.signal,
       system: SYSTEM,
       prompt: buildPrompt(context, today),
       temperature: 0.4,

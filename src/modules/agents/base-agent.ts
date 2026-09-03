@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   agentEvents,
@@ -7,10 +7,11 @@ import {
   type AgentRun,
 } from "@/lib/db/schema";
 import type { AgentName } from "@/lib/llm";
-import type {
-  AgentContext,
-  AgentResult,
-  AgentRunOptions,
+import {
+  WORKING_STATUSES,
+  type AgentContext,
+  type AgentResult,
+  type AgentRunOptions,
 } from "./types";
 
 type Status =
@@ -43,8 +44,11 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
   ): Promise<AgentResult>;
 
   async run(opts: AgentRunOptions): Promise<AgentRun> {
-    const { userId, trigger, triggerKey, force } = opts;
+    const { userId, trigger, triggerKey, force, signal } = opts;
     const input = opts.input ?? {};
+    const abortIfCancelled = () => {
+      if (signal?.aborted) throw new DOMException("Run cancelled", "AbortError");
+    };
 
     if (triggerKey && !force) {
       const [existing] = await db
@@ -62,6 +66,25 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
       if (existing && existing.status === "completed") return existing;
       if (existing && existing.status === "waiting_for_approval") return existing;
     }
+
+    // Only one run per agent is ever active. Fail any earlier run still stuck
+    // in a working status so the console never shows two — or a ghost that
+    // outlived the process that started it.
+    await db
+      .update(agentRuns)
+      .set({
+        status: "failed",
+        currentStep: "failed",
+        error: "Superseded by a newer run",
+        finishedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(agentRuns.userId, userId),
+          eq(agentRuns.agentName, this.name),
+          inArray(agentRuns.status, [...WORKING_STATUSES]),
+        ),
+      );
 
     const [run] = await db
       .insert(agentRuns)
@@ -81,6 +104,7 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
       agentRunId: run.id,
       trigger,
       input,
+      signal,
       log: (message, o) =>
         this.event(run.id, userId, message, o?.level ?? "info", o?.step, o?.data),
     };
@@ -95,14 +119,17 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
       await setStatus("running");
       await ctx.log("Run started", { step: "running" });
 
+      abortIfCancelled();
       await setStatus("gathering_context");
       const context = await this.gatherContext(ctx);
       await ctx.log("Context gathered", { step: "gathering_context" });
 
+      abortIfCancelled();
       await setStatus("analyzing");
       const analysis = await this.analyze(ctx, context);
       await ctx.log("Analysis complete", { step: "analyzing" });
 
+      abortIfCancelled();
       await setStatus("recommending");
       const outcome = await this.buildRecommendations(ctx, context, analysis);
       await ctx.log(outcome.summary, { step: "recommending" });
@@ -137,8 +164,20 @@ export abstract class BaseAgent<Context = unknown, Analysis = unknown> {
         .returning();
       return finished;
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      await this.event(run.id, userId, message, "error", "failed");
+      const cancelled =
+        (err instanceof Error && err.name === "AbortError") || signal?.aborted;
+      const message = cancelled
+        ? "Cancelled by user"
+        : err instanceof Error
+          ? err.message
+          : String(err);
+      await this.event(
+        run.id,
+        userId,
+        cancelled ? "Run cancelled" : message,
+        cancelled ? "warn" : "error",
+        "failed",
+      );
       const usage = await this.sumUsage(run.id, userId);
       const [failed] = await db
         .update(agentRuns)

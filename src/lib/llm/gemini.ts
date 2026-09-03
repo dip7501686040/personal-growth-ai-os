@@ -37,6 +37,7 @@ export class GeminiProvider implements LLMProvider {
   private async call(
     model: string,
     body: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<{ text: string; usage: GenerateResult["usage"] }> {
     const res = await fetch(`${BASE}/models/${model}:generateContent`, {
       method: "POST",
@@ -45,6 +46,7 @@ export class GeminiProvider implements LLMProvider {
         "x-goog-api-key": this.apiKey,
       },
       body: JSON.stringify(body),
+      signal,
     });
 
     const json = (await res.json().catch(() => ({}))) as GeminiResponse;
@@ -77,17 +79,21 @@ export class GeminiProvider implements LLMProvider {
   }
 
   async generate(opts: GenerateOptions): Promise<GenerateResult> {
-    return this.call(opts.model, {
-      ...(opts.system
-        ? { system_instruction: { parts: [{ text: opts.system }] } }
-        : {}),
-      contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
-      generationConfig: {
-        temperature: opts.temperature ?? 0.4,
-        maxOutputTokens: opts.maxOutputTokens ?? 4096,
-        thinkingConfig: { thinkingLevel: opts.thinkingLevel ?? "low" },
+    return this.call(
+      opts.model,
+      {
+        ...(opts.system
+          ? { system_instruction: { parts: [{ text: opts.system }] } }
+          : {}),
+        contents: [{ role: "user", parts: [{ text: opts.prompt }] }],
+        generationConfig: {
+          temperature: opts.temperature ?? 0.4,
+          maxOutputTokens: opts.maxOutputTokens ?? 4096,
+          thinkingConfig: { thinkingLevel: opts.thinkingLevel ?? "low" },
+        },
       },
-    });
+      opts.signal,
+    );
   }
 
   async generateStructured<T>(
@@ -100,23 +106,27 @@ export class GeminiProvider implements LLMProvider {
       toGeminiSchema(opts.schema),
     )}`;
 
-    const { text, usage } = await this.call(opts.model, {
-      ...(opts.system
-        ? { system_instruction: { parts: [{ text: opts.system }] } }
-        : {}),
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: `${opts.prompt}\n\n${schemaHint}` }],
+    const { text, usage } = await this.call(
+      opts.model,
+      {
+        ...(opts.system
+          ? { system_instruction: { parts: [{ text: opts.system }] } }
+          : {}),
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `${opts.prompt}\n\n${schemaHint}` }],
+          },
+        ],
+        generationConfig: {
+          temperature: opts.temperature ?? 0.3,
+          maxOutputTokens: opts.maxOutputTokens ?? 4096,
+          thinkingConfig: { thinkingLevel: opts.thinkingLevel ?? "low" },
+          responseMimeType: "application/json",
         },
-      ],
-      generationConfig: {
-        temperature: opts.temperature ?? 0.3,
-        maxOutputTokens: opts.maxOutputTokens ?? 4096,
-        thinkingConfig: { thinkingLevel: opts.thinkingLevel ?? "low" },
-        responseMimeType: "application/json",
       },
-    });
+      opts.signal,
+    );
 
     let parsed: unknown;
     try {
