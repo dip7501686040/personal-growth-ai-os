@@ -4,7 +4,10 @@ import { env } from "@/lib/env";
 import { getOwnerUserId } from "@/lib/owner";
 import { activityAnalyzerAgent } from "@/modules/agents/activity-analyzer-agent";
 import { chiefOfStaffAgent } from "@/modules/agents/chief-of-staff-agent";
+import { extractionAgent } from "@/modules/agents/extraction-agent";
 import { learningAgent } from "@/modules/agents/learning-agent";
+import { countPendingJobs } from "@/modules/ingestion/queue";
+import { drainContextEvents } from "@/modules/ingestion/refresh";
 
 export const maxDuration = 60;
 
@@ -39,6 +42,25 @@ const JOBS: Record<string, (userId: string) => Promise<{ id: string; status: str
         input: { date: d },
       });
       return { id: run.id, status: run.status };
+    },
+    "knowledge-refresh": async (userId) => {
+      const r = await drainContextEvents(userId);
+      return {
+        id: "-",
+        status: `refreshed ${r.processed} events → ${r.documents} docs / ${r.chunks} chunks`,
+      };
+    },
+    "ingest-drain": async (userId) => {
+      // Bounded per invocation so we stay under the function time limit.
+      let done = 0;
+      for (let i = 0; i < 6; i++) {
+        if ((await countPendingJobs(userId)) === 0) break;
+        const run = await extractionAgent.run({ userId, trigger: "schedule" });
+        const res = run.result as { skipped?: boolean } | null;
+        if (res?.skipped) break;
+        done++;
+      }
+      return { id: "-", status: `drained ${done} job(s)` };
     },
   };
 

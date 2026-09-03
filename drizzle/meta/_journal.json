@@ -71,6 +71,13 @@
       "when": 1788434423918,
       "tag": "0009_fat_serpent_society",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788435810935,
+      "tag": "0010_tense_vapor",
+      "breakpoints": true
     }
   ]
 }

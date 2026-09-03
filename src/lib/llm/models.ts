@@ -31,6 +31,8 @@ export const MODEL_LADDER: Record<AgentName, ModelChoice[]> = {
   chief_of_staff: [GEMINI_BEST, GEMINI_LITE, OPENAI_CHEAP],
   career: [OPENAI_BEST, OPENAI_CHEAP, GEMINI_LITE],
   activity_analyzer: [OPENAI_BEST, OPENAI_CHEAP, GEMINI_LITE],
+  // Structured extraction from repos/conversations — cheap Gemini first.
+  extractor: [GEMINI_LITE, GEMINI_BEST, OPENAI_CHEAP],
 };
 
 /** Top of each ladder — the model an agent uses when nothing is constrained. */

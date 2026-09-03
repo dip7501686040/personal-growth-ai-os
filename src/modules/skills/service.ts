@@ -8,6 +8,7 @@ import {
   type SkillEvidence,
 } from "@/lib/db/schema";
 import { slugify } from "@/lib/slug";
+import { recordContextEvent } from "@/modules/context/events";
 import { LEVEL_LABEL, type SkillCategory, type SkillLevel } from "./levels";
 import {
   deriveLevel,
@@ -155,6 +156,12 @@ export async function recomputeSkill(
   userId: string,
   skillId: string,
 ): Promise<Skill> {
+  const [before] = await db
+    .select({ level: skills.level })
+    .from(skills)
+    .where(and(eq(skills.userId, userId), eq(skills.id, skillId)))
+    .limit(1);
+
   const accepted = await db
     .select()
     .from(skillEvidence)
@@ -177,6 +184,15 @@ export async function recomputeSkill(
     })
     .where(and(eq(skills.userId, userId), eq(skills.id, skillId)))
     .returning();
+
+  if (before && before.level !== row.level) {
+    await recordContextEvent({
+      userId,
+      kind: "skill_changed",
+      refId: skillId,
+      payload: { from: before.level, to: row.level },
+    });
+  }
   return row;
 }
 

@@ -11,6 +11,7 @@ import {
   type DsaPattern,
   type LearningSession,
 } from "@/lib/db/schema";
+import { recordContextEvent } from "@/modules/context/events";
 import { addEvidence, upsertSkillByName } from "@/modules/skills/service";
 import {
   computePatternStats,
@@ -76,6 +77,12 @@ export async function createLearningSession(
       });
     }
   }
+
+  await recordContextEvent({
+    userId,
+    kind: "learning_logged",
+    refId: session.id,
+  });
 
   return session;
 }

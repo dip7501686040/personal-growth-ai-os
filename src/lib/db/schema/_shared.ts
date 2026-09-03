@@ -44,6 +44,12 @@ export const evidenceSourceTypeEnum = pgEnum("evidence_source_type", [
   "activity_analysis",
   "manual",
   "agent_suggestion",
+  // Personal Context System — evidence distilled from external sources.
+  "github_repo",
+  "conversation",
+  "linkedin",
+  "local_doc",
+  "knowledge_document",
 ]);
 
 export const evidenceStrengthEnum = pgEnum("evidence_strength", [
@@ -68,6 +74,7 @@ export const agentNameEnum = pgEnum("agent_name", [
   "business",
   "chief_of_staff",
   "activity_analyzer",
+  "extractor",
 ]);
 
 export const agentStatusEnum = pgEnum("agent_status", [

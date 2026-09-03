@@ -9,7 +9,8 @@ export type AgentName =
   | "content"
   | "business"
   | "chief_of_staff"
-  | "activity_analyzer";
+  | "activity_analyzer"
+  | "extractor";
 
 export interface TokenUsage {
   inputTokens: number | null;

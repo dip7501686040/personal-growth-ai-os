@@ -10,6 +10,7 @@ import {
   type ProjectFeature,
 } from "@/lib/db/schema";
 import { slugify } from "@/lib/slug";
+import { recordContextEvent } from "@/modules/context/events";
 import { recomputeSkill, upsertSkillByName } from "@/modules/skills/service";
 import type { SkillCategory } from "@/modules/skills/levels";
 
@@ -131,7 +132,62 @@ export async function createProject(
       status: input.status ?? "idea",
     })
     .returning();
+  await recordContextEvent({
+    userId,
+    kind: "project_updated",
+    refId: row.id,
+  });
   return row;
+}
+
+/**
+ * Get the project with this name (by slug), or create it as an `idea`.
+ * Used by the Extraction Agent — fills a blank description when it learns one,
+ * but never overwrites what the user has written.
+ */
+export async function upsertProjectByName(
+  userId: string,
+  name: string,
+  description?: string,
+): Promise<Project> {
+  const slug = slugify(name);
+  const [existing] = await db
+    .select()
+    .from(projects)
+    .where(and(eq(projects.userId, userId), eq(projects.slug, slug)))
+    .limit(1);
+
+  if (existing) {
+    if (!existing.description && description?.trim()) {
+      const [updated] = await db
+        .update(projects)
+        .set({ description: description.trim(), updatedAt: new Date() })
+        .where(eq(projects.id, existing.id))
+        .returning();
+      return updated;
+    }
+    return existing;
+  }
+
+  const [row] = await db
+    .insert(projects)
+    .values({
+      userId,
+      name: name.trim(),
+      slug,
+      description: description?.trim() || null,
+      status: "idea",
+    })
+    .onConflictDoNothing({ target: [projects.userId, projects.slug] })
+    .returning();
+  if (row) return row;
+
+  const [after] = await db
+    .select()
+    .from(projects)
+    .where(and(eq(projects.userId, userId), eq(projects.slug, slug)))
+    .limit(1);
+  return after;
 }
 
 export async function updateProject(
@@ -148,6 +204,11 @@ export async function updateProject(
     .update(projects)
     .set({ ...patch, updatedAt: new Date() })
     .where(and(eq(projects.userId, userId), eq(projects.id, projectId)));
+  await recordContextEvent({
+    userId,
+    kind: "project_updated",
+    refId: projectId,
+  });
 }
 
 export async function deleteProject(

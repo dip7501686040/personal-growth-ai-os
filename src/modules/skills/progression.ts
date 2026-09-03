@@ -25,7 +25,12 @@ export type EvidenceSourceType =
   | "project_feature"
   | "activity_analysis"
   | "manual"
-  | "agent_suggestion";
+  | "agent_suggestion"
+  | "github_repo"
+  | "conversation"
+  | "linkedin"
+  | "local_doc"
+  | "knowledge_document";
 
 export interface EvidenceLike {
   id: string;
