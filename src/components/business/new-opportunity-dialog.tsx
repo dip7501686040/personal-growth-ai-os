@@ -60,7 +60,7 @@ export function NewOpportunityDialog() {
               <Label htmlFor="proposedSolution">Proposed solution</Label>
               <Textarea id="proposedSolution" name="proposedSolution" rows={2} required />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="complexity">Complexity</Label>
                 <NativeSelect id="complexity" name="complexity" defaultValue="medium">

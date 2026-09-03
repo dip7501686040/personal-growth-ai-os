@@ -35,7 +35,7 @@ export function LogSessionForm({
         <Input id="topic" name="topic" placeholder="e.g. Idempotent consumers" required />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="category">Category</Label>
           <NativeSelect id="category" name="category" defaultValue="technology">
@@ -58,7 +58,7 @@ export function LogSessionForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="confidenceBefore">Confidence before (0–100)</Label>
           <Input id="confidenceBefore" name="confidenceBefore" type="number" min={0} max={100} />

@@ -40,7 +40,7 @@ export function NewOpportunityDialog() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3 py-4">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="company">Company</Label>
                 <Input id="company" name="company" required />
@@ -50,7 +50,7 @@ export function NewOpportunityDialog() {
                 <Input id="role" name="role" required />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="jobUrl">Job URL (optional)</Label>
                 <Input id="jobUrl" name="jobUrl" type="url" />

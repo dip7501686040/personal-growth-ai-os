@@ -58,7 +58,7 @@ export function LogAttemptForm({
         Solved
       </label>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="timeTakenMinutes">Minutes</Label>
           <Input id="timeTakenMinutes" name="timeTakenMinutes" type="number" min={0} />
@@ -69,7 +69,7 @@ export function LogAttemptForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-2">
           <Label htmlFor="confidenceBefore">Confidence before</Label>
           <Input id="confidenceBefore" name="confidenceBefore" type="number" min={0} max={100} />

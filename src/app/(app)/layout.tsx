@@ -6,9 +6,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
 
   return (
-    <div className="flex min-h-svh bg-background">
+    <div className="flex min-h-svh flex-col bg-background md:flex-row">
       <AppNav email={user.email ?? ""} />
-      <main className="flex-1 overflow-x-hidden px-8 py-8">
+      <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-6 md:px-8 md:py-8">
         <div className="mx-auto w-full max-w-5xl">{children}</div>
       </main>
     </div>

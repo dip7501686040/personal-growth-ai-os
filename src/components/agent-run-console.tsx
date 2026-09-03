@@ -429,7 +429,7 @@ export function AgentRunConsole({
         {(usage && (usage.in > 0 || usage.out > 0)) || quota ? (
           <div className="flex flex-col gap-0.5 border-t px-3 py-1 text-[11px] text-muted-foreground">
             {usage && (usage.in > 0 || usage.out > 0) && (
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
                 <span>
                   <span className="text-foreground tabular-nums">
                     {fmtNum(usage.in)}
