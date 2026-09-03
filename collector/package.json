@@ -6,7 +6,8 @@
   "description": "Local Claude Code activity collector for Personal Growth AI OS. Zero dependencies — runs on Node 22.18+ native TypeScript.",
   "scripts": {
     "install-hooks": "node install.ts",
-    "sync": "node src/index.ts sync"
+    "sync": "node src/index.ts sync",
+    "test": "node test/scenario.ts"
   },
   "engines": {
     "node": ">=22.18.0"

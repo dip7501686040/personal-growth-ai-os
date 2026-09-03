@@ -1,31 +1,40 @@
-import { config, debug } from "./config.ts";
+import { mkdirSync, rmSync, statSync } from "node:fs";
+import { config, debug, DRAIN_LOCK } from "./config.ts";
 import { pruneQueue } from "./maintenance.ts";
 import { readQueue, rewriteQueue } from "./queue.ts";
 
 type SendResult = "ok" | "retry" | "drop";
 
-async function send(event: unknown): Promise<SendResult> {
-  if (!config.ingestToken) {
-    debug("no PGAIOS_INGEST_TOKEN set — keeping event for later");
-    return "retry";
-  }
+const LOCK_STALE_MS = 2 * 60 * 1000;
+
+interface TranscriptEnvelope {
+  __t: "transcript";
+  sessionId: string;
+  title?: string;
+  text: string;
+}
+
+function isTranscript(e: unknown): e is TranscriptEnvelope {
+  return !!e && typeof e === "object" && (e as { __t?: string }).__t === "transcript";
+}
+
+async function post(path: string, body: unknown): Promise<SendResult> {
   try {
-    const res = await fetch(`${config.apiBaseUrl}/api/activity/ingest`, {
+    const res = await fetch(`${config.apiBaseUrl}${path}`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         authorization: `Bearer ${config.ingestToken}`,
       },
-      body: JSON.stringify(event),
-      signal: AbortSignal.timeout(12_000),
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15_000),
     });
     if (res.ok) return "ok";
-    // 401 (bad/revoked token) and 400 (bad payload) won't fix themselves.
     if (res.status === 401 || res.status === 400) {
-      debug(`dropping event after HTTP ${res.status}`);
+      debug(`dropping event after HTTP ${res.status} from ${path}`);
       return "drop";
     }
-    debug(`retry after HTTP ${res.status}`);
+    debug(`retry after HTTP ${res.status} from ${path}`);
     return "retry";
   } catch (e) {
     debug("network error, will retry:", (e as Error).message);
@@ -33,16 +42,65 @@ async function send(event: unknown): Promise<SendResult> {
   }
 }
 
-/** Tries to send every queued event; keeps only the ones that should be retried. */
-export async function drainQueue(): Promise<void> {
-  pruneQueue();
-  const events = readQueue();
-  if (events.length === 0) return;
-  const keep: unknown[] = [];
-  for (const event of events) {
-    const result = await send(event);
-    if (result === "retry") keep.push(event);
+async function send(event: unknown): Promise<SendResult> {
+  if (!config.ingestToken) {
+    debug("no PGAIOS_INGEST_TOKEN set — keeping event for later");
+    return "retry";
   }
-  rewriteQueue(keep);
-  debug(`drain complete: ${events.length - keep.length} sent, ${keep.length} kept`);
+  if (isTranscript(event)) {
+    return post("/api/ingest/transcripts", {
+      sessionId: event.sessionId,
+      title: event.title,
+      text: event.text,
+    });
+  }
+  return post("/api/activity/ingest", event);
+}
+
+/** Non-blocking lock so two concurrent hook processes don't race the queue. */
+function acquireLock(): boolean {
+  try {
+    mkdirSync(DRAIN_LOCK);
+    return true;
+  } catch {
+    try {
+      if (Date.now() - statSync(DRAIN_LOCK).mtimeMs > LOCK_STALE_MS) {
+        rmSync(DRAIN_LOCK, { recursive: true, force: true });
+        mkdirSync(DRAIN_LOCK);
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  }
+}
+
+function releaseLock(): void {
+  try {
+    rmSync(DRAIN_LOCK, { recursive: true, force: true });
+  } catch {
+    // ignore
+  }
+}
+
+/** Send every queued event; keep the ones that should be retried. */
+export async function drainQueue(): Promise<void> {
+  if (!acquireLock()) {
+    debug("drain skipped — another process holds the lock");
+    return;
+  }
+  try {
+    pruneQueue();
+    const events = readQueue();
+    if (events.length === 0) return;
+    const keep: unknown[] = [];
+    for (const event of events) {
+      if ((await send(event)) === "retry") keep.push(event);
+    }
+    rewriteQueue(keep);
+    debug(`drain complete: ${events.length - keep.length} sent, ${keep.length} kept`);
+  } finally {
+    releaseLock();
+  }
 }

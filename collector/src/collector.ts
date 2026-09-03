@@ -1,6 +1,7 @@
 import {
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -8,16 +9,28 @@ import {
 import { join } from "node:path";
 import { SESSIONS_DIR } from "./config.ts";
 
+/** One repo's edit window within a session (reset on a day-boundary rollup). */
+export interface RepoWindow {
+  /** git repo root (realpath) */
+  root: string;
+  /** project name for this repo */
+  name: string;
+  branch: string | null;
+  /** HEAD when this window started */
+  startHead: string | null;
+  /** absolute file paths Claude edited in this window */
+  touched: string[];
+}
+
 export interface SessionState {
   sessionId: string;
   cwd: string;
-  projectPath: string;
-  projectName: string;
+  /** when the session began */
   startedAt: string;
-  startHead: string | null;
-  branch: string | null;
-  /** Absolute file paths Claude edited/wrote this session. */
-  touched: string[];
+  /** anchor for the day-boundary rollup — reset each time a window is flushed */
+  windowStartAt: string;
+  /** repo root → its current edit window */
+  repos: Record<string, RepoWindow>;
 }
 
 const stateFile = (id: string) =>
@@ -44,4 +57,32 @@ export function deleteSession(id: string): void {
   } catch {
     // ignore
   }
+}
+
+/** Every on-disk session state (used to finalize sessions left open across days). */
+export function listSessions(): SessionState[] {
+  let files: string[];
+  try {
+    files = readdirSync(SESSIONS_DIR);
+  } catch {
+    return [];
+  }
+  const out: SessionState[] = [];
+  for (const f of files) {
+    if (!f.endsWith(".json")) continue;
+    try {
+      out.push(JSON.parse(readFileSync(join(SESSIONS_DIR, f), "utf8")));
+    } catch {
+      // ignore malformed
+    }
+  }
+  return out;
+}
+
+/** Local YYYY-MM-DD for a timestamp — the rollup boundary. */
+export function localDay(iso: string | number | Date): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
 }

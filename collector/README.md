@@ -30,10 +30,18 @@ Claude Code ── hooks ──▶  collector/src/index.ts <event>
 
 | Claude Code hook | Collector command | What it does |
 |---|---|---|
-| `SessionStart` | `session-start` | records session id, cwd, detected project, git branch + HEAD |
-| `PostToolUse` (`Edit`/`Write`/`MultiEdit`) | `file-activity` | adds the touched file path to the session (no network) |
-| `Stop` | `checkpoint` | flushes the offline queue |
-| `SessionEnd` | `session-end` | builds one `coding_session` from `git status` / `git log` / `git diff --stat`, enqueues it, syncs |
+| `SessionStart` | `session-start` | records session id + cwd; seeds an edit window per git repo; finalizes any session left open past midnight |
+| `PostToolUse` (`Edit`/`Write`/`MultiEdit`) | `file-activity` | attributes the touched file to **its own** git repo (multi-repo sessions are split) |
+| `Stop` | `checkpoint` | on a local day boundary (or an 18h+ window), rolls the window: one `coding_session` **per repo** for that day, then resets. Flushes the queue. |
+| `SessionEnd` | `session-end` | finalizes every repo window, enqueues, syncs |
+
+- **One row per repo per day.** Work across `repo-a` + `infra-b` in one session,
+  spanning days, yields a clean `coding_session` per repo per day — not one blob.
+- **Transcripts (opt-in).** With `PGAIOS_SYNC_TRANSCRIPTS=1`, `Stop` / `SessionEnd`
+  also ship trimmed user+assistant prose (no tool calls, thinking, or
+  system-reminders) to `/api/ingest/transcripts`. One-time catch-up of past
+  sessions: `node collector/src/index.ts transcripts --backfill`.
+- A `mkdir`-based lock keeps two concurrent hook processes from racing the queue.
 
 ---
 

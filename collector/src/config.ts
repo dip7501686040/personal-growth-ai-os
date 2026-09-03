@@ -7,6 +7,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const DATA_DIR = join(root, "data");
 export const SESSIONS_DIR = join(DATA_DIR, "sessions");
 export const QUEUE_FILE = join(DATA_DIR, "pending-events.jsonl");
+export const TRANSCRIPTS_CURSOR = join(DATA_DIR, "transcripts-cursor.json");
+export const DRAIN_LOCK = join(DATA_DIR, "drain.lock");
 
 /** Minimal .env loader (no dependency). Only sets vars that aren't already set. */
 function loadEnvFile(): void {
@@ -45,6 +47,8 @@ export const config = {
   /** Optional map: absolute path → your project name/id (overrides detection). */
   projects: fileConfig.projects ?? {},
   debug: process.env.PGAIOS_DEBUG === "1",
+  /** Opt-in: also ship trimmed Claude Code conversation text for extraction. */
+  syncTranscripts: process.env.PGAIOS_SYNC_TRANSCRIPTS === "1",
 };
 
 export function debug(...args: unknown[]): void {

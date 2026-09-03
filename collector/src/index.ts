@@ -3,9 +3,11 @@ import {
   onFileActivity,
   onSessionEnd,
   onSessionStart,
+  readStdin,
 } from "./hooks.ts";
 import { sweepStaleSessions } from "./maintenance.ts";
 import { drainQueue } from "./sync.ts";
+import { backfillTranscripts, syncCurrentTranscript } from "./transcripts.ts";
 
 const commands: Record<string, () => Promise<void>> = {
   "session-start": onSessionStart,
@@ -14,6 +16,18 @@ const commands: Record<string, () => Promise<void>> = {
   "session-end": onSessionEnd,
   sync: async () => {
     sweepStaleSessions();
+    await drainQueue();
+  },
+  transcripts: async () => {
+    if (process.argv.includes("--backfill")) {
+      const n = backfillTranscripts();
+      console.error(`[pgaios-collector] transcript backfill queued ${n} session(s)`);
+    } else {
+      const h = await readStdin();
+      if (h.session_id) {
+        syncCurrentTranscript(h.session_id, h.cwd || process.cwd());
+      }
+    }
     await drainQueue();
   },
 };
