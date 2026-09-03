@@ -18,6 +18,8 @@
  * ALLOWED_EMAILS looked up via the Supabase admin API.
  */
 
+export {}; // module scope — keep top-level names out of the global script scope
+
 // The transaction pooler (DATABASE_URL, port 6543) kills the first query after
 // a paused free-tier project wakes up (statement timeout, SQLSTATE 57014).
 // Point the db client at the session pooler (DIRECT_URL, port 5432) instead.
