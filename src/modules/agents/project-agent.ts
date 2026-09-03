@@ -2,6 +2,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { learningSessions } from "@/lib/db/schema";
 import { hasProviderKey, resolveModelConfig, runStructured } from "@/lib/llm";
+import { getPersonalContext } from "@/modules/context";
 import { getProjectSnapshot } from "@/modules/projects/service";
 import { BaseAgent } from "./base-agent";
 import { ProjectPlanSchema, type ProjectPlan } from "./project-plan-schema";
@@ -22,6 +23,8 @@ interface Context {
   snapshot: Awaited<ReturnType<typeof getProjectSnapshot>>;
   recentTopics: string[];
   hasData: boolean;
+  /** Unified skill + knowledge-base view from the Personal Context Engine. */
+  personal: string;
 }
 
 const SYSTEM = `You are the Project Agent inside a personal engineering-growth OS for one senior backend/full-stack engineer.
@@ -36,6 +39,9 @@ Rules:
 function buildPrompt(ctx: Context, today: string): string {
   return [
     `Today: ${today}`,
+    ``,
+    `# The engineer's current context`,
+    ctx.personal,
     ``,
     `Existing projects: ${JSON.stringify(ctx.snapshot.projects)}`,
     `Proven/implemented skills: ${JSON.stringify(ctx.snapshot.strengths)}`,
@@ -87,7 +93,7 @@ export class ProjectAgent extends BaseAgent<Context, ProjectAgentResult> {
   readonly name = "project" as const;
 
   protected async gatherContext(ctx: AgentContext): Promise<Context> {
-    const [snapshot, sessions] = await Promise.all([
+    const [snapshot, sessions, pc] = await Promise.all([
       getProjectSnapshot(ctx.userId),
       db
         .select({ topic: learningSessions.topic })
@@ -95,6 +101,7 @@ export class ProjectAgent extends BaseAgent<Context, ProjectAgentResult> {
         .where(eq(learningSessions.userId, ctx.userId))
         .orderBy(desc(learningSessions.occurredAt))
         .limit(25),
+      getPersonalContext({ userId: ctx.userId, purpose: "project_ideas" }),
     ]);
 
     const recentTopics = [...new Set(sessions.map((s) => s.topic))].slice(0, 15);
@@ -104,7 +111,7 @@ export class ProjectAgent extends BaseAgent<Context, ProjectAgentResult> {
         recentTopics.length >
       0;
 
-    return { snapshot, recentTopics, hasData };
+    return { snapshot, recentTopics, hasData, personal: pc.toPromptString() };
   }
 
   protected async analyze(

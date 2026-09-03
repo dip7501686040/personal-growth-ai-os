@@ -72,4 +72,14 @@ export const PURPOSES: Record<ContextPurpose, PurposeConfig> = {
     halfLifeDays: 240,
     defaultQuery: (s) => flatSkills(s, 15) || "solo-buildable technical skills",
   },
+  daily_briefing: {
+    budgetTokens: 2000,
+    knowledgeK: 5,
+    rrf: { vector: 1, keyword: 0.7 },
+    halfLifeDays: 45, // the briefing is about right now
+    defaultQuery: (s) =>
+      [...s.inProgressSkills.map((k) => k.name), recentTopics(s, 3)]
+        .filter(Boolean)
+        .join(", ") || "current engineering focus and priorities",
+  },
 };

@@ -6,6 +6,7 @@ import {
   projectFeatures,
 } from "@/lib/db/schema";
 import { hasProviderKey, resolveModelConfig, runStructured } from "@/lib/llm";
+import { getPersonalContext } from "@/modules/context";
 import {
   createIdea,
   getContentItem,
@@ -43,7 +44,7 @@ interface Candidate {
 }
 
 type Context =
-  | { mode: "scan"; candidates: Candidate[] }
+  | { mode: "scan"; candidates: Candidate[]; personal: string }
   | {
       mode: "draft";
       itemId: string;
@@ -192,13 +193,16 @@ export class ContentAgent extends BaseAgent<Context, ContentAgentResult> {
       };
     }
 
-    const snap = await getContentSnapshot(ctx.userId);
+    const [snap, pc] = await Promise.all([
+      getContentSnapshot(ctx.userId),
+      getPersonalContext({ userId: ctx.userId, purpose: "content_draft" }),
+    ]);
     const candidates = buildCandidates(snap);
     const fresh: Candidate[] = [];
     for (const c of candidates) {
       if (!(await hasItemForSource(ctx.userId, c.type, c.id))) fresh.push(c);
     }
-    return { mode: "scan", candidates: fresh };
+    return { mode: "scan", candidates: fresh, personal: pc.toPromptString() };
   }
 
   protected async analyze(
@@ -319,6 +323,9 @@ export class ContentAgent extends BaseAgent<Context, ContentAgentResult> {
       signal: ctx.signal,
       system: SCAN_SYSTEM,
       prompt: [
+        `# The engineer's current context (for judging what's post-worthy)`,
+        context.personal,
+        ``,
         `Recent real events:`,
         ...context.candidates.map(
           (c) => `[${c.key}] ${c.label}${c.detail ? ` — ${c.detail}` : ""}`,

@@ -1,4 +1,5 @@
 import { hasProviderKey, resolveModelConfig, runStructured } from "@/lib/llm";
+import { getPersonalContext } from "@/modules/context";
 import {
   createOpportunity,
   getBusinessSnapshot,
@@ -23,6 +24,8 @@ interface Context {
   market: string;
   businessType: string;
   knownProblems: string;
+  /** Unified skill + knowledge-base view from the Personal Context Engine. */
+  personal: string;
 }
 
 const SYSTEM = `You are the Business Opportunity Agent for one senior backend/full-stack engineer who wants realistic side income.
@@ -40,6 +43,9 @@ Hard constraints:
 function buildPrompt(ctx: Context, today: string): string {
   return [
     `Today: ${today}`,
+    ``,
+    `# The engineer's current context`,
+    ctx.personal,
     ``,
     `User can build with (proven/implemented): ${JSON.stringify(ctx.snapshot.buildableWith)}`,
     `Also knows (practiced): ${JSON.stringify(ctx.snapshot.alsoKnows)}`,
@@ -134,11 +140,16 @@ export class BusinessAgent extends BaseAgent<Context, BusinessAgentResult> {
   readonly name = "business" as const;
 
   protected async gatherContext(ctx: AgentContext): Promise<Context> {
+    const [snapshot, pc] = await Promise.all([
+      getBusinessSnapshot(ctx.userId),
+      getPersonalContext({ userId: ctx.userId, purpose: "business_scan" }),
+    ]);
     return {
-      snapshot: await getBusinessSnapshot(ctx.userId),
+      snapshot,
       market: String(ctx.input.market ?? "").trim(),
       businessType: String(ctx.input.businessType ?? "").trim(),
       knownProblems: String(ctx.input.knownProblems ?? "").trim(),
+      personal: pc.toPromptString(),
     };
   }
 

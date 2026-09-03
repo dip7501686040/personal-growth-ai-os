@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { skillEvidence, skills } from "@/lib/db/schema";
 import { hasProviderKey, resolveModelConfig, runStructured } from "@/lib/llm";
+import { getPersonalContext } from "@/modules/context";
 import {
   getOpportunity,
   saveMatch,
@@ -37,6 +38,8 @@ interface Context {
   opportunity: { company: string; role: string; description: string };
   skillFacts: SkillFact[];
   projects: { name: string; status: string; features: string; skills: number }[];
+  /** JD-focused skill + knowledge-base view from the Personal Context Engine. */
+  personal: string;
 }
 
 const SYSTEM = `You are the Career Agent for one senior backend/full-stack engineer. You judge a job against the user's REAL proof-of-skills — honestly, never inflating.
@@ -56,6 +59,9 @@ Hard rules:
 function buildPrompt(ctx: Context, today: string): string {
   return [
     `Today: ${today}`,
+    ``,
+    `# The engineer's proof-of-work context`,
+    ctx.personal,
     ``,
     `JOB`,
     `Company: ${ctx.opportunity.company}`,
@@ -117,7 +123,7 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
     const opp = await getOpportunity(ctx.userId, opportunityId);
     if (!opp) throw new Error("Opportunity not found.");
 
-    const [skillRows, evRows, projectRows] = await Promise.all([
+    const [skillRows, evRows, projectRows, pc] = await Promise.all([
       db
         .select({
           id: skills.id,
@@ -139,6 +145,11 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
           ),
         ),
       listProjects(ctx.userId),
+      getPersonalContext({
+        userId: ctx.userId,
+        purpose: "career_match",
+        query: opp.opportunity.description.slice(0, 4000),
+      }),
     ]);
 
     const byProject = new Set(
@@ -168,6 +179,7 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
         features: `${p.featuresDone}/${p.featuresTotal} done`,
         skills: p.skillsCount,
       })),
+      personal: pc.toPromptString(),
     };
   }
 

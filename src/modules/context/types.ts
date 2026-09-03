@@ -8,6 +8,7 @@ export const CONTEXT_PURPOSES = [
   "project_ideas",
   "content_draft",
   "business_scan",
+  "daily_briefing",
 ] as const;
 export type ContextPurpose = (typeof CONTEXT_PURPOSES)[number];
 

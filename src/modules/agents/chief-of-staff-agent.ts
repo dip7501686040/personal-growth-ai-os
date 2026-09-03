@@ -1,10 +1,13 @@
 import { hasProviderKey, resolveModelConfig, runStructured } from "@/lib/llm";
+import { getPersonalContext } from "@/modules/context";
 import {
   getBriefingContext,
   upsertBriefing,
   type BriefingContext,
   type BriefingData,
 } from "@/modules/briefing/service";
+
+type CosContext = BriefingContext & { personal: string };
 import { BaseAgent } from "./base-agent";
 import { BriefingSchema, type Briefing } from "./chief-of-staff-schema";
 import type { AgentContext, AgentResult } from "./types";
@@ -140,16 +143,20 @@ function deterministic(ctx: BriefingContext): Briefing {
   };
 }
 
-export class ChiefOfStaffAgent extends BaseAgent<BriefingContext, ChiefOfStaffResult> {
+export class ChiefOfStaffAgent extends BaseAgent<CosContext, ChiefOfStaffResult> {
   readonly name = "chief_of_staff" as const;
 
-  protected gatherContext(ctx: AgentContext): Promise<BriefingContext> {
-    return getBriefingContext(ctx.userId);
+  protected async gatherContext(ctx: AgentContext): Promise<CosContext> {
+    const [briefing, pc] = await Promise.all([
+      getBriefingContext(ctx.userId),
+      getPersonalContext({ userId: ctx.userId, purpose: "daily_briefing" }),
+    ]);
+    return { ...briefing, personal: pc.toPromptString() };
   }
 
   protected async analyze(
     ctx: AgentContext,
-    context: BriefingContext,
+    context: CosContext,
   ): Promise<ChiefOfStaffResult> {
     const today = context.today;
     const cfg = await resolveModelConfig(ctx.userId, "chief_of_staff");
@@ -174,7 +181,7 @@ export class ChiefOfStaffAgent extends BaseAgent<BriefingContext, ChiefOfStaffRe
       schemaName: "daily_briefing",
       signal: ctx.signal,
       system: SYSTEM,
-      prompt: digest(context),
+      prompt: `${digest(context)}\n\n# The engineer's current context\n${context.personal}`,
       temperature: 0.3,
       cache: false,
     });
