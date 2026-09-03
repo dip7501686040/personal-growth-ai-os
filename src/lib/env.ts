@@ -36,6 +36,10 @@ const serverEnvSchema = z.object({
   // Which embedding backend the knowledge base uses. "auto" = Gemini when
   // GEMINI_API_KEY is set, else the local Transformers.js model.
   EMBEDDINGS_PROVIDER: z.enum(["auto", "gemini", "local"]).optional(),
+  // GitHub personal access token for the repo connector (read-only scopes:
+  // `repo` for private, or none for public). Optional — public repos work
+  // unauthenticated at 60 req/hr.
+  GITHUB_TOKEN: z.string().min(1).optional(),
   // Shared secret for Vercel Cron routes.
   CRON_SECRET: z.string().min(1).optional(),
   // The single owner's auth.users id — lets cron skip an auth-schema lookup.
@@ -54,6 +58,7 @@ const parsed = serverEnvSchema.safeParse({
   GEMINI_API_KEY: optional(process.env.GEMINI_API_KEY),
   OPENAI_API_KEY: optional(process.env.OPENAI_API_KEY),
   EMBEDDINGS_PROVIDER: optional(process.env.EMBEDDINGS_PROVIDER),
+  GITHUB_TOKEN: optional(process.env.GITHUB_TOKEN),
   CRON_SECRET: optional(process.env.CRON_SECRET),
   OWNER_USER_ID: optional(process.env.OWNER_USER_ID),
 });

@@ -13,6 +13,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/career", label: "Career", phase: "Phase 5" },
   { href: "/content", label: "Content", phase: "Phase 6" },
   { href: "/business", label: "Business Opportunities", phase: "Phase 7" },
+  { href: "/knowledge", label: "Knowledge", phase: "Context P4" },
   { href: "/approvals", label: "Approval Inbox", phase: "Phase 9" },
   { href: "/activity", label: "Agent Activity", phase: "Phase 2.5 / 9" },
 ];

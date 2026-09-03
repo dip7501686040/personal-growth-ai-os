@@ -8,6 +8,7 @@ import { extractionAgent } from "@/modules/agents/extraction-agent";
 import { learningAgent } from "@/modules/agents/learning-agent";
 import { countPendingJobs } from "@/modules/ingestion/queue";
 import { drainContextEvents } from "@/modules/ingestion/refresh";
+import { syncSources } from "@/modules/ingestion/sources";
 
 export const maxDuration = 60;
 
@@ -42,6 +43,13 @@ const JOBS: Record<string, (userId: string) => Promise<{ id: string; status: str
         input: { date: d },
       });
       return { id: run.id, status: run.status };
+    },
+    "github-sync": async (userId) => {
+      const r = await syncSources(userId, "github_repo");
+      return {
+        id: "-",
+        status: `synced ${r.sources} repo(s) → ${r.enqueued} new job(s), ${r.deduped} unchanged, ${r.errors} error(s)`,
+      };
     },
     "knowledge-refresh": async (userId) => {
       const r = await drainContextEvents(userId);

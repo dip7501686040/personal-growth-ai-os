@@ -10,6 +10,10 @@
       "schedule": "30 2 * * *"
     },
     {
+      "path": "/api/cron/github-sync",
+      "schedule": "0 1 * * *"
+    },
+    {
       "path": "/api/cron/knowledge-refresh",
       "schedule": "45 1 * * *"
     },

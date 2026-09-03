@@ -13,3 +13,4 @@ export {
   type KnowledgeHit,
   type SearchOpts,
 } from "./search";
+export { knowledgeStats, type KnowledgeStats } from "./stats";
