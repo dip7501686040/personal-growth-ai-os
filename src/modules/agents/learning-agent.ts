@@ -1,15 +1,8 @@
-import { and, desc, eq, gte } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { skillEvidence, skills } from "@/lib/db/schema";
 import { hasProviderKey, resolveModelConfig, runStructured } from "@/lib/llm";
 import {
-  getPatternStats,
-  listLearningSessions,
-  listRecentAttempts,
-  countLearningActivity,
-  rankWeakPatterns,
-} from "@/modules/learning/service";
-import type { PatternStat } from "@/modules/learning/pattern-stats";
+  getPersonalContext,
+  type LearningPlanContext,
+} from "@/modules/context";
 import { BaseAgent } from "./base-agent";
 import { LearningPlanSchema, type LearningPlan } from "./learning-plan-schema";
 import type { AgentContext, AgentResult } from "./types";
@@ -25,28 +18,7 @@ export interface LearningAgentResult {
   note?: string;
 }
 
-// ── Context ────────────────────────────────────────────────────────────────
-
-interface Context {
-  activityCount: number;
-  patternStats: PatternStat[];
-  weakPatterns: PatternStat[];
-  recentSessions: {
-    topic: string;
-    category: string;
-    confidenceAfter: number | null;
-    occurredAt: string;
-  }[];
-  recentAttempts: {
-    title: string;
-    solved: boolean;
-    hintsUsed: number;
-    failureReason: string;
-    attemptedAt: string;
-  }[];
-  inProgressSkills: { name: string; level: string; category: string }[];
-  activityEvidence: { skill: string; summary: string }[];
-}
+type Context = LearningPlanContext;
 
 const SYSTEM = `You are the Learning Agent inside a personal engineering-growth OS for a single senior backend/full-stack engineer.
 Your job: produce ONE focused daily learning plan and, when the data supports it, a DSA pattern-recognition weakness note.
@@ -56,46 +28,20 @@ Rules:
 - Prefer the next logical step from what the user recently studied or built over starting something unrelated.
 - Be specific and concise. No motivational filler.`;
 
-function buildPrompt(ctx: Context, today: string): string {
+function buildPrompt(context: Context, today: string): string {
   return [
     `Today: ${today}`,
     ``,
-    `DSA pattern stats (patterns with >=1 attempt):`,
-    JSON.stringify(ctx.patternStats, null, 0),
-    ``,
-    `Weakest patterns (ranked):`,
-    JSON.stringify(
-      ctx.weakPatterns.map((p) => ({
-        pattern: p.name,
-        attempts: p.attempts,
-        solveRate: p.solveRate,
-        avgHints: p.avgHints,
-        couldNotIdentify: p.couldNotIdentify,
-        recognitionGap: p.recognitionGap,
-      })),
-      null,
-      0,
-    ),
-    ``,
-    `Recent learning sessions:`,
-    JSON.stringify(ctx.recentSessions, null, 0),
-    ``,
-    `Recent DSA attempts:`,
-    JSON.stringify(ctx.recentAttempts, null, 0),
-    ``,
-    `Skills currently in progress (learning/practiced):`,
-    JSON.stringify(ctx.inProgressSkills, null, 0),
-    ``,
-    `Evidence from recent real development activity:`,
-    JSON.stringify(ctx.activityEvidence, null, 0),
+    `# The engineer's current context`,
+    context.toPromptString(),
     ``,
     `Produce the daily plan. If there is not enough DSA data for a confident weakness call, set dsaWeakness to null.`,
   ].join("\n");
 }
 
-function deterministicPlan(ctx: Context, reason: string): LearningPlan {
-  const weak = ctx.weakPatterns[0];
-  const inProg = ctx.inProgressSkills[0];
+function deterministicPlan(context: Context, reason: string): LearningPlan {
+  const weak = context.structured.weakPatterns[0];
+  const inProg = context.structured.inProgressSkills[0];
   return {
     dsaWeakness: weak
       ? {
@@ -133,66 +79,8 @@ function deterministicPlan(ctx: Context, reason: string): LearningPlan {
 export class LearningAgent extends BaseAgent<Context, LearningAgentResult> {
   readonly name = "learning" as const;
 
-  protected async gatherContext(ctx: AgentContext): Promise<Context> {
-    const [activityCount, patternStats, sessions, attempts, inProgress, actEv] =
-      await Promise.all([
-        countLearningActivity(ctx.userId),
-        getPatternStats(ctx.userId),
-        listLearningSessions(ctx.userId, 10),
-        listRecentAttempts(ctx.userId, 25),
-        db
-          .select({
-            name: skills.name,
-            level: skills.level,
-            category: skills.category,
-          })
-          .from(skills)
-          .where(eq(skills.userId, ctx.userId))
-          .orderBy(desc(skills.updatedAt))
-          .limit(60),
-        db
-          .select({
-            skill: skills.name,
-            summary: skillEvidence.summary,
-          })
-          .from(skillEvidence)
-          .innerJoin(skills, eq(skills.id, skillEvidence.skillId))
-          .where(
-            and(
-              eq(skillEvidence.userId, ctx.userId),
-              eq(skillEvidence.sourceType, "activity_analysis"),
-              eq(skillEvidence.status, "accepted"),
-              gte(
-                skillEvidence.createdAt,
-                new Date(Date.now() - 7 * 864e5),
-              ),
-            ),
-          )
-          .limit(20),
-      ]);
-
-    return {
-      activityCount,
-      patternStats,
-      weakPatterns: rankWeakPatterns(patternStats).slice(0, 4),
-      recentSessions: sessions.map((s) => ({
-        topic: s.topic,
-        category: s.category,
-        confidenceAfter: s.confidenceAfter,
-        occurredAt: s.occurredAt.toISOString().slice(0, 10),
-      })),
-      recentAttempts: attempts.map((a) => ({
-        title: a.title,
-        solved: a.solved,
-        hintsUsed: a.hintsUsed,
-        failureReason: a.failureReason,
-        attemptedAt: a.attemptedAt.toISOString().slice(0, 10),
-      })),
-      inProgressSkills: inProgress
-        .filter((s) => s.level === "learning" || s.level === "practiced")
-        .slice(0, 12),
-      activityEvidence: actEv,
-    };
+  protected gatherContext(ctx: AgentContext): Promise<Context> {
+    return getPersonalContext({ userId: ctx.userId, purpose: "learning_plan" });
   }
 
   protected async analyze(
@@ -201,7 +89,7 @@ export class LearningAgent extends BaseAgent<Context, LearningAgentResult> {
   ): Promise<LearningAgentResult> {
     const today = new Date().toISOString().slice(0, 10);
 
-    if (context.activityCount === 0) {
+    if (context.structured.activityCount === 0) {
       await ctx.log("No learning/DSA data yet — deterministic starter plan", {
         level: "warn",
         step: "analyzing",
