@@ -116,5 +116,7 @@ test("every purpose has a config with a usable default query", () => {
     assert.ok(q.length > 0, `${name} produced an empty default query`);
     assert.ok(cfg.budgetTokens > 0);
     assert.ok(cfg.knowledgeK > 0);
+    assert.ok(cfg.rrf.vector > 0 && cfg.rrf.keyword > 0, `${name} rrf weights`);
+    assert.ok(cfg.halfLifeDays > 0, `${name} halfLifeDays`);
   }
 });

@@ -17,7 +17,8 @@
     "set-password": "node --env-file=.env.local --import tsx scripts/set-password.ts",
     "knowledge:smoke": "node --env-file=.env.local --import tsx scripts/knowledge-smoke.ts",
     "ingest:smoke": "node --env-file=.env.local --import tsx scripts/ingest-smoke.ts",
-    "sources:smoke": "node --env-file=.env.local --import tsx scripts/sources-smoke.ts"
+    "sources:smoke": "node --env-file=.env.local --import tsx scripts/sources-smoke.ts",
+    "retrieval:eval": "node --env-file=.env.local --import tsx scripts/retrieval-eval.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -25,6 +26,7 @@
     "@langchain/core": "^1.2.9",
     "@langchain/langgraph": "^1.4.13",
     "@langchain/textsplitters": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@supabase/ssr": "^0.12.5",
     "@supabase/supabase-js": "^2.112.4",
     "class-variance-authority": "^0.7.1",

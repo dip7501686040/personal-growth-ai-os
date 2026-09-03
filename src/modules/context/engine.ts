@@ -57,6 +57,8 @@ export async function getPersonalContext(
       k: cfg.knowledgeK,
       docTypes: cfg.knowledgeDocTypes,
       sourceKinds: cfg.knowledgeSourceKinds,
+      rrf: cfg.rrf,
+      halfLifeDays: cfg.halfLifeDays,
     });
   }
 

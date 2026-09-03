@@ -15,26 +15,53 @@ export interface KnowledgeHit {
   score: number;
 }
 
+export interface RrfWeights {
+  vector: number;
+  keyword: number;
+}
+
 export interface SearchOpts {
   userId: string;
   query: string;
   k?: number;
   docTypes?: string[];
   sourceKinds?: string[];
-  /** recency half-life in days for the soft decay multiplier */
+  /** recency half-life in days for the soft decay multiplier (default 120) */
   halfLifeDays?: number;
+  /** per-signal RRF weights (default { vector: 1, keyword: 1 }) */
+  rrf?: RrfWeights;
 }
 
 const RRF_K = 60;
 
+/** Word-set Jaccard on the first ~40 tokens — cheap near-duplicate check. */
+function nearDuplicate(a: string, b: string): boolean {
+  const toks = (s: string): Set<string> =>
+    new Set(
+      s
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 40),
+    );
+  const A = toks(a);
+  const B = toks(b);
+  if (A.size === 0 || B.size === 0) return false;
+  let inter = 0;
+  for (const t of A) if (B.has(t)) inter++;
+  return inter / (A.size + B.size - inter) > 0.82;
+}
+
 /**
  * Hybrid retrieval over the knowledge base: pgvector cosine + keyword `ilike`,
- * merged with Reciprocal Rank Fusion at the document level, then softly
- * down-weighted by age. Returns the best chunk per document.
+ * merged with weighted Reciprocal Rank Fusion at the document level, softly
+ * down-weighted by age, then de-duplicated. Returns the best chunk per document.
  */
 export async function searchKnowledge(opts: SearchOpts): Promise<KnowledgeHit[]> {
   const k = opts.k ?? 8;
   const pool = Math.max(k * 4, 20);
+  const weights = opts.rrf ?? { vector: 1, keyword: 1 };
   const provider = getEmbeddingProvider();
 
   // 1. vector search (chunk level)
@@ -101,7 +128,7 @@ export async function searchKnowledge(opts: SearchOpts): Promise<KnowledgeHit[]>
       ),
     );
 
-  // 4. RRF + recency decay
+  // 4. weighted RRF + recency decay
   const halfLife = opts.halfLifeDays ?? 120;
   const now = Date.now();
 
@@ -114,7 +141,8 @@ export async function searchKnowledge(opts: SearchOpts): Promise<KnowledgeHit[]>
     const vr = vecDocRank.get(doc.id);
     const kr = kwDocRank.get(doc.id);
     const rrf =
-      (vr ? 1 / (RRF_K + vr) : 0) + (kr ? 1 / (RRF_K + kr) : 0);
+      weights.vector * (vr ? 1 / (RRF_K + vr) : 0) +
+      weights.keyword * (kr ? 1 / (RRF_K + kr) : 0);
     const ageDays = (now - doc.createdAt.getTime()) / 86_400_000;
     const recency = Math.pow(0.5, ageDays / halfLife);
     const bc = bestChunk.get(doc.id);
@@ -132,5 +160,13 @@ export async function searchKnowledge(opts: SearchOpts): Promise<KnowledgeHit[]>
   }
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, k);
+
+  // 5. drop near-duplicate chunks (e.g. the same decision extracted twice)
+  const out: KnowledgeHit[] = [];
+  for (const hit of scored) {
+    if (out.some((h) => nearDuplicate(h.content, hit.content))) continue;
+    out.push(hit);
+    if (out.length >= k) break;
+  }
+  return out;
 }
