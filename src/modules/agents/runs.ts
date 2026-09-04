@@ -87,6 +87,7 @@ const ALL_AGENT_NAMES: AgentName[] = [
   "business",
   "chief_of_staff",
   "activity_analyzer",
+  "extractor",
 ];
 
 export interface AgentStatusRow {

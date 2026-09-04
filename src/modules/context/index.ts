@@ -6,6 +6,7 @@ export {
   CONTEXT_PURPOSES,
   type ContextPurpose,
   type CoreSlice,
+  type FocusEntity,
   type GetContextArgs,
   type LearningSlice,
   type LearningPlanContext,

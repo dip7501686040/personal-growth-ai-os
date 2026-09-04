@@ -1,11 +1,15 @@
+import { and, eq, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { warmupDb } from "@/lib/db";
+import { db, warmupDb } from "@/lib/db";
+import { knowledgeDocuments } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { getOwnerUserId } from "@/lib/owner";
 import { activityAnalyzerAgent } from "@/modules/agents/activity-analyzer-agent";
 import { chiefOfStaffAgent } from "@/modules/agents/chief-of-staff-agent";
 import { extractionAgent } from "@/modules/agents/extraction-agent";
 import { learningAgent } from "@/modules/agents/learning-agent";
+import { backfillEntityEmbeddings } from "@/modules/knowledge/entities";
+import { mapDocument } from "@/modules/knowledge/mapping";
 import { countPendingJobs } from "@/modules/ingestion/queue";
 import { drainContextEvents } from "@/modules/ingestion/refresh";
 import { syncSources } from "@/modules/ingestion/sources";
@@ -69,6 +73,36 @@ const JOBS: Record<string, (userId: string) => Promise<{ id: string; status: str
         done++;
       }
       return { id: "-", status: `drained ${done} job(s)` };
+    },
+    "knowledge-map": async (userId) => {
+      // Refresh entity vectors first so new/edited skills, projects, etc. are
+      // linkable, then (re-)map every current document. Cheap — mostly SQL +
+      // JS; LLM rationale calls are budget-capped across the whole run.
+      await backfillEntityEmbeddings(userId);
+
+      const docs = await db
+        .select({ id: knowledgeDocuments.id })
+        .from(knowledgeDocuments)
+        .where(
+          and(
+            eq(knowledgeDocuments.userId, userId),
+            isNull(knowledgeDocuments.supersededAt),
+          ),
+        )
+        .limit(200);
+
+      const llmBudget = { used: 0, max: 20 };
+      let links = 0;
+      let accepted = 0;
+      for (const d of docs) {
+        const r = await mapDocument(userId, d.id, { llmBudget });
+        links += r.inserted;
+        accepted += r.autoAccepted;
+      }
+      return {
+        id: "-",
+        status: `mapped ${docs.length} doc(s) → ${links} link(s), ${accepted} auto-accepted`,
+      };
     },
   };
 

@@ -1,8 +1,7 @@
-import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveIngestToken } from "@/modules/activity/service";
-import { enqueueJob } from "@/modules/ingestion/queue";
+import { upsertSessionJob } from "@/modules/ingestion/queue";
 
 export const maxDuration = 30;
 
@@ -49,13 +48,13 @@ export async function POST(req: Request) {
   }
   const { sessionId, title, text } = parsed.data;
 
-  const textHash = createHash("sha256").update(text).digest("hex").slice(0, 16);
-
   try {
-    const { job, deduped } = await enqueueJob({
+    // One queue row per session — later (longer) snapshots fold into it rather
+    // than piling up a job per message.
+    const { job, action } = await upsertSessionJob({
       userId,
       kind: "claude_transcript",
-      dedupeKey: `claude:${sessionId}:${textHash}`,
+      dedupeKey: `claude:${sessionId}`,
       payload: {
         text,
         title: title ?? `Claude Code session ${sessionId.slice(0, 8)}`,
@@ -64,7 +63,7 @@ export async function POST(req: Request) {
         evidenceSourceType: "conversation",
       },
     });
-    return NextResponse.json({ ok: true, jobId: job.id, deduped });
+    return NextResponse.json({ ok: true, jobId: job.id, action });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Ingest failed" },

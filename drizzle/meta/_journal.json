@@ -78,6 +78,20 @@
       "when": 1788435810935,
       "tag": "0010_tense_vapor",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788529056874,
+      "tag": "0011_knowledge_mapping",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788534539866,
+      "tag": "0012_knowledge_search",
+      "breakpoints": true
     }
   ]
 }

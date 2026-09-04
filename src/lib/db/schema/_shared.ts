@@ -217,3 +217,14 @@ export const activityStatusEnum = pgEnum("activity_status", [
   "analyzed",
   "failed",
 ]);
+
+/** What a knowledge_links row points at. */
+export const knowledgeTargetTypeEnum = pgEnum("knowledge_target_type", [
+  "skill",
+  "project",
+  "career_opportunity",
+  "content_item",
+  "business_opportunity",
+  "learning_session",
+  "dsa_pattern",
+]);

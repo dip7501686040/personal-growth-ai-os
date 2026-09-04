@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { IngestionJob } from "@/lib/db/schema";
 import { embedDocument, upsertDocumentRow } from "@/lib/knowledge";
 import { runStructured } from "@/lib/llm";
+import { mapDocument } from "@/modules/knowledge/mapping";
 import {
   CanonicalKnowledgeSchema,
   isEmptyCanonical,
@@ -369,6 +370,26 @@ export class ExtractionAgent extends BaseAgent<
       return {};
     };
 
+    const link = async (
+      state: GraphState,
+    ): Promise<Partial<GraphState>> => {
+      let links = 0;
+      let accepted = 0;
+      const budget = { used: 0, max: 2 };
+      for (const { id } of state.outcome?.toEmbed ?? []) {
+        const r = await mapDocument(ctx.userId, id, {
+          agentRunId: ctx.agentRunId,
+          llmBudget: budget,
+        });
+        links += r.inserted;
+        accepted += r.autoAccepted;
+      }
+      await ctx.log(`link: ${links} candidate link(s), ${accepted} auto-accepted`, {
+        step: "analyzing",
+      });
+      return {};
+    };
+
     return new StateGraph(State)
       .addNode("classify", classify)
       .addNode("extract", extract)
@@ -376,6 +397,7 @@ export class ExtractionAgent extends BaseAgent<
       .addNode("reconcile", reconcile)
       .addNode("persist", persist)
       .addNode("embed", embed)
+      .addNode("link", link)
       .addEdge(START, "classify")
       .addEdge("classify", "extract")
       .addEdge("extract", "validate")
@@ -386,7 +408,8 @@ export class ExtractionAgent extends BaseAgent<
       )
       .addEdge("reconcile", "persist")
       .addEdge("persist", "embed")
-      .addEdge("embed", END)
+      .addEdge("embed", "link")
+      .addEdge("link", END)
       .compile();
   }
 }

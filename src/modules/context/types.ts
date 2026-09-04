@@ -1,4 +1,6 @@
 import type { KnowledgeHit } from "@/lib/knowledge";
+import type { RelatedKnowledgeHit } from "@/modules/knowledge/mapping";
+import type { KnowledgeTargetType } from "@/modules/knowledge/target-types";
 import type { PatternStat } from "@/modules/learning/pattern-stats";
 import type { SkillLevel } from "@/modules/skills/levels";
 
@@ -12,6 +14,11 @@ export const CONTEXT_PURPOSES = [
 ] as const;
 export type ContextPurpose = (typeof CONTEXT_PURPOSES)[number];
 
+export interface FocusEntity {
+  targetType: KnowledgeTargetType;
+  targetId: string;
+}
+
 export interface GetContextArgs {
   userId: string;
   purpose: ContextPurpose;
@@ -19,6 +26,13 @@ export interface GetContextArgs {
   query?: string;
   /** Soft cap on the rendered prompt string. Defaults per purpose. */
   budgetTokens?: number;
+  /**
+   * Entities this context is specifically about (the opportunity being
+   * matched, the project being advanced, ...). Their `accepted` knowledge_links
+   * documents are pulled into a dedicated section ahead of generic retrieval,
+   * and excluded from the generic section to avoid duplication.
+   */
+  focusEntities?: FocusEntity[];
 }
 
 export type SkillsByLevel = Record<SkillLevel, string[]>;
@@ -69,6 +83,9 @@ export interface PersonalContext<S extends CoreSlice = CoreSlice> {
   structured: S;
   /** Semantic recall from the knowledge base (empty until sources are ingested). */
   knowledge: KnowledgeHit[];
+  /** Directly linked knowledge for `focusEntities` — empty unless the caller
+   *  passed any and at least one has an accepted knowledge_links document. */
+  related: RelatedKnowledgeHit[];
   /** Rough token count of `toPromptString()`. */
   tokenEstimate: number;
   /** True when sections were dropped to fit `budgetTokens`. */

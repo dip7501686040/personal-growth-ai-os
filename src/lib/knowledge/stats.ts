@@ -7,6 +7,7 @@ export interface KnowledgeStats {
   chunks: number;
   byType: { docType: string; n: number }[];
   bySource: { sourceKind: string; n: number }[];
+  byModel: { model: string | null; n: number }[];
 }
 
 export async function knowledgeStats(userId: string): Promise<KnowledgeStats> {
@@ -54,5 +55,15 @@ export async function knowledgeStats(userId: string): Promise<KnowledgeStats> {
     .groupBy(knowledgeDocuments.sourceKind)
     .orderBy(sql`count(*) desc`);
 
-  return { documents, chunks, byType, bySource };
+  const byModel = await db
+    .select({
+      model: knowledgeChunks.embeddingModel,
+      n: sql<number>`count(*)::int`,
+    })
+    .from(knowledgeChunks)
+    .where(eq(knowledgeChunks.userId, userId))
+    .groupBy(knowledgeChunks.embeddingModel)
+    .orderBy(sql`count(*) desc`);
+
+  return { documents, chunks, byType, bySource, byModel };
 }

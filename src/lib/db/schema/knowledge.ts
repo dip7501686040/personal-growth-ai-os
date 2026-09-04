@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  customType,
   index,
   integer,
   jsonb,
@@ -11,6 +12,13 @@ import {
   vector,
 } from "drizzle-orm/pg-core";
 import { createdAt, updatedAt, userId } from "./_shared";
+
+/** Postgres tsvector — no first-class Drizzle column type, so a thin custom one. */
+const tsvector = customType<{ data: string }>({
+  dataType() {
+    return "tsvector";
+  },
+});
 
 /**
  * A canonical, distilled fact/summary derived from a source (a GitHub repo, a
@@ -37,6 +45,10 @@ export const knowledgeDocuments = pgTable(
     meta: jsonb("meta").notNull().default(sql`'{}'::jsonb`),
     contentHash: text("content_hash").notNull(),
     supersededAt: timestamp("superseded_at", { withTimezone: true }),
+    /** title (weight A) + body (weight B), for full-text search (K4). */
+    searchTsv: tsvector("search_tsv").generatedAlwaysAs(
+      sql`setweight(to_tsvector('english', coalesce(title, '')), 'A') || setweight(to_tsvector('english', coalesce(body, '')), 'B')`,
+    ),
     createdAt,
     updatedAt,
   },
@@ -47,6 +59,11 @@ export const knowledgeDocuments = pgTable(
       t.userId,
       t.sourceKind,
       t.sourceRef,
+    ),
+    index("knowledge_documents_search_tsv_idx").using("gin", t.searchTsv),
+    index("knowledge_documents_title_trgm_idx").using(
+      "gin",
+      sql`${t.title} gin_trgm_ops`,
     ),
   ],
 ).enableRLS();
