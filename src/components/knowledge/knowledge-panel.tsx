@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { fmtDateTime } from "@/lib/format";
 import {
   addRepoAction,
-  drainNowAction,
   removeSourceAction,
   syncSourceAction,
   uploadAction,
@@ -172,20 +171,6 @@ export function KnowledgePanel({
               Queue for extraction
             </Button>
           </div>
-        </InlineForm>
-      </section>
-
-      {/* Process */}
-      <section className="flex flex-col gap-2">
-        <h3 className="text-sm font-semibold">Process queue</h3>
-        <p className="text-xs text-muted-foreground">
-          Runs the Extraction Agent on queued items and refreshes context from
-          recent app activity. Bounded per click — run again for more.
-        </p>
-        <InlineForm action={drainNowAction}>
-          <Button type="submit" size="sm" className="w-fit">
-            Process queue now
-          </Button>
         </InlineForm>
       </section>
     </div>

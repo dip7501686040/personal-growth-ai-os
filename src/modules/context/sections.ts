@@ -1,5 +1,6 @@
 import { estimateTokens } from "@/lib/knowledge/chunk";
 import type { KnowledgeHit } from "@/lib/knowledge/search";
+import type { RelatedKnowledgeHit } from "@/modules/knowledge/mapping";
 import { LEVEL_LABEL, SKILL_LEVELS } from "@/modules/skills/levels";
 import type { ContextPurpose, CoreSlice, LearningSlice } from "./types";
 
@@ -28,6 +29,15 @@ function knowledgeBlock(hits: KnowledgeHit[]): string {
     .join("\n");
 }
 
+function relatedKnowledgeBlock(hits: RelatedKnowledgeHit[]): string {
+  return hits
+    .map((h) => {
+      const excerpt = h.content.replace(/\s+/g, " ").slice(0, 320).trim();
+      return `- [${h.docType}] ${h.title} (linked to ${h.via}): ${excerpt}`;
+    })
+    .join("\n");
+}
+
 function isLearningSlice(s: CoreSlice): s is LearningSlice {
   return "weakPatterns" in s;
 }
@@ -37,6 +47,7 @@ export function buildSections(
   purpose: ContextPurpose,
   slice: CoreSlice,
   knowledge: KnowledgeHit[],
+  related: RelatedKnowledgeHit[] = [],
 ): Section[] {
   const sections: Section[] = [
     { title: "Skills by level", body: skillsBlock(slice), priority: 1 },
@@ -66,6 +77,13 @@ export function buildSections(
         .map((e) => `- [${e.skill}] ${e.summary}`)
         .join("\n"),
       priority: 5,
+    },
+    // Directly linked (reviewed) knowledge for this context's focus entities —
+    // ranks ahead of generic semantic retrieval so it survives budget trimming.
+    {
+      title: "Directly linked knowledge",
+      body: relatedKnowledgeBlock(related),
+      priority: 5.5,
     },
     {
       title: "Relevant past knowledge",

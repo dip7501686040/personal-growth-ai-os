@@ -149,6 +149,7 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
         userId: ctx.userId,
         purpose: "career_match",
         query: opp.opportunity.description.slice(0, 4000),
+        focusEntities: [{ targetType: "career_opportunity", targetId: opportunityId }],
       }),
     ]);
 

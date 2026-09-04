@@ -27,4 +27,5 @@ export * from "./business";
 export * from "./briefing";
 export * from "./activity";
 export * from "./knowledge";
+export * from "./knowledge-links";
 export * from "./ingestion";

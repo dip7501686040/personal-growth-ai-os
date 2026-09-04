@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { knowledgeChunks } from "@/lib/db/schema";
 import { searchKnowledge, type KnowledgeHit } from "@/lib/knowledge";
+import { getRelatedKnowledge, type RelatedKnowledgeHit } from "@/modules/knowledge/mapping";
 import { PURPOSES } from "./purposes";
 import { buildSections, renderSections } from "./sections";
 import { buildCoreSlice, buildLearningSlice } from "./structured";
@@ -48,10 +49,17 @@ export async function getPersonalContext(
       ? await buildLearningSlice(userId)
       : await buildCoreSlice(userId);
 
+  // Directly linked (reviewed) knowledge for this context's focus entities,
+  // ahead of generic retrieval — see modules/knowledge/mapping.
+  const related: RelatedKnowledgeHit[] = args.focusEntities?.length
+    ? await getRelatedKnowledge(userId, args.focusEntities, cfg.knowledgeK)
+    : [];
+  const relatedIds = new Set(related.map((r) => r.documentId));
+
   let knowledge: KnowledgeHit[] = [];
   if (await userHasKnowledge(userId)) {
     const query = args.query?.trim() || cfg.defaultQuery(structured);
-    knowledge = await searchKnowledge({
+    const hits = await searchKnowledge({
       userId,
       query,
       k: cfg.knowledgeK,
@@ -60,10 +68,12 @@ export async function getPersonalContext(
       rrf: cfg.rrf,
       halfLifeDays: cfg.halfLifeDays,
     });
+    // avoid showing the same document twice (once linked, once generically retrieved)
+    knowledge = hits.filter((h) => !relatedIds.has(h.documentId));
   }
 
   const rendered = renderSections(
-    buildSections(purpose, structured, knowledge),
+    buildSections(purpose, structured, knowledge, related),
     budgetTokens,
   );
 
@@ -72,6 +82,7 @@ export async function getPersonalContext(
     generatedAt,
     structured,
     knowledge,
+    related,
     tokenEstimate: rendered.tokenEstimate,
     truncated: rendered.truncated,
     toPromptString: () => rendered.text,
