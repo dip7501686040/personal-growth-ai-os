@@ -1,14 +1,21 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   activityAnalyses,
   contextEvents,
   learningSessions,
+  projectFeatures,
   projects,
   skills,
   type ContextEvent,
 } from "@/lib/db/schema";
-import { embedDocument, upsertDocumentRow, type UpsertDocInput } from "@/lib/knowledge";
+import {
+  checkCrossSourceDuplicate,
+  embedDocument,
+  upsertDocumentRow,
+  type UpsertDocInput,
+} from "@/lib/knowledge";
+import { mapDocument } from "@/modules/knowledge/mapping";
 
 interface DocSpec {
   docType: UpsertDocInput["docType"];
@@ -78,6 +85,15 @@ async function specFor(
       .where(and(eq(projects.userId, userId), eq(projects.id, ev.refId)))
       .limit(1);
     if (!p) return null;
+
+    const features = await db
+      .select({ title: projectFeatures.title, status: projectFeatures.status })
+      .from(projectFeatures)
+      .where(
+        and(eq(projectFeatures.userId, userId), eq(projectFeatures.projectId, p.id)),
+      )
+      .orderBy(asc(projectFeatures.createdAt));
+
     return {
       docType: "repo_summary",
       title: `Project: ${p.name}`,
@@ -86,6 +102,9 @@ async function specFor(
         p.problemSolved ? `Problem solved: ${p.problemSolved}` : "",
         p.architecture ? `Architecture: ${p.architecture}` : "",
         `Status: ${p.status}.`,
+        features.length
+          ? `Features:\n${features.map((f) => `- ${f.title} (${f.status})`).join("\n")}`
+          : "",
       ]
         .filter(Boolean)
         .join("\n"),
@@ -160,6 +179,12 @@ export async function drainContextEvents(
       if (created) {
         documents++;
         chunks += await embedDocument(userId, document.id, spec.body);
+        const duplicateOf = await checkCrossSourceDuplicate(userId, document.id);
+        if (!duplicateOf) {
+          // map it the same run it's created, not just the same night —
+          // mirrors the ExtractionAgent's embed->link step for external docs
+          await mapDocument(userId, document.id);
+        }
       }
     }
     await db
@@ -169,4 +194,15 @@ export async function drainContextEvents(
   }
 
   return { processed: rows.length, documents, chunks };
+}
+
+/** Count of context_events not yet drained into a knowledge document. */
+export async function countPendingContextEvents(userId: string): Promise<number> {
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(contextEvents)
+    .where(
+      and(eq(contextEvents.userId, userId), isNull(contextEvents.processedAt)),
+    );
+  return n;
 }

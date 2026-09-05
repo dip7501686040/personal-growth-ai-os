@@ -8,6 +8,7 @@ import {
   saveMatch,
   type MatchData,
 } from "@/modules/career/service";
+import { getProofOfWork, getRelatedEntities, linkEntityToSkills } from "@/modules/knowledge/entity-skill-links";
 import { listProjects } from "@/modules/projects/service";
 import { BaseAgent } from "./base-agent";
 import {
@@ -32,6 +33,9 @@ interface SkillFact {
   level: string;
   provenByProject: boolean;
   provenByActivity: boolean;
+  /** "Feature title (Project)" for every done/used project feature that
+   *  demonstrates this skill — real supporting documents, not a claim. */
+  proof: string[];
 }
 
 interface Context {
@@ -40,6 +44,9 @@ interface Context {
   projects: { name: string; status: string; features: string; skills: number }[];
   /** JD-focused skill + knowledge-base view from the Personal Context Engine. */
   personal: string;
+  /** Content/learning that share a skill or feature with this job, via the
+   *  entity_skill_links cross-module bridge (HLD §6). */
+  related: { content: string[]; learning: string[] };
 }
 
 const SYSTEM = `You are the Career Agent for one senior backend/full-stack engineer. You judge a job against the user's REAL proof-of-skills — honestly, never inflating.
@@ -69,12 +76,21 @@ function buildPrompt(ctx: Context, today: string): string {
     `Description:`,
     ctx.opportunity.description.slice(0, 6000),
     ``,
-    `USER SKILL FACTS (do not upgrade these):`,
+    `USER SKILL FACTS (do not upgrade these; "proof" lists real shipped`,
+    `project features that demonstrate the skill — cite them, don't invent more):`,
     JSON.stringify(ctx.skillFacts),
     ``,
     `USER PROJECTS:`,
     JSON.stringify(ctx.projects),
     ``,
+    ...(ctx.related.content.length || ctx.related.learning.length
+      ? [
+          `RELATED WORK (shares a skill/feature with this job — background only):`,
+          ...ctx.related.content.map((c) => `- content: ${c}`),
+          ...ctx.related.learning.map((l) => `- learning: ${l}`),
+          ``,
+        ]
+      : []),
     `Produce the honest match analysis.`,
   ].join("\n");
 }
@@ -123,7 +139,17 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
     const opp = await getOpportunity(ctx.userId, opportunityId);
     if (!opp) throw new Error("Opportunity not found.");
 
-    const [skillRows, evRows, projectRows, pc] = await Promise.all([
+    // Refresh this opportunity's skill/feature matches the same run it's
+    // analyzed (mirrors mapDocument mapping a doc the same run it's created),
+    // so the cross-module bridge below reflects the current job text.
+    await linkEntityToSkills(
+      ctx.userId,
+      "career_opportunity",
+      opportunityId,
+      `${opp.opportunity.role} at ${opp.opportunity.company}. ${opp.opportunity.description}`,
+    );
+
+    const [skillRows, evRows, projectRows, pc, related] = await Promise.all([
       db
         .select({
           id: skills.id,
@@ -151,8 +177,10 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
         query: opp.opportunity.description.slice(0, 4000),
         focusEntities: [{ targetType: "career_opportunity", targetId: opportunityId }],
       }),
+      getRelatedEntities(ctx.userId, "career_opportunity", opportunityId),
     ]);
 
+    const proof = await getProofOfWork(ctx.userId, skillRows.map((s) => s.id));
     const byProject = new Set(
       evRows.filter((e) => e.sourceType === "project_feature").map((e) => e.skillId),
     );
@@ -173,6 +201,7 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
         level: s.level,
         provenByProject: byProject.has(s.id),
         provenByActivity: byActivity.has(s.id),
+        proof: (proof.get(s.id) ?? []).map((p) => `${p.featureTitle} (${p.projectName})`),
       })),
       projects: projectRows.map((p) => ({
         name: p.name,
@@ -181,6 +210,10 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
         skills: p.skillsCount,
       })),
       personal: pc.toPromptString(),
+      related: {
+        content: related.content.map((c) => `${c.title} [${c.status}]`),
+        learning: related.learning.map((l) => `${l.topic} (${l.category})`),
+      },
     };
   }
 

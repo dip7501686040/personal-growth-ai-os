@@ -1,5 +1,7 @@
 export { chunkText, estimateTokens } from "./chunk";
 export { SupabaseVectorStore, type KnowledgeChunkMeta } from "./store";
+export { docVector, toVectorLiteral } from "./vector";
+export { checkCrossSourceDuplicate } from "./dedupe";
 export {
   upsertDocument,
   upsertDocumentRow,
@@ -7,6 +9,7 @@ export {
   listKnowledgeDocuments,
   getKnowledgeDocument,
   listDocumentsByJob,
+  listDocumentsForMapping,
   updateKnowledgeDocument,
   deleteKnowledgeDocument,
   type UpsertDocInput,
@@ -16,6 +19,7 @@ export {
   type KnowledgeDocumentDetail,
   type KnowledgeChunkRow,
   type KnowledgeDocumentFilters,
+  type MappingCandidateDoc,
 } from "./documents";
 export {
   searchKnowledge,

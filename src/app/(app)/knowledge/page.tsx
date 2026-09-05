@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireUserId } from "@/lib/user";
+import { getLastCronRuns } from "@/lib/cron-runs";
 import { env } from "@/lib/env";
-import { fmtNum } from "@/lib/format";
+import { fmtDateTime, fmtNum } from "@/lib/format";
 import {
   getModuleFacets,
   getSkillFacets,
@@ -13,6 +14,7 @@ import {
   countPendingJobs,
   listJobs,
 } from "@/modules/ingestion/queue";
+import { countPendingContextEvents } from "@/modules/ingestion/refresh";
 import { listSources } from "@/modules/ingestion/sources";
 import { getAgentConsole } from "@/modules/agents/runs";
 import { DocumentFilters } from "@/components/knowledge/document-filters";
@@ -31,6 +33,7 @@ import {
 export const metadata = { title: "Knowledge" };
 
 const QUEUE_STATUSES = ["pending", "running", "failed"];
+const CRON_JOBS = ["knowledge-map", "knowledge-refresh", "github-sync", "ingest-drain"] as const;
 
 export default async function KnowledgePage({
   searchParams,
@@ -46,6 +49,7 @@ export default async function KnowledgePage({
   const [
     sources,
     pending,
+    pendingEvents,
     stats,
     queueCounts,
     jobsPage,
@@ -53,9 +57,11 @@ export default async function KnowledgePage({
     extractorConsole,
     skillFacets,
     moduleFacets,
+    cronRuns,
   ] = await Promise.all([
     listSources(userId),
     countPendingJobs(userId),
+    countPendingContextEvents(userId),
     knowledgeStats(userId),
     countJobsByStatus(userId),
     listJobs(userId, { statuses: QUEUE_STATUSES, limit: 10 }),
@@ -63,6 +69,7 @@ export default async function KnowledgePage({
     getAgentConsole(userId, "extractor"),
     getSkillFacets(userId),
     getModuleFacets(userId),
+    getLastCronRuns(userId, CRON_JOBS),
   ]);
 
   return (
@@ -75,7 +82,7 @@ export default async function KnowledgePage({
         </p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         <StatLink
           href="#documents"
           label="Knowledge documents"
@@ -98,6 +105,12 @@ export default async function KnowledgePage({
               ? `${queueCounts.running} running · ${queueCounts.failed} failed · ${queueCounts.done} done`
               : `${queueCounts.done} done`
           }
+        />
+        <StatLink
+          href="#crons"
+          label="Pending context events"
+          value={pendingEvents}
+          hint="waiting for knowledge-refresh to drain"
         />
       </div>
 
@@ -172,6 +185,53 @@ export default async function KnowledgePage({
             }))}
             githubTokenSet={!!env.GITHUB_TOKEN}
           />
+        </CardContent>
+      </Card>
+
+      {/* ── System crons ────────────────────────────────────────────────── */}
+      <Card id="crons" className="scroll-mt-6">
+        <CardHeader>
+          <CardTitle>System crons</CardTitle>
+          <CardDescription>
+            Last run of each nightly job, straight from{" "}
+            <code className="text-xs">cron_runs</code>.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ul className="divide-y rounded-md border text-sm">
+            {CRON_JOBS.map((job, i) => {
+              const run = cronRuns[i];
+              return (
+                <li
+                  key={job}
+                  className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span className="font-medium">{job}</span>
+                  {run ? (
+                    <span className="text-xs text-muted-foreground">
+                      <span
+                        className={
+                          run.status === "error"
+                            ? "text-destructive"
+                            : run.status === "running"
+                              ? "text-muted-foreground"
+                              : "text-foreground"
+                        }
+                      >
+                        {run.status}
+                      </span>
+                      {" · "}
+                      {fmtDateTime(run.startedAt)}
+                      {run.summary ? ` · ${run.summary}` : ""}
+                      {run.error ? ` · ${run.error}` : ""}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">never run</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </CardContent>
       </Card>
     </div>

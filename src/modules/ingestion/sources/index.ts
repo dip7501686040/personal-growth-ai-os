@@ -88,6 +88,39 @@ export async function removeSource(userId: string, id: string): Promise<void> {
     );
 }
 
+/** Pause skips a source in `syncSources` (the nightly `github-sync` cron)
+ *  without losing its cursor; resume clears any stale error too. */
+export async function setSourceStatus(
+  userId: string,
+  id: string,
+  status: "active" | "paused",
+): Promise<void> {
+  await db
+    .update(ingestionSources)
+    .set(
+      status === "active"
+        ? { status, error: null, updatedAt: new Date() }
+        : { status, updatedAt: new Date() },
+    )
+    .where(and(eq(ingestionSources.userId, userId), eq(ingestionSources.id, id)));
+}
+
+/** Forget how far a source has synced so the next sync re-walks its full
+ *  history (e.g. all commits, not just those after the stored SHA). Already-
+ *  ingested items still dedupe away by their stable `dedupeKey`. */
+export async function resetSourceCursor(userId: string, id: string): Promise<void> {
+  await db
+    .update(ingestionSources)
+    .set({
+      lastCursor: null,
+      lastSyncedAt: null,
+      status: "active",
+      error: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(ingestionSources.userId, userId), eq(ingestionSources.id, id)));
+}
+
 // ── sync ──────────────────────────────────────────────────────────────────
 
 export interface SyncOneResult {

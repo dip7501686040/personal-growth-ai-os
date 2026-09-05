@@ -1,0 +1,1 @@
+ALTER TABLE "knowledge_documents" ADD COLUMN "last_mapped_at" timestamp with time zone;

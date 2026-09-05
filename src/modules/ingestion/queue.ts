@@ -439,6 +439,25 @@ export async function listJobs(
   };
 }
 
+/** Last N jobs a given source produced, any status — the per-source drill-down
+ *  on the Sources card. Newest first, no pagination (bounded by `limit`). */
+export async function listJobsForSource(
+  userId: string,
+  sourceId: string,
+  limit = 20,
+): Promise<JobListItem[]> {
+  const rows = await db
+    .select({ job: ingestionJobs, externalRef: ingestionSources.externalRef })
+    .from(ingestionJobs)
+    .leftJoin(ingestionSources, eq(ingestionJobs.sourceId, ingestionSources.id))
+    .where(
+      and(eq(ingestionJobs.userId, userId), eq(ingestionJobs.sourceId, sourceId)),
+    )
+    .orderBy(desc(ingestionJobs.createdAt))
+    .limit(limit);
+  return rows.map((r) => summarizeJob(r.job, r.externalRef ?? null));
+}
+
 /** Edit a not-yet-processed job's title / source text. Returns false if the job
  *  is missing or currently `running`. */
 export async function updateJobPayload(

@@ -19,6 +19,7 @@ import {
   countPendingJobs,
   deleteJob,
   listJobs,
+  listJobsForSource,
   updateJobPayload,
   type JobListItem,
 } from "@/modules/ingestion/queue";
@@ -31,7 +32,9 @@ import {
   addSource,
   ingestUpload,
   removeSource,
+  resetSourceCursor,
   runSourceSync,
+  setSourceStatus,
   UPLOAD_CATEGORIES,
 } from "@/modules/ingestion/sources";
 
@@ -83,6 +86,49 @@ export async function syncSourceAction(
     ok: true,
     message: `${r.enqueued} new item(s) queued, ${r.deduped} unchanged. Run "Process queue" to extract.`,
   };
+}
+
+export async function pauseSourceAction(
+  _p: ActionState,
+  fd: FormData,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const id = z.string().uuid().parse(fd.get("id"));
+  await setSourceStatus(userId, id, "paused");
+  revalidatePath("/knowledge");
+  return { ok: true, message: "Source paused — the nightly sync will skip it." };
+}
+
+export async function resumeSourceAction(
+  _p: ActionState,
+  fd: FormData,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const id = z.string().uuid().parse(fd.get("id"));
+  await setSourceStatus(userId, id, "active");
+  revalidatePath("/knowledge");
+  return { ok: true, message: "Source resumed." };
+}
+
+export async function resyncSourceAction(
+  _p: ActionState,
+  fd: FormData,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const id = z.string().uuid().parse(fd.get("id"));
+  await resetSourceCursor(userId, id);
+  const r = await runSourceSync(userId, id);
+  revalidatePath("/knowledge");
+  if (r.error) return { ok: false, message: `Resync failed: ${r.error}` };
+  return {
+    ok: true,
+    message: `Resynced from scratch: ${r.enqueued} item(s) queued, ${r.deduped} already ingested.`,
+  };
+}
+
+export async function loadSourceJobsAction(sourceId: string): Promise<JobListItem[]> {
+  const userId = await requireUserId();
+  return listJobsForSource(userId, UUID.parse(sourceId));
 }
 
 export async function uploadAction(

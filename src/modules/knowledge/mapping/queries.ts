@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/schema";
 import { fetchEntityLabels, listAllEntities } from "../entities";
 import {
+  isKnowledgeTargetType,
   KNOWLEDGE_TARGET_TYPES,
   TARGET_TYPE_LABEL,
   type KnowledgeTargetType,
@@ -32,7 +33,7 @@ export async function listDocumentLinks(
   userId: string,
   documentId: string,
 ): Promise<DocumentLinkRow[]> {
-  const rows = await db
+  const allRows = await db
     .select()
     .from(knowledgeLinks)
     .where(
@@ -42,6 +43,12 @@ export async function listDocumentLinks(
       ),
     )
     .orderBy(desc(knowledgeLinks.score));
+  // legacy rows targeting the now-unused `project`/`dsa_pattern` enum values
+  // are cleaned up by the Phase 0 migration script, but filter defensively
+  const rows = allRows.filter(
+    (r): r is typeof r & { targetType: KnowledgeTargetType } =>
+      isKnowledgeTargetType(r.targetType),
+  );
 
   const idsByType = new Map<KnowledgeTargetType, string[]>();
   for (const r of rows) {
@@ -200,7 +207,11 @@ export async function getRelatedKnowledge(
           inArray(knowledgeLinks.targetId, ids),
         ),
       );
-    linkRows.push(...rows);
+    for (const r of rows) {
+      if (isKnowledgeTargetType(r.targetType)) {
+        linkRows.push({ ...r, targetType: r.targetType });
+      }
+    }
   }
   if (linkRows.length === 0) return [];
 

@@ -1,14 +1,14 @@
-import { and, eq, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { db, warmupDb } from "@/lib/db";
-import { knowledgeDocuments } from "@/lib/db/schema";
+import { warmupDb } from "@/lib/db";
+import { recordCronFinish, recordCronStart } from "@/lib/cron-runs";
 import { env } from "@/lib/env";
+import { listDocumentsForMapping } from "@/lib/knowledge";
 import { getOwnerUserId } from "@/lib/owner";
 import { activityAnalyzerAgent } from "@/modules/agents/activity-analyzer-agent";
 import { chiefOfStaffAgent } from "@/modules/agents/chief-of-staff-agent";
 import { extractionAgent } from "@/modules/agents/extraction-agent";
 import { learningAgent } from "@/modules/agents/learning-agent";
-import { backfillEntityEmbeddings } from "@/modules/knowledge/entities";
+import { backfillEntityEmbeddings, getEntityWatermark } from "@/modules/knowledge/entities";
 import { mapDocument } from "@/modules/knowledge/mapping";
 import { countPendingJobs } from "@/modules/ingestion/queue";
 import { drainContextEvents } from "@/modules/ingestion/refresh";
@@ -76,32 +76,49 @@ const JOBS: Record<string, (userId: string) => Promise<{ id: string; status: str
     },
     "knowledge-map": async (userId) => {
       // Refresh entity vectors first so new/edited skills, projects, etc. are
-      // linkable, then (re-)map every current document. Cheap — mostly SQL +
-      // JS; LLM rationale calls are budget-capped across the whole run.
+      // linkable, then (re-)map documents. Cheap — SQL + JS only, no LLM calls
+      // anywhere in this pipeline. Paginates through *every* current document
+      // (no row-count cap) but skips one that's already seen both its own
+      // latest edit and the current entity corpus (Phase 3) — steady-state
+      // nights only do work on what's actually new or changed. Bounded by
+      // wall-clock time, not a row limit, to stay under the function timeout.
       await backfillEntityEmbeddings(userId);
+      const watermark = await getEntityWatermark(userId);
 
-      const docs = await db
-        .select({ id: knowledgeDocuments.id })
-        .from(knowledgeDocuments)
-        .where(
-          and(
-            eq(knowledgeDocuments.userId, userId),
-            isNull(knowledgeDocuments.supersededAt),
-          ),
-        )
-        .limit(200);
-
-      const llmBudget = { used: 0, max: 20 };
+      const deadline = Date.now() + 50_000;
+      let cursor: string | null = null;
+      let scanned = 0;
+      let mapped = 0;
+      let skipped = 0;
       let links = 0;
       let accepted = 0;
-      for (const d of docs) {
-        const r = await mapDocument(userId, d.id, { llmBudget });
-        links += r.inserted;
-        accepted += r.autoAccepted;
+
+      while (Date.now() < deadline) {
+        const page = await listDocumentsForMapping(userId, { cursor, limit: 50 });
+        if (page.items.length === 0) break;
+
+        for (const d of page.items) {
+          if (Date.now() >= deadline) break;
+          scanned++;
+          const stale =
+            !d.lastMappedAt || d.lastMappedAt < d.updatedAt || d.lastMappedAt < watermark;
+          if (!stale) {
+            skipped++;
+            continue;
+          }
+          const r = await mapDocument(userId, d.id);
+          mapped++;
+          links += r.inserted;
+          accepted += r.autoAccepted;
+        }
+
+        cursor = page.nextCursor;
+        if (!cursor) break;
       }
+
       return {
         id: "-",
-        status: `mapped ${docs.length} doc(s) → ${links} link(s), ${accepted} auto-accepted`,
+        status: `scanned ${scanned} doc(s), mapped ${mapped}, skipped ${skipped} unchanged → ${links} link(s), ${accepted} auto-accepted`,
       };
     },
   };
@@ -122,15 +139,17 @@ export async function GET(
     return NextResponse.json({ error: `Unknown job: ${job}` }, { status: 404 });
   }
 
+  await warmupDb();
+  const userId = await getOwnerUserId();
+  const runId = await recordCronStart(userId, job);
+
   try {
-    await warmupDb();
-    const userId = await getOwnerUserId();
     const result = await handler(userId);
+    await recordCronFinish(runId, { status: "ok", summary: result.status });
     return NextResponse.json({ ok: true, job, ...result });
   } catch (e) {
-    return NextResponse.json(
-      { ok: false, job, error: e instanceof Error ? e.message : String(e) },
-      { status: 500 },
-    );
+    const error = e instanceof Error ? e.message : String(e);
+    await recordCronFinish(runId, { status: "error", error });
+    return NextResponse.json({ ok: false, job, error }, { status: 500 });
   }
 }

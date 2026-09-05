@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/user";
 import { getOpportunity } from "@/modules/career/service";
 import { listApprovals } from "@/modules/approvals/service";
+import { getProofOfWorkByNames, getRelatedEntities } from "@/modules/knowledge/entity-skill-links";
 import { MatchReport } from "@/components/career/match-report";
 import { OpportunityActions } from "@/components/career/opportunity-actions";
+import { ProofOfWorkCard } from "@/components/knowledge/proof-of-work-card";
 import { deleteOpportunityAction } from "@/app/(app)/career/actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +48,17 @@ export default async function OpportunityPage({
       a.actionType === "apply_job" &&
       (a.context as { opportunityId?: string }).opportunityId === id,
   );
+
+  const matchedSkillNames = match
+    ? [
+        ...((match.provenMatches ?? []) as string[]),
+        ...((match.implementedMatches ?? []) as string[]),
+      ]
+    : [];
+  const [proof, related] = await Promise.all([
+    getProofOfWorkByNames(userId, matchedSkillNames),
+    getRelatedEntities(userId, "career_opportunity", id),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -100,6 +113,8 @@ export default async function OpportunityPage({
           </CardContent>
         )}
       </Card>
+
+      <ProofOfWorkCard proof={proof} related={related} />
 
       <Card>
         <CardHeader>

@@ -9,12 +9,11 @@ import { TARGET_TYPE_LABEL } from "@/modules/knowledge/target-types";
 import type { ModuleFacet, SkillFacet } from "@/lib/knowledge";
 
 const MODULE_TYPES = [
-  "project",
+  "project_feature",
   "career_opportunity",
   "content_item",
   "business_opportunity",
   "learning_session",
-  "dsa_pattern",
 ] as const;
 
 const CATEGORY_LABEL: Record<string, string> = {

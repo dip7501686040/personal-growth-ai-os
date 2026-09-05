@@ -56,6 +56,31 @@ export async function listSkills(userId: string): Promise<SkillWithCounts[]> {
   }));
 }
 
+/**
+ * Resolve loosely-named skill mentions (e.g. a business opportunity's
+ * `tech_stack`, or a career match's `provenMatches`/`implementedMatches`,
+ * both string[] of skill *names*, not ids) to real skill ids — the first
+ * step before `getProofOfWork` can do anything with them. Case-insensitive;
+ * names with no matching skill are simply absent from the result.
+ */
+export async function resolveSkillIdsByName(
+  userId: string,
+  names: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (names.length === 0) return out;
+  const rows = await db
+    .select({ id: skills.id, name: skills.name })
+    .from(skills)
+    .where(eq(skills.userId, userId));
+  const byLower = new Map(rows.map((r) => [r.name.toLowerCase(), r.id]));
+  for (const name of names) {
+    const id = byLower.get(name.toLowerCase());
+    if (id) out.set(name, id);
+  }
+  return out;
+}
+
 export async function getSkillById(
   userId: string,
   skillId: string,

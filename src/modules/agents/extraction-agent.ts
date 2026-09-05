@@ -1,7 +1,7 @@
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 import { z } from "zod";
 import type { IngestionJob } from "@/lib/db/schema";
-import { embedDocument, upsertDocumentRow } from "@/lib/knowledge";
+import { checkCrossSourceDuplicate, embedDocument, upsertDocumentRow } from "@/lib/knowledge";
 import { runStructured } from "@/lib/llm";
 import { mapDocument } from "@/modules/knowledge/mapping";
 import {
@@ -363,10 +363,16 @@ export class ExtractionAgent extends BaseAgent<
       state: GraphState,
     ): Promise<Partial<GraphState>> => {
       let chunks = 0;
+      let duplicates = 0;
       for (const { id, body } of state.outcome?.toEmbed ?? []) {
         chunks += await embedDocument(ctx.userId, id, body);
+        if (await checkCrossSourceDuplicate(ctx.userId, id)) duplicates++;
       }
-      await ctx.log(`embed: ${chunks} chunks`, { step: "analyzing" });
+      await ctx.log(
+        `embed: ${chunks} chunks` +
+          (duplicates ? `, ${duplicates} duplicate(s) superseded` : ""),
+        { step: "analyzing" },
+      );
       return {};
     };
 
@@ -375,12 +381,8 @@ export class ExtractionAgent extends BaseAgent<
     ): Promise<Partial<GraphState>> => {
       let links = 0;
       let accepted = 0;
-      const budget = { used: 0, max: 2 };
       for (const { id } of state.outcome?.toEmbed ?? []) {
-        const r = await mapDocument(ctx.userId, id, {
-          agentRunId: ctx.agentRunId,
-          llmBudget: budget,
-        });
+        const r = await mapDocument(ctx.userId, id, { agentRunId: ctx.agentRunId });
         links += r.inserted;
         accepted += r.autoAccepted;
       }

@@ -35,12 +35,11 @@ async function main() {
     );
 
   console.log(`\nMapping ${docs.length} document(s)...`);
-  const llmBudget = { used: 0, max: 40 };
   let totalInserted = 0;
   let totalAccepted = 0;
   let totalTags = 0;
   for (const d of docs) {
-    const r = await mapDocument(userId, d.id, { llmBudget });
+    const r = await mapDocument(userId, d.id);
     totalInserted += r.inserted;
     totalAccepted += r.autoAccepted;
     totalTags += r.tags;
@@ -50,7 +49,7 @@ async function main() {
   }
 
   console.log(
-    `\nTotal: ${totalInserted} link(s) (${totalAccepted} auto-accepted), ${totalTags} tag(s) across ${docs.length} doc(s). LLM rationale calls: ${llmBudget.used}/${llmBudget.max}.`,
+    `\nTotal: ${totalInserted} link(s) (${totalAccepted} auto-accepted), ${totalTags} tag(s) across ${docs.length} doc(s).`,
   );
   process.exit(0);
 }

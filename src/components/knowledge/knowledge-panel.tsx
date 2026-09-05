@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,11 +11,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { fmtDateTime } from "@/lib/format";
 import {
   addRepoAction,
+  loadSourceJobsAction,
+  pauseSourceAction,
   removeSourceAction,
+  resumeSourceAction,
+  resyncSourceAction,
   syncSourceAction,
   uploadAction,
   type ActionState,
 } from "@/app/(app)/knowledge/actions";
+import type { JobListItem } from "@/modules/ingestion/queue";
 
 export interface SourceRow {
   id: string;
@@ -39,10 +45,12 @@ function InlineForm({
   action,
   children,
   hidden,
+  confirmMessage,
 }: {
   action: (p: ActionState, fd: FormData) => Promise<ActionState>;
   children: React.ReactNode;
   hidden?: Record<string, string>;
+  confirmMessage?: string;
 }) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     action,
@@ -50,7 +58,13 @@ function InlineForm({
   );
   useToast(state);
   return (
-    <form action={formAction} className="contents">
+    <form
+      action={formAction}
+      className="contents"
+      onSubmit={(e) => {
+        if (confirmMessage && !confirm(confirmMessage)) e.preventDefault();
+      }}
+    >
       {hidden &&
         Object.entries(hidden).map(([k, v]) => (
           <input key={k} type="hidden" name={k} value={v} />
@@ -59,6 +73,65 @@ function InlineForm({
         {children}
       </fieldset>
     </form>
+  );
+}
+
+const STATUS_VARIANT: Record<
+  string,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
+  pending: "secondary",
+  running: "default",
+  failed: "destructive",
+  done: "outline",
+};
+
+function SourceHistory({ sourceId }: { sourceId: string }) {
+  const [open, setOpen] = useState(false);
+  const [jobs, setJobs] = useState<JobListItem[] | null>(null);
+  const [loading, startLoad] = useTransition();
+
+  function toggle() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+    if (jobs === null) {
+      startLoad(async () => setJobs(await loadSourceJobsAction(sourceId)));
+    }
+  }
+
+  return (
+    <div className="w-full">
+      <Button type="button" size="sm" variant="ghost" onClick={toggle}>
+        {open ? "Hide history" : "History"}
+      </Button>
+      {open && (
+        <ul className="mt-1 flex flex-col divide-y rounded-md border text-xs">
+          {loading && (
+            <li className="px-3 py-2 text-muted-foreground">Loading…</li>
+          )}
+          {!loading && jobs?.length === 0 && (
+            <li className="px-3 py-2 text-muted-foreground">
+              No queue items from this source yet.
+            </li>
+          )}
+          {!loading &&
+            jobs?.map((j) => (
+              <li key={j.id} className="flex items-center gap-2 px-3 py-2">
+                <Badge variant={STATUS_VARIANT[j.status] ?? "outline"}>
+                  {j.status}
+                </Badge>
+                <span className="min-w-0 flex-1 truncate">{j.title}</span>
+                <span className="shrink-0 text-muted-foreground">
+                  {fmtDateTime(j.createdAt)}
+                </span>
+              </li>
+            ))}
+        </ul>
+      )}
+    </div>
   );
 }
 
@@ -101,42 +174,65 @@ export function KnowledgePanel({
           )}
           {sources
             .filter((s) => s.kind === "github_repo")
-            .map((s) => (
-              <li
-                key={s.id}
-                className="flex flex-wrap items-center gap-2 px-3 py-2"
-              >
-                <span className="font-mono">{s.externalRef}</span>
-                <span
-                  className={
-                    s.status === "error"
-                      ? "text-xs text-red-600 dark:text-red-400"
-                      : "text-xs text-muted-foreground"
-                  }
-                >
-                  {s.status === "error"
-                    ? `error: ${s.error?.slice(0, 80)}`
-                    : s.lastSyncedAt
-                      ? `synced ${fmtDateTime(s.lastSyncedAt)}`
-                      : "never synced"}
-                </span>
-                <span className="ml-auto flex gap-2">
-                  <InlineForm action={syncSourceAction} hidden={{ id: s.id }}>
-                    <Button type="submit" size="sm" variant="secondary">
-                      Sync
-                    </Button>
-                  </InlineForm>
-                  <InlineForm
-                    action={removeSourceAction}
-                    hidden={{ id: s.id }}
+            .map((s) => {
+              const paused = s.status === "paused";
+              return (
+                <li key={s.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                  <span className="font-mono">{s.externalRef}</span>
+                  {paused && <Badge variant="outline">paused</Badge>}
+                  <span
+                    className={
+                      s.status === "error"
+                        ? "text-xs text-red-600 dark:text-red-400"
+                        : "text-xs text-muted-foreground"
+                    }
                   >
-                    <Button type="submit" size="sm" variant="ghost">
-                      Remove
-                    </Button>
-                  </InlineForm>
-                </span>
-              </li>
-            ))}
+                    {s.status === "error"
+                      ? `error: ${s.error?.slice(0, 80)}`
+                      : s.lastSyncedAt
+                        ? `synced ${fmtDateTime(s.lastSyncedAt)}`
+                        : "never synced"}
+                  </span>
+                  <span className="ml-auto flex gap-2">
+                    {paused ? (
+                      <InlineForm action={resumeSourceAction} hidden={{ id: s.id }}>
+                        <Button type="submit" size="sm" variant="secondary">
+                          Resume
+                        </Button>
+                      </InlineForm>
+                    ) : (
+                      <>
+                        <InlineForm action={syncSourceAction} hidden={{ id: s.id }}>
+                          <Button type="submit" size="sm" variant="secondary">
+                            Sync
+                          </Button>
+                        </InlineForm>
+                        <InlineForm action={pauseSourceAction} hidden={{ id: s.id }}>
+                          <Button type="submit" size="sm" variant="ghost">
+                            Pause
+                          </Button>
+                        </InlineForm>
+                      </>
+                    )}
+                    <InlineForm
+                      action={resyncSourceAction}
+                      hidden={{ id: s.id }}
+                      confirmMessage={`Resync ${s.externalRef} from scratch? This re-walks its full commit history.`}
+                    >
+                      <Button type="submit" size="sm" variant="ghost">
+                        Resync from scratch
+                      </Button>
+                    </InlineForm>
+                    <InlineForm action={removeSourceAction} hidden={{ id: s.id }}>
+                      <Button type="submit" size="sm" variant="ghost">
+                        Remove
+                      </Button>
+                    </InlineForm>
+                  </span>
+                  <SourceHistory sourceId={s.id} />
+                </li>
+              );
+            })}
         </ul>
       </section>
 

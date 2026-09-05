@@ -164,6 +164,7 @@ export async function upsertProjectByName(
         .set({ description: description.trim(), updatedAt: new Date() })
         .where(eq(projects.id, existing.id))
         .returning();
+      await recordContextEvent({ userId, kind: "project_updated", refId: updated.id });
       return updated;
     }
     return existing;
@@ -180,7 +181,10 @@ export async function upsertProjectByName(
     })
     .onConflictDoNothing({ target: [projects.userId, projects.slug] })
     .returning();
-  if (row) return row;
+  if (row) {
+    await recordContextEvent({ userId, kind: "project_updated", refId: row.id });
+    return row;
+  }
 
   const [after] = await db
     .select()
@@ -273,6 +277,7 @@ export async function addFeature(
       completedAt: input.status === "done" ? new Date() : null,
     })
     .returning();
+  await recordContextEvent({ userId, kind: "project_updated", refId: projectId });
   return row;
 }
 
@@ -281,7 +286,7 @@ export async function setFeatureStatus(
   featureId: string,
   status: FeatureStatus,
 ): Promise<void> {
-  await db
+  const [row] = await db
     .update(projectFeatures)
     .set({
       status,
@@ -289,7 +294,11 @@ export async function setFeatureStatus(
     })
     .where(
       and(eq(projectFeatures.userId, userId), eq(projectFeatures.id, featureId)),
-    );
+    )
+    .returning({ projectId: projectFeatures.projectId });
+  if (row) {
+    await recordContextEvent({ userId, kind: "project_updated", refId: row.projectId });
+  }
   await syncFeatureEvidence(userId, featureId);
 }
 

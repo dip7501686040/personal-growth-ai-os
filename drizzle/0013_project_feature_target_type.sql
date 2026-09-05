@@ -1,0 +1,1 @@
+ALTER TYPE "public"."knowledge_target_type" ADD VALUE 'project_feature';

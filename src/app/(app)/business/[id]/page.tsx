@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/user";
 import { getOpportunity } from "@/modules/business/service";
+import { getProofOfWorkByNames, getRelatedEntities } from "@/modules/knowledge/entity-skill-links";
 import { OpportunityForm } from "@/components/business/opportunity-form";
+import { ProofOfWorkCard } from "@/components/knowledge/proof-of-work-card";
 import { deleteOpportunityAction } from "@/app/(app)/business/actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +37,10 @@ export default async function OpportunityPage({
   if (!o) notFound();
 
   const tech = (o.techStack ?? []) as string[];
+  const [proof, related] = await Promise.all([
+    getProofOfWorkByNames(userId, tech),
+    getRelatedEntities(userId, "business_opportunity", id),
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -97,6 +103,8 @@ export default async function OpportunityPage({
           </div>
         </CardContent>
       </Card>
+
+      <ProofOfWorkCard proof={proof} related={related} />
 
       <Card>
         <CardHeader>

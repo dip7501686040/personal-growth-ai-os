@@ -1,6 +1,6 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { dsaPatterns, projects, skills } from "@/lib/db/schema";
+import { projectFeatures, projects, skills } from "@/lib/db/schema";
 import { type KnowledgeTargetType } from "../target-types";
 import { docVector, toVectorLiteral } from "./doc-vector";
 
@@ -11,10 +11,10 @@ import { docVector, toVectorLiteral } from "./doc-vector";
  * technical-content similarity floats at 0.35–0.5 regardless of actual
  * relevance. 0.55 keeps the former, drops the latter.
  */
-const EMBED_FLOOR = 0.55;
+export const EMBED_FLOOR = 0.55;
 const EMBED_TOP_PER_TYPE = 3;
 /** Skip name matches shorter than this — avoids noisy 1–2 char hits. */
-const NAME_FLOOR = 3;
+export const NAME_FLOOR = 3;
 
 export interface DocContext {
   id: string;
@@ -28,11 +28,11 @@ export interface RawCandidate {
   targetType: KnowledgeTargetType;
   targetId: string;
   embedScore: number | null;
-  /** the skill/pattern name literally found in the doc, if any */
+  /** the skill/feature name literally found in the doc, if any */
   nameMatch: string | null;
-  /** doc's github repo short name matches a project's name/slug (soft signal) */
+  /** doc's github repo short name matches the feature's project (soft signal) */
   repoNameMatch: boolean;
-  /** doc's sourceRef directly identifies this row (internal docs only) */
+  /** doc's sourceRef directly identifies this row, or its parent project (internal docs only) */
   sharedSource: boolean;
 }
 
@@ -40,7 +40,7 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function containsName(haystack: string, name: string): boolean {
+export function containsName(haystack: string, name: string): boolean {
   const n = name.trim();
   if (n.length < NAME_FLOOR) return false;
   return new RegExp(`\\b${escapeRegex(n)}\\b`, "i").test(haystack);
@@ -56,17 +56,24 @@ interface EmbedHit {
   sim: number;
 }
 
-/** Top-K per target type over `entity_embeddings`, same-model cosine kNN. */
-async function embeddingCandidates(
+/**
+ * Top-K per target type over `entity_embeddings`, same-model cosine kNN.
+ * `restrictTypes` narrows the scan to a subset (e.g. just `skill` and
+ * `project_feature` for the entity-skill-link bridge, Phase 7) instead of
+ * every link-target type a knowledge document could match.
+ */
+export async function embeddingCandidates(
   userId: string,
   vector: number[],
   model: string,
+  restrictTypes?: readonly KnowledgeTargetType[],
 ): Promise<Map<string, number>> {
   const lit = toVectorLiteral(vector);
   const rows = await db.execute(sql`
     select target_type, target_id, 1 - (embedding <=> ${lit}::vector) as sim
     from entity_embeddings
     where user_id = ${userId} and embedding_model = ${model} and embedding is not null
+    ${restrictTypes?.length ? sql`and target_type in ${restrictTypes}` : sql``}
     order by embedding <=> ${lit}::vector
   `);
 
@@ -87,10 +94,13 @@ async function embeddingCandidates(
  * Every doc is checked against all target types in parallel (not a sequential
  * fallback) — three independent signals, merged by key:
  *   1. embedding kNN over entity_embeddings (same model as the doc's chunks)
- *   2. lexical: a skill/dsa_pattern name literally appears in the doc text
+ *   2. lexical: a skill/project-feature name literally appears in the doc text
  *   3. shared source: an `internal` doc's sourceRef IS `skill:<id>` /
- *      `project:<id>` / `learning_session:<id>`; a `github_repo` doc's repo
- *      short name matches a project's name/slug (softer — not auto-accept eligible)
+ *      `learning_session:<id>` directly, or `project:<id>` — which fans out to
+ *      every feature currently under that project (project itself isn't a
+ *      target type; its features are the concrete thing). A `github_repo`
+ *      doc's repo name matching a project similarly fans out to that
+ *      project's features (softer signal — not auto-accept eligible).
  */
 export async function generateCandidates(
   userId: string,
@@ -133,22 +143,35 @@ export async function generateCandidates(
     if (containsName(text, s.name)) upsert("skill", s.id, { nameMatch: s.name });
   }
 
-  const patterns = await db
-    .select({ id: dsaPatterns.id, name: dsaPatterns.name })
-    .from(dsaPatterns);
-  for (const p of patterns) {
-    if (containsName(text, p.name)) upsert("dsa_pattern", p.id, { nameMatch: p.name });
+  const userFeatures = await db
+    .select({ id: projectFeatures.id, title: projectFeatures.title })
+    .from(projectFeatures)
+    .where(eq(projectFeatures.userId, userId));
+  for (const f of userFeatures) {
+    if (containsName(text, f.title)) upsert("project_feature", f.id, { nameMatch: f.title });
   }
+
+  /** Every current feature of one project — used to fan a project-level
+   *  signal (shared source, repo-name match) out to the concrete things. */
+  const featuresOfProject = (projectId: string) =>
+    db
+      .select({ id: projectFeatures.id })
+      .from(projectFeatures)
+      .where(
+        and(eq(projectFeatures.userId, userId), eq(projectFeatures.projectId, projectId)),
+      );
 
   if (doc.sourceKind === "internal" && doc.sourceRef) {
     const [kind, id] = doc.sourceRef.split(":");
-    const map: Partial<Record<string, KnowledgeTargetType>> = {
-      skill: "skill",
-      project: "project",
-      learning_session: "learning_session",
-    };
-    const targetType = map[kind];
-    if (targetType && id) upsert(targetType, id, { sharedSource: true });
+    if (kind === "skill" && id) {
+      upsert("skill", id, { sharedSource: true });
+    } else if (kind === "learning_session" && id) {
+      upsert("learning_session", id, { sharedSource: true });
+    } else if (kind === "project" && id) {
+      for (const f of await featuresOfProject(id)) {
+        upsert("project_feature", f.id, { sharedSource: true });
+      }
+    }
   }
 
   if (doc.sourceKind === "github_repo" && doc.sourceRef?.startsWith("github:")) {
@@ -162,7 +185,9 @@ export async function generateCandidates(
         .where(eq(projects.userId, userId));
       for (const p of userProjects) {
         if (slugish(p.name) === shortSlug || slugish(p.slug) === shortSlug) {
-          upsert("project", p.id, { repoNameMatch: true });
+          for (const f of await featuresOfProject(p.id)) {
+            upsert("project_feature", f.id, { repoNameMatch: true });
+          }
         }
       }
     }

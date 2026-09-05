@@ -250,6 +250,67 @@ export async function listDocumentsByJob(
   }));
 }
 
+export interface MappingCandidateDoc {
+  id: string;
+  updatedAt: Date;
+  lastMappedAt: Date | null;
+}
+
+/**
+ * Lightweight, cursor-paginated feed of every non-superseded document for the
+ * nightly mapping sweep (Phase 3) — just enough per row (`updatedAt`,
+ * `lastMappedAt`) to decide whether it needs remapping, no chunk join. Internal
+ * pipeline use, so dates stay as `Date`, not ISO strings.
+ */
+export async function listDocumentsForMapping(
+  userId: string,
+  opts: { cursor?: string | null; limit?: number },
+): Promise<Page<MappingCandidateDoc>> {
+  const limit = opts.limit ?? 50;
+  const cur = decodeCursor(opts.cursor);
+
+  const rows = await db
+    .select({
+      id: knowledgeDocuments.id,
+      updatedAt: knowledgeDocuments.updatedAt,
+      lastMappedAt: knowledgeDocuments.lastMappedAt,
+      createdAt: knowledgeDocuments.createdAt,
+    })
+    .from(knowledgeDocuments)
+    .where(
+      and(
+        eq(knowledgeDocuments.userId, userId),
+        isNull(knowledgeDocuments.supersededAt),
+        cur
+          ? or(
+              lt(knowledgeDocuments.createdAt, cur.createdAt),
+              and(
+                eq(knowledgeDocuments.createdAt, cur.createdAt),
+                lt(knowledgeDocuments.id, cur.id),
+              ),
+            )
+          : undefined,
+      ),
+    )
+    .orderBy(desc(knowledgeDocuments.createdAt), desc(knowledgeDocuments.id))
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const pageRows = rows.slice(0, limit);
+  const last = pageRows.at(-1);
+  return {
+    items: pageRows.map((r) => ({
+      id: r.id,
+      updatedAt: r.updatedAt,
+      lastMappedAt: r.lastMappedAt,
+    })),
+    nextCursor:
+      hasMore && last
+        ? encodeCursor({ createdAt: last.createdAt, id: last.id })
+        : null,
+  };
+}
+
 export interface KnowledgeChunkRow {
   id: string;
   chunkIndex: number;

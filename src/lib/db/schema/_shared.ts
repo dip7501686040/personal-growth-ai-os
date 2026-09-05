@@ -218,7 +218,12 @@ export const activityStatusEnum = pgEnum("activity_status", [
   "failed",
 ]);
 
-/** What a knowledge_links row points at. */
+/**
+ * What a knowledge_links row points at. `project` and `dsa_pattern` are kept
+ * here (Postgres can't cheaply drop an enum value) but are no longer used at
+ * the application level — see modules/knowledge/target-types.ts for the
+ * actual, narrower set of usable values and why.
+ */
 export const knowledgeTargetTypeEnum = pgEnum("knowledge_target_type", [
   "skill",
   "project",
@@ -227,4 +232,18 @@ export const knowledgeTargetTypeEnum = pgEnum("knowledge_target_type", [
   "business_opportunity",
   "learning_session",
   "dsa_pattern",
+  "project_feature",
+]);
+
+/**
+ * Source side of an `entity_skill_links` row (Phase 7) — the three modules
+ * that have no structural skill/feature link of their own and get one via the
+ * same embedding-match mechanism `knowledge_links` uses for documents. The
+ * target side reuses `knowledge_target_type` (see modules/knowledge/entity-
+ * skill-links.ts), narrowed at the app level to `skill`/`project_feature`.
+ */
+export const entitySkillSourceTypeEnum = pgEnum("entity_skill_source_type", [
+  "career_opportunity",
+  "content_item",
+  "business_opportunity",
 ]);

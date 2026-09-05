@@ -18,8 +18,7 @@ const RELATION_BY_TYPE: Record<
   { matched: string; default: string }
 > = {
   skill: { matched: "demonstrates", default: "relevant_to" },
-  dsa_pattern: { matched: "demonstrates", default: "relevant_to" },
-  project: { matched: "demonstrates", default: "used_in" },
+  project_feature: { matched: "demonstrates", default: "used_in" },
   learning_session: { matched: "evidence_for", default: "relevant_to" },
   career_opportunity: { matched: "relevant_to", default: "relevant_to" },
   content_item: { matched: "relevant_to", default: "relevant_to" },

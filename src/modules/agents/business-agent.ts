@@ -6,6 +6,8 @@ import {
   titleExists,
   type OpportunityInput,
 } from "@/modules/business/service";
+import { getProofOfWork, linkEntityToSkills } from "@/modules/knowledge/entity-skill-links";
+import { resolveSkillIdsByName } from "@/modules/skills/service";
 import { BaseAgent } from "./base-agent";
 import { BusinessOpportunitiesSchema } from "./business-schema";
 import type { AgentContext, AgentResult } from "./types";
@@ -26,6 +28,26 @@ interface Context {
   knownProblems: string;
   /** Unified skill + knowledge-base view from the Personal Context Engine. */
   personal: string;
+  /** "SkillName: shipped in 'Feature' (Project)" — real proof for the
+   *  buildable-with skills, resolved name→id first (tech_stack is loose text). */
+  proofOfWork: string[];
+}
+
+/** After a business opportunity is (re)persisted, refresh its skill/feature
+ *  matches so the cross-module bridge (related content/learning) works from
+ *  its detail page — the same "map it the same run it's created" pattern
+ *  mapDocument and the career agent use. */
+async function linkOpportunity(
+  userId: string,
+  id: string,
+  o: { title: string; problem: string; proposedSolution: string; techStack?: string[] },
+): Promise<void> {
+  await linkEntityToSkills(
+    userId,
+    "business_opportunity",
+    id,
+    `${o.title}. ${o.problem} ${o.proposedSolution} ${(o.techStack ?? []).join(", ")}`,
+  );
 }
 
 const SYSTEM = `You are the Business Opportunity Agent for one senior backend/full-stack engineer who wants realistic side income.
@@ -50,6 +72,9 @@ function buildPrompt(ctx: Context, today: string): string {
     `User can build with (proven/implemented): ${JSON.stringify(ctx.snapshot.buildableWith)}`,
     `Also knows (practiced): ${JSON.stringify(ctx.snapshot.alsoKnows)}`,
     `Has shipped: ${JSON.stringify(ctx.snapshot.projects)}`,
+    ...(ctx.proofOfWork.length
+      ? [`Proof of work per skill (cite real features, don't invent more):`, ...ctx.proofOfWork.map((p) => `- ${p}`)]
+      : []),
     ``,
     `Market / location: ${ctx.market || "(not specified — assume small & local businesses)"}`,
     `Business type focus: ${ctx.businessType || "(any small business)"}`,
@@ -144,12 +169,25 @@ export class BusinessAgent extends BaseAgent<Context, BusinessAgentResult> {
       getBusinessSnapshot(ctx.userId),
       getPersonalContext({ userId: ctx.userId, purpose: "business_scan" }),
     ]);
+
+    // tech_stack / buildableWith name skills loosely (by text) — resolve to
+    // real ids before proof-of-work can join against project_skills.
+    const skillIds = await resolveSkillIdsByName(ctx.userId, [
+      ...snapshot.buildableWith,
+      ...snapshot.alsoKnows,
+    ]);
+    const proof = await getProofOfWork(ctx.userId, [...skillIds.values()]);
+    const proofOfWork = [...skillIds.entries()].flatMap(([name, id]) =>
+      (proof.get(id) ?? []).map((p) => `${name}: shipped in "${p.featureTitle}" (${p.projectName})`),
+    );
+
     return {
       snapshot,
       market: String(ctx.input.market ?? "").trim(),
       businessType: String(ctx.input.businessType ?? "").trim(),
       knownProblems: String(ctx.input.knownProblems ?? "").trim(),
       personal: pc.toPromptString(),
+      proofOfWork,
     };
   }
 
@@ -168,7 +206,8 @@ export class BusinessAgent extends BaseAgent<Context, BusinessAgentResult> {
       const created: BusinessAgentResult["created"] = [];
       for (const opp of deterministicOpportunities(context)) {
         if (await titleExists(ctx.userId, opp.title)) continue;
-        await createOpportunity(ctx.userId, { ...opp, agentRunId: ctx.agentRunId });
+        const row = await createOpportunity(ctx.userId, { ...opp, agentRunId: ctx.agentRunId });
+        await linkOpportunity(ctx.userId, row.id, opp);
         created.push({
           title: opp.title,
           skillMatchScore: opp.skillMatchScore ?? 0,
@@ -200,7 +239,7 @@ export class BusinessAgent extends BaseAgent<Context, BusinessAgentResult> {
     const created: BusinessAgentResult["created"] = [];
     for (const o of data.opportunities) {
       if (await titleExists(ctx.userId, o.title)) continue;
-      await createOpportunity(ctx.userId, {
+      const row = await createOpportunity(ctx.userId, {
         title: o.title,
         problem: o.problem,
         targetCustomer: o.targetCustomer,
@@ -214,6 +253,7 @@ export class BusinessAgent extends BaseAgent<Context, BusinessAgentResult> {
         businessType: context.businessType || undefined,
         agentRunId: ctx.agentRunId,
       });
+      await linkOpportunity(ctx.userId, row.id, o);
       created.push({ title: o.title, skillMatchScore: o.skillMatchScore });
     }
 

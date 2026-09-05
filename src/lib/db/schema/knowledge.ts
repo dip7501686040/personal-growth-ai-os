@@ -45,6 +45,10 @@ export const knowledgeDocuments = pgTable(
     meta: jsonb("meta").notNull().default(sql`'{}'::jsonb`),
     contentHash: text("content_hash").notNull(),
     supersededAt: timestamp("superseded_at", { withTimezone: true }),
+    /** Last time this doc was run through the mapping pipeline (any outcome).
+     *  The nightly sweep skips a doc when this is newer than both its own
+     *  `updated_at` and the entity corpus's last change (Phase 3). */
+    lastMappedAt: timestamp("last_mapped_at", { withTimezone: true }),
     /** title (weight A) + body (weight B), for full-text search (K4). */
     searchTsv: tsvector("search_tsv").generatedAlwaysAs(
       sql`setweight(to_tsvector('english', coalesce(title, '')), 'A') || setweight(to_tsvector('english', coalesce(body, '')), 'B')`,

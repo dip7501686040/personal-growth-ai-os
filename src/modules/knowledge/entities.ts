@@ -1,13 +1,13 @@
 import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   businessOpportunities,
   careerOpportunities,
   contentItems,
-  dsaPatterns,
   entityEmbeddings,
   learningSessions,
+  projectFeatures,
   projects,
   skills,
 } from "@/lib/db/schema";
@@ -44,20 +44,21 @@ async function fetchEntities(
         text: [`${r.name} (${r.category})`, r.notes].filter(Boolean).join(". "),
       }));
     }
-    case "project": {
+    case "project_feature": {
       const rows = await db
         .select({
-          id: projects.id,
-          name: projects.name,
-          description: projects.description,
-          problemSolved: projects.problemSolved,
-          architecture: projects.architecture,
+          id: projectFeatures.id,
+          title: projectFeatures.title,
+          description: projectFeatures.description,
+          status: projectFeatures.status,
+          projectName: projects.name,
         })
-        .from(projects)
-        .where(eq(projects.userId, userId));
+        .from(projectFeatures)
+        .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
+        .where(eq(projectFeatures.userId, userId));
       return rows.map((r) => ({
         id: r.id,
-        text: [r.name, r.description, r.problemSolved, r.architecture]
+        text: [`${r.title} (${r.projectName}, ${r.status})`, r.description]
           .filter(Boolean)
           .join(". "),
       }));
@@ -122,21 +123,6 @@ async function fetchEntities(
         text: [`${r.topic} (${r.category})`, r.description]
           .filter(Boolean)
           .join(". "),
-      }));
-    }
-    case "dsa_pattern": {
-      // global reference table — same rows for every user, embedded once per
-      // owner (entity_embeddings is still keyed by userId, like everything else)
-      const rows = await db
-        .select({
-          id: dsaPatterns.id,
-          name: dsaPatterns.name,
-          description: dsaPatterns.description,
-        })
-        .from(dsaPatterns);
-      return rows.map((r) => ({
-        id: r.id,
-        text: [r.name, r.description].filter(Boolean).join(". "),
       }));
     }
   }
@@ -301,4 +287,19 @@ export async function backfillEntityEmbeddings(
     results.push({ type, total: rows.length, embedded: toEmbed.length });
   }
   return results;
+}
+
+/**
+ * The most recent time any link-target entity's embedding changed for this
+ * user — a document mapped since this watermark has already seen the current
+ * entity corpus and can be skipped by the nightly sweep (Phase 3). Falls back
+ * to the epoch when there are no entity embeddings yet, so a doc is never
+ * skipped just because the corpus is empty.
+ */
+export async function getEntityWatermark(userId: string): Promise<Date> {
+  const [row] = await db
+    .select({ max: sql<string | null>`max(${entityEmbeddings.updatedAt})` })
+    .from(entityEmbeddings)
+    .where(eq(entityEmbeddings.userId, userId));
+  return row?.max ? new Date(row.max) : new Date(0);
 }

@@ -15,6 +15,7 @@ import {
   updateContentItem,
   type SourceType,
 } from "@/modules/content/service";
+import { linkEntityToSkills } from "@/modules/knowledge/entity-skill-links";
 import { BaseAgent } from "./base-agent";
 import {
   ContentOpportunitiesSchema,
@@ -294,13 +295,19 @@ export class ContentAgent extends BaseAgent<Context, ContentAgentResult> {
       const picks = context.candidates.slice(0, 3);
       const created: { title: string; hook: string }[] = [];
       for (const c of picks) {
-        await createIdea(ctx.userId, {
+        const item = await createIdea(ctx.userId, {
           title: c.label,
           hook: c.detail || c.label,
           angle: "What I learned / what was non-obvious.",
           agentRunId: ctx.agentRunId,
           sources: [{ sourceType: c.type, sourceId: c.id, note: c.label }],
         });
+        await linkEntityToSkills(
+          ctx.userId,
+          "content_item",
+          item.id,
+          `${item.title}. ${item.hook ?? ""}`,
+        );
         created.push({ title: c.label, hook: c.detail || c.label });
       }
       return {
@@ -342,13 +349,19 @@ export class ContentAgent extends BaseAgent<Context, ContentAgentResult> {
     for (const o of data.opportunities) {
       const c = byKey.get(o.sourceKey);
       if (!c) continue;
-      await createIdea(ctx.userId, {
+      const item = await createIdea(ctx.userId, {
         title: o.title,
         hook: o.hook,
         angle: o.angle,
         agentRunId: ctx.agentRunId,
         sources: [{ sourceType: c.type, sourceId: c.id, note: c.label }],
       });
+      await linkEntityToSkills(
+        ctx.userId,
+        "content_item",
+        item.id,
+        `${item.title}. ${item.hook ?? ""} ${item.angle ?? ""}`,
+      );
       created.push({ title: o.title, hook: o.hook });
     }
 
