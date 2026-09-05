@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { knowledgeDocuments } from "@/lib/db/schema";
+import { knowledgeChunks, knowledgeDocuments } from "@/lib/db/schema";
 import { docVector, toVectorLiteral } from "./vector";
 
 /**
@@ -28,7 +28,12 @@ interface SimilarChunk {
  * floor, marks the newer document `superseded_at` — the exact mechanism that
  * already hides superseded rows from every list/search/mapping query,
  * instead of inventing a second one — and records which document it
- * duplicates in `meta.duplicateOf` for traceability. Nothing is deleted.
+ * duplicates in `meta.duplicateOf` for traceability. The document row itself
+ * is kept (so `duplicateOf` has something to point at), but its now-useless
+ * `knowledge_chunks` — the actual embedded vectors — are deleted; they'd
+ * otherwise sit in the corpus taking up space and, since they were embedded
+ * before this check ran, could still surface as a raw kNN hit anywhere that
+ * doesn't join back to `knowledge_documents` to filter `superseded_at`.
  */
 export async function checkCrossSourceDuplicate(
   userId: string,
@@ -77,6 +82,12 @@ export async function checkCrossSourceDuplicate(
       meta: sql`${knowledgeDocuments.meta} || ${JSON.stringify({ duplicateOf: best.id })}::jsonb`,
     })
     .where(eq(knowledgeDocuments.id, documentId));
+
+  await db
+    .delete(knowledgeChunks)
+    .where(
+      and(eq(knowledgeChunks.userId, userId), eq(knowledgeChunks.documentId, documentId)),
+    );
 
   return best.id;
 }
