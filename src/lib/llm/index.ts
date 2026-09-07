@@ -3,6 +3,7 @@ import type { ZodType } from "zod";
 import { db } from "@/lib/db";
 import { agentEvents, agentModelConfig, agentRuns } from "@/lib/db/schema";
 import { env } from "@/lib/env";
+import { AnthropicProvider } from "./anthropic";
 import { cacheKey, getCached, putCached } from "./cache";
 import { GeminiProvider } from "./gemini";
 import { MODEL_LADDER, type ModelChoice } from "./models";
@@ -21,7 +22,9 @@ export type { AgentName } from "./types";
 export { AGENT_MODEL_DEFAULTS, MODEL_LADDER } from "./models";
 
 export function hasProviderKey(name: LlmProviderName): boolean {
-  return name === "gemini" ? !!env.GEMINI_API_KEY : !!env.OPENAI_API_KEY;
+  if (name === "gemini") return !!env.GEMINI_API_KEY;
+  if (name === "anthropic") return !!env.ANTHROPIC_API_KEY;
+  return !!env.OPENAI_API_KEY;
 }
 
 function getProvider(name: LlmProviderName): LLMProvider {
@@ -30,6 +33,12 @@ function getProvider(name: LlmProviderName): LLMProvider {
       throw new LlmError("GEMINI_API_KEY is not set", "gemini");
     }
     return new GeminiProvider(env.GEMINI_API_KEY);
+  }
+  if (name === "anthropic") {
+    if (!env.ANTHROPIC_API_KEY) {
+      throw new LlmError("ANTHROPIC_API_KEY is not set", "anthropic");
+    }
+    return new AnthropicProvider(env.ANTHROPIC_API_KEY);
   }
   if (!env.OPENAI_API_KEY) {
     throw new LlmError("OPENAI_API_KEY is not set", "openai");

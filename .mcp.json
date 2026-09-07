@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "personal-context": {
+      "command": "node",
+      "args": [
+        "--import",
+        "tsx",
+        "--env-file=.env.local",
+        "mcp/server.ts"
+      ]
+    }
+  }
+}

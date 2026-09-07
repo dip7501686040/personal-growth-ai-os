@@ -46,7 +46,7 @@ const OPENAI_FALLBACK = { rpm: 500, tpm: 200_000, tpd: 2_000_000 };
 const OPENAI_BUDGET_USD = num(process.env.OPENAI_BUDGET_USD, 5);
 
 export interface QuotaSummary {
-  provider: "gemini" | "openai";
+  provider: "gemini" | "openai" | "anthropic";
   model: string;
   gemini?: {
     rpd: number;
@@ -73,10 +73,11 @@ export interface QuotaSummary {
 
 export function providerFromModelUsed(
   modelUsed: string | null,
-): "gemini" | "openai" | null {
+): "gemini" | "openai" | "anthropic" | null {
   if (!modelUsed) return null;
   if (modelUsed.startsWith("gemini")) return "gemini";
   if (modelUsed.startsWith("openai")) return "openai";
+  if (modelUsed.startsWith("anthropic")) return "anthropic";
   return null;
 }
 
@@ -130,6 +131,10 @@ export async function hasHeadroom(
   userId: string,
   choice: ModelChoice,
 ): Promise<boolean> {
+  // Anthropic is pure pay-per-token — no free-tier RPD / prepaid-credit ceiling
+  // the app tracks, so it always has headroom (real limits surface as 429s,
+  // which runStructured already falls back on).
+  if (choice.provider === "anthropic") return true;
   if (choice.provider === "gemini") {
     const limits = geminiLimitsFor(choice.model);
     return (await geminiRequestsToday(userId)) < limits.rpd;
@@ -145,6 +150,8 @@ export async function computeQuota(
 ): Promise<QuotaSummary | null> {
   const provider = providerFromModelUsed(modelUsed);
   if (!provider) return null;
+  // Anthropic has no free-tier / prepaid-credit meter to summarise.
+  if (provider === "anthropic") return null;
   const model = bareModel(modelUsed);
 
   if (provider === "gemini") {

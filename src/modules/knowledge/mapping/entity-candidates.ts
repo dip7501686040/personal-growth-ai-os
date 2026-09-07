@@ -20,6 +20,13 @@ import { scoreCandidate, SCORE_FLOOR, type ScoredCandidate } from "./score";
 export async function matchSkillsAndFeatures(
   userId: string,
   text: string,
+  opts?: {
+    /** Keep a candidate whose name literally appears in `text` even if its
+     *  fused score is below `SCORE_FLOOR`. A JD that spells out "Kubernetes"
+     *  is naming the skill on purpose — for `get_proof_for_jd` that's signal,
+     *  not noise. Off by default so document/entity linking is unaffected. */
+    keepNameMatches?: boolean;
+  },
 ): Promise<ScoredCandidate[]> {
   const provider = getEmbeddingProvider();
   const [vector] = await provider.embed([text]);
@@ -69,5 +76,11 @@ export async function matchSkillsAndFeatures(
     if (containsName(text, f.title)) upsert("project_feature", f.id, { nameMatch: f.title });
   }
 
-  return [...byKey.values()].map(scoreCandidate).filter((c) => c.score >= SCORE_FLOOR);
+  return [...byKey.values()]
+    .map(scoreCandidate)
+    .filter(
+      (c) =>
+        c.score >= SCORE_FLOOR ||
+        (opts?.keepNameMatches === true && !!c.nameMatch),
+    );
 }

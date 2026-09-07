@@ -1,5 +1,7 @@
 import {
+  boolean,
   index,
+  jsonb,
   pgTable,
   text,
   uuid,
@@ -28,6 +30,13 @@ export const contentItems = pgTable(
     /** Suggested take the draft should develop. */
     angle: text("angle"),
     body: text("body"),
+    /** Cleared for the public portfolio API (J6). Only `isPublic && published`
+     *  rows leave the private app. */
+    isPublic: boolean("is_public").notNull().default(false),
+    /** Where this piece is published, per platform: {"linkedin":"...","blog":"..."}. */
+    publishedUrls: jsonb("published_urls"),
+    /** video | image | doc | diagram | post — drives how the portfolio renders it. */
+    assetType: text("asset_type"),
     agentRunId: uuid("agent_run_id").references(() => agentRuns.id, {
       onDelete: "set null",
     }),

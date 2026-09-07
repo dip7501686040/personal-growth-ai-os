@@ -279,6 +279,41 @@ export async function setEvidenceStatus(
   if (row) await recomputeSkill(userId, row.skillId);
 }
 
+/** Count of not-yet-reviewed evidence across all skills (drives the /skills banner). */
+export async function countSuggestedEvidence(userId: string): Promise<number> {
+  const [{ n }] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(skillEvidence)
+    .where(
+      and(
+        eq(skillEvidence.userId, userId),
+        eq(skillEvidence.status, "suggested"),
+      ),
+    );
+  return n;
+}
+
+/** Accept every suggested evidence row (used after a repo sync). Recomputes
+ *  each affected skill's level once. Returns how many were accepted. */
+export async function acceptAllSuggestedEvidence(
+  userId: string,
+): Promise<number> {
+  const rows = await db
+    .update(skillEvidence)
+    .set({ status: "accepted", decidedAt: new Date() })
+    .where(
+      and(
+        eq(skillEvidence.userId, userId),
+        eq(skillEvidence.status, "suggested"),
+      ),
+    )
+    .returning({ skillId: skillEvidence.skillId });
+  for (const skillId of new Set(rows.map((r) => r.skillId))) {
+    await recomputeSkill(userId, skillId);
+  }
+  return rows.length;
+}
+
 export type LevelChangeResult =
   | { applied: true }
   | { applied: false; approvalId: string };

@@ -33,6 +33,7 @@ const serverEnvSchema = z.object({
   // AI providers — optional; agents degrade gracefully when a key is absent.
   GEMINI_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
   // Which embedding backend the knowledge base uses. "auto" = Gemini when
   // GEMINI_API_KEY is set, else the local Transformers.js model.
   EMBEDDINGS_PROVIDER: z.enum(["auto", "gemini", "local"]).optional(),
@@ -57,6 +58,7 @@ const parsed = serverEnvSchema.safeParse({
   ALLOWED_EMAILS: process.env.ALLOWED_EMAILS,
   GEMINI_API_KEY: optional(process.env.GEMINI_API_KEY),
   OPENAI_API_KEY: optional(process.env.OPENAI_API_KEY),
+  ANTHROPIC_API_KEY: optional(process.env.ANTHROPIC_API_KEY),
   EMBEDDINGS_PROVIDER: optional(process.env.EMBEDDINGS_PROVIDER),
   GITHUB_TOKEN: optional(process.env.GITHUB_TOKEN),
   CRON_SECRET: optional(process.env.CRON_SECRET),

@@ -1,5 +1,7 @@
+import { sql } from "drizzle-orm";
 import {
   index,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -29,6 +31,12 @@ export const projects = pgTable(
     status: projectStatusEnum("status").notNull().default("idea"),
     /** Absolute repo path, for the Phase 2.5 activity collector to match on. */
     repoPath: text("repo_path"),
+    /** GitHub URL — the base for proof links (`repoUrl/tree/main/<codePath>`). */
+    repoUrl: text("repo_url"),
+    liveUrl: text("live_url"),
+    /** git SHA at the last `/sync-repo` run — later runs diff `<sha>..HEAD`. */
+    lastSyncedSha: text("last_synced_sha"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     createdAt,
     updatedAt,
   },
@@ -47,9 +55,24 @@ export const projectFeatures = pgTable(
     description: text("description"),
     status: featureStatusEnum("status").notNull().default("planned"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    /** Cloudinary demo clip for this feature (proof link, priority #1). */
+    demoVideoUrl: text("demo_video_url"),
+    /** Named repo sub-paths per JD keyword, e.g. {"k8s":"infra/k8s"} — resolved
+     *  to `repoUrl/tree/main/<path>` when a JD asks for that skill. */
+    codePaths: jsonb("code_paths"),
+    /** Stable identity for idempotent `/sync-repo` reconcile:
+     *  `repo:<url>:feature:<slug>`. Null for hand-created features. */
+    sourceKey: text("source_key"),
+    /** Last `/sync-repo` run that still detected this feature in the repo. */
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     createdAt,
   },
-  (t) => [index("project_features_project_idx").on(t.projectId)],
+  (t) => [
+    index("project_features_project_idx").on(t.projectId),
+    uniqueIndex("project_features_source_key_idx")
+      .on(t.userId, t.sourceKey)
+      .where(sql`${t.sourceKey} is not null`),
+  ],
 ).enableRLS();
 
 /**

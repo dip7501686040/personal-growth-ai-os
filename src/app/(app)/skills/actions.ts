@@ -9,6 +9,7 @@ import {
   SKILL_LEVELS,
 } from "@/modules/skills/levels";
 import {
+  acceptAllSuggestedEvidence,
   addEvidence,
   createSkill,
   requestLevelChange,
@@ -164,4 +165,19 @@ export async function decideEvidenceAction(
   revalidatePath(`/skills/${parsed.data.slug}`);
   revalidatePath("/skills");
   return { ok: true, message: `Evidence ${parsed.data.decision}.` };
+}
+
+// ── Accept every suggested evidence row (post repo-sync review) ─────────────
+
+export async function acceptAllEvidenceAction(): Promise<ActionState> {
+  const userId = await requireUserId();
+  try {
+    const n = await acceptAllSuggestedEvidence(userId);
+    revalidatePath("/skills");
+    return n > 0
+      ? { ok: true, message: `Accepted ${n} evidence row${n === 1 ? "" : "s"}; levels recomputed.` }
+      : { ok: true, message: "Nothing to accept." };
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Could not accept evidence.");
+  }
 }

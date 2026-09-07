@@ -16,4 +16,5 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/knowledge", label: "Knowledge", phase: "Context P4" },
   { href: "/approvals", label: "Approval Inbox", phase: "Phase 9" },
   { href: "/activity", label: "Agent Activity", phase: "Phase 2.5 / 9" },
+  { href: "/settings", label: "Settings", phase: "Track A" },
 ];

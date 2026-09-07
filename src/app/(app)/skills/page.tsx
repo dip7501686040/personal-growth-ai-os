@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { requireUserId } from "@/lib/user";
-import { listSkills } from "@/modules/skills/service";
+import { countSuggestedEvidence, listSkills } from "@/modules/skills/service";
 import {
   CATEGORY_LABEL,
   SKILL_CATEGORIES,
   SKILL_LEVELS,
   type SkillCategory,
 } from "@/modules/skills/levels";
+import { AcceptAllEvidence } from "@/components/skills/accept-all-evidence";
 import { LevelBadge } from "@/components/skills/level-badge";
 import { AddSkillDialog } from "@/components/skills/add-skill-dialog";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +16,10 @@ export const metadata = { title: "Skills" };
 
 export default async function SkillsPage() {
   const userId = await requireUserId();
-  const skills = await listSkills(userId);
+  const [skills, suggestedCount] = await Promise.all([
+    listSkills(userId),
+    countSuggestedEvidence(userId),
+  ]);
 
   const byLevel = SKILL_LEVELS.map((lvl) => ({
     level: lvl,
@@ -39,6 +43,8 @@ export default async function SkillsPage() {
         </div>
         <AddSkillDialog />
       </div>
+
+      {suggestedCount > 0 && <AcceptAllEvidence count={suggestedCount} />}
 
       {skills.length === 0 ? (
         <Card>

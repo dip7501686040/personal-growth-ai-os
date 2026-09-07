@@ -16,6 +16,7 @@ import { warmupDb } from "@/lib/db";
 import { searchKnowledge } from "@/lib/knowledge";
 import { getOwnerUserId } from "@/lib/owner";
 import { CONTEXT_PURPOSES, getPersonalContext } from "@/modules/context";
+import { getProofForJd } from "@/modules/knowledge/jd-proof";
 import { SKILL_LEVELS } from "@/modules/skills/levels";
 import { listSkills } from "@/modules/skills/service";
 
@@ -97,6 +98,21 @@ server.registerTool(
       }),
     );
     return text(JSON.stringify(rows, null, 2));
+  },
+);
+
+server.registerTool(
+  "get_proof_for_jd",
+  {
+    description:
+      "Given a job description, return the owner's matching skills (name, level, and the shipped project features that prove each — with repo, demo video and specific code-path links), directly-matched project features, and related published content and learning sessions. Deterministic: embedding + lexical match, then plain SQL — no LLM. Use to assemble a per-JD proof-of-work bundle.",
+    inputSchema: {
+      jd: z.string().min(1).describe("the full job-description text"),
+    },
+  },
+  async ({ jd }) => {
+    const userId = await getOwnerUserId();
+    return text(JSON.stringify(await getProofForJd(userId, jd), null, 2));
   },
 );
 

@@ -17,6 +17,13 @@ interface ChatResponse {
   error?: { message?: string };
 }
 
+/** GPT-5 / o-series reasoning models reject an explicit `temperature`. */
+function isReasoningModel(model: string): boolean {
+  return (
+    model.startsWith("gpt-5") || model.startsWith("o1") || model.startsWith("o3")
+  );
+}
+
 export class OpenAIProvider implements LLMProvider {
   readonly name = "openai" as const;
 
@@ -67,7 +74,9 @@ export class OpenAIProvider implements LLMProvider {
           ...(opts.system ? [{ role: "system", content: opts.system }] : []),
           { role: "user", content: opts.prompt },
         ],
-        temperature: opts.temperature ?? 0.4,
+        ...(isReasoningModel(opts.model)
+          ? {}
+          : { temperature: opts.temperature ?? 0.4 }),
       },
       opts.signal,
     );
@@ -83,7 +92,9 @@ export class OpenAIProvider implements LLMProvider {
           ...(opts.system ? [{ role: "system", content: opts.system }] : []),
           { role: "user", content: opts.prompt },
         ],
-        temperature: opts.temperature ?? 0.3,
+        ...(isReasoningModel(opts.model)
+          ? {}
+          : { temperature: opts.temperature ?? 0.3 }),
         response_format: {
           type: "json_schema",
           json_schema: {

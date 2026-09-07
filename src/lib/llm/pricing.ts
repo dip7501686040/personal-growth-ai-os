@@ -3,6 +3,8 @@ import type { TokenUsage } from "./types";
 /** Approximate USD per 1M tokens. For rough cost tracking only — verify before
  * relying on these numbers. */
 const PRICES: Record<string, { in: number; out: number }> = {
+  "claude-sonnet-5": { in: 2, out: 10 },
+  "gpt-5": { in: 1.25, out: 10 },
   "gemini-3.6-flash": { in: 0.3, out: 2.5 },
   "gemini-3.5-flash": { in: 0.3, out: 2.5 },
   "gemini-3.5-flash-lite": { in: 0.1, out: 0.4 },

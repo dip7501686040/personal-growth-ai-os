@@ -1,6 +1,6 @@
 import type { ZodType } from "zod";
 
-export type LlmProviderName = "gemini" | "openai";
+export type LlmProviderName = "gemini" | "openai" | "anthropic";
 
 export type AgentName =
   | "learning"
