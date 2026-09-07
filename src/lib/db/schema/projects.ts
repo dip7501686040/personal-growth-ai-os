@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   index,
   jsonb,
   pgTable,
@@ -37,6 +38,9 @@ export const projects = pgTable(
     /** git SHA at the last `/sync-repo` run — later runs diff `<sha>..HEAD`. */
     lastSyncedSha: text("last_synced_sha"),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    /** When true, this project's `done` features are served by the public
+     *  proof API (`/api/public/features`) for the portfolio site (J6). */
+    isPublic: boolean("is_public").notNull().default(false),
     createdAt,
     updatedAt,
   },

@@ -11,6 +11,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/learning", label: "Learning", phase: "Phase 3" },
   { href: "/projects", label: "Projects", phase: "Phase 4" },
   { href: "/career", label: "Career", phase: "Phase 5" },
+  { href: "/applications", label: "Applications", phase: "Track J" },
   { href: "/content", label: "Content", phase: "Phase 6" },
   { href: "/business", label: "Business Opportunities", phase: "Phase 7" },
   { href: "/knowledge", label: "Knowledge", phase: "Context P4" },

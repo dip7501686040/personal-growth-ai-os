@@ -34,6 +34,12 @@ const serverEnvSchema = z.object({
   GEMINI_API_KEY: z.string().min(1).optional(),
   OPENAI_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  // Job-search sources (Track J) — all optional; the search skips a source
+  // whose key is missing.
+  JSEARCH_API_KEY: z.string().min(1).optional(),
+  ADZUNA_APP_ID: z.string().min(1).optional(),
+  ADZUNA_APP_KEY: z.string().min(1).optional(),
+  SERPAPI_KEY: z.string().min(1).optional(),
   // Which embedding backend the knowledge base uses. "auto" = Gemini when
   // GEMINI_API_KEY is set, else the local Transformers.js model.
   EMBEDDINGS_PROVIDER: z.enum(["auto", "gemini", "local"]).optional(),
@@ -59,6 +65,10 @@ const parsed = serverEnvSchema.safeParse({
   GEMINI_API_KEY: optional(process.env.GEMINI_API_KEY),
   OPENAI_API_KEY: optional(process.env.OPENAI_API_KEY),
   ANTHROPIC_API_KEY: optional(process.env.ANTHROPIC_API_KEY),
+  JSEARCH_API_KEY: optional(process.env.JSEARCH_API_KEY),
+  ADZUNA_APP_ID: optional(process.env.ADZUNA_APP_ID),
+  ADZUNA_APP_KEY: optional(process.env.ADZUNA_APP_KEY),
+  SERPAPI_KEY: optional(process.env.SERPAPI_KEY),
   EMBEDDINGS_PROVIDER: optional(process.env.EMBEDDINGS_PROVIDER),
   GITHUB_TOKEN: optional(process.env.GITHUB_TOKEN),
   CRON_SECRET: optional(process.env.CRON_SECRET),

@@ -239,6 +239,56 @@ export const knowledgeTargetTypeEnum = pgEnum("knowledge_target_type", [
   "project_feature",
 ]);
 
+// ── Job-application ledger (Track J) ───────────────────────────────────────
+
+export const applicationStatusEnum = pgEnum("application_status", [
+  "draft",
+  "applied",
+  "screening",
+  "interviewing",
+  "offer",
+  "rejected",
+  "ghosted",
+]);
+
+export const touchpointKindEnum = pgEnum("touchpoint_kind", [
+  "submitted",
+  "recruiter_pitch",
+  "referral_pitch",
+  "follow_up_1",
+  "follow_up_2",
+  "interview",
+  "note",
+]);
+
+export const touchpointChannelEnum = pgEnum("touchpoint_channel", [
+  "portal",
+  "email",
+  "linkedin",
+  "whatsapp",
+  "twitter",
+  "instagram",
+  "facebook",
+  "discord",
+  "slack",
+  "telegram",
+  "other",
+]);
+
+export const companyTypeEnum = pgEnum("company_type", [
+  "product",
+  "agency_named_client",
+  "agency_unnamed",
+  "body_shop",
+  "unknown",
+]);
+
+export const remoteKindEnum = pgEnum("remote_kind", [
+  "remote",
+  "onsite_foreign",
+  "onsite_india",
+]);
+
 /**
  * Source side of an `entity_skill_links` row (Phase 7) — the three modules
  * that have no structural skill/feature link of their own and get one via the

@@ -1,0 +1,159 @@
+{
+  "_note": "Master résumé — the single source the résumé generator reads. Never sent as-is; `pnpm resume <archetype> [--jd f]` renders a tailored, ATS-clean .md + .docx from this. Review resume/master.md for a readable view; edit THIS file to change anything. Seeded from portfolio/lib/data.ts + the repo-sync project data 2026-09-07.",
+  "name": "Dipankar Saha",
+  "title": "Senior Backend / Full-Stack Engineer",
+  "location": "Kolkata, India",
+  "email": "dip7501686040@gmail.com",
+  "phone": "+91 70017 33750",
+  "github": "https://github.com/dip7501686040",
+  "linkedin": "https://linkedin.com/in/dipankar-saha-247725153",
+  "yearsExperience": 6,
+  "summary": {
+    "default": "Senior engineer with 6+ years building production backend and full-stack systems — event-driven microservices, RAG/LLM features, and the platform and CI/CD that ship them. Comfortable owning a service end to end: schema, API, messaging, observability, and rollout.",
+    "backend": "Backend engineer with 6+ years designing event-driven microservice platforms — NestJS/Node.js services over gRPC and RabbitMQ, per-service Postgres, multi-tenant RBAC, and full OpenTelemetry observability. Recently built an 11-service AI notification platform end to end.",
+    "platform": "Full-stack engineer who also owns the platform: reproducible Kubernetes deployments via Helm + ArgoCD GitOps, a Terraform-defined AWS-shaped runtime (EKS/ECR/ELBv2), Jenkins CI, and an OpenTelemetry → Prometheus/Loki/Jaeger/Grafana stack — plus 6+ years of the microservices those pipelines deploy.",
+    "ai-llm": "Engineer building LLM-backed product features on solid distributed-systems foundations: multi-provider AI analysis pipelines, pgvector RAG (duplicate-incident detection, per-JD retrieval), LangGraph agents behind a provider-ladder abstraction, and the event-driven microservices they run inside."
+  },
+  "skills": [
+    { "label": "Backend", "items": ["Node.js", "NestJS", "TypeScript", "REST APIs", "GraphQL", "gRPC", "JWT / OAuth2", "RBAC"] },
+    { "label": "Messaging & Architecture", "items": ["RabbitMQ", "Event-Driven Architecture", "Microservices Design", "Monorepo (pnpm / Turborepo)"] },
+    { "label": "Databases", "items": ["PostgreSQL", "pgvector", "MySQL", "MongoDB", "Redis", "Prisma", "Drizzle ORM"] },
+    { "label": "AI & LLM", "items": ["OpenAI API", "RAG (pgvector)", "LangGraph agents", "Prompt Engineering", "LLM Workflow Design"] },
+    { "label": "Cloud & DevOps", "items": ["AWS (EC2, S3, EKS, ECR, ELBv2)", "Kubernetes", "Helm", "ArgoCD (GitOps)", "Terraform", "Docker", "GitHub Actions", "Jenkins", "CI/CD"] },
+    { "label": "Observability", "items": ["OpenTelemetry", "Prometheus", "Grafana", "Jaeger", "Loki"] },
+    { "label": "Frontend", "items": ["React", "Next.js (App Router)", "Tailwind CSS", "Radix UI"] }
+  ],
+  "experience": [
+    {
+      "role": "Senior Software Engineer",
+      "company": "Veztraa Solutions",
+      "location": "Remote",
+      "period": "Mar 2023 — Present",
+      "bullets": [
+        "Design and build enterprise SaaS applications with React, Next.js, TypeScript, Node.js and NestJS, following a microservices architecture.",
+        "Lead architecture discussions for scalable, cloud-native services — modular backends with REST APIs and event-driven messaging.",
+        "Implement secure authentication and authorization with JWT and role-based access control.",
+        "Optimize MongoDB aggregation pipelines and MySQL queries through indexing and schema tuning.",
+        "Containerize services with Docker, deploy to Kubernetes on AWS, and maintain CI/CD with GitHub Actions and Jenkins.",
+        "Mentor junior engineers on service design, testing, and delivery."
+      ],
+      "tech": ["React", "Next.js", "TypeScript", "Node.js", "NestJS", "Docker", "Kubernetes", "MySQL", "MongoDB", "RabbitMQ", "AWS", "GitHub Actions", "Jenkins"]
+    },
+    {
+      "role": "Software Engineer",
+      "company": "Tata Consultancy Services (TCS)",
+      "location": "Kolkata, India",
+      "period": "Apr 2021 — Feb 2023",
+      "bullets": [
+        "Built enterprise insurance applications for Zurich Insurance with Angular and Node.js.",
+        "Developed scalable REST APIs and frontend modules for high-volume business workflows.",
+        "Worked with distributed teams in Agile/Scrum; resolved production issues while keeping availability high.",
+        "Improved application performance and reduced production defects through proactive optimization."
+      ],
+      "tech": ["Angular", "Node.js", "JavaScript", "REST APIs", "MySQL", "Git"]
+    },
+    {
+      "role": "Software Engineer",
+      "company": "Asparrowtech",
+      "location": "Indore, India",
+      "period": "Jun 2020 — Mar 2021",
+      "bullets": [
+        "Built responsive web applications with JavaScript frameworks and Node.js.",
+        "Developed backend APIs and integrated third-party services; contributed to database design and enhancements.",
+        "Collaborated directly with clients to deliver custom software."
+      ],
+      "tech": ["JavaScript", "Node.js", "REST APIs"]
+    }
+  ],
+  "projects": [
+    {
+      "name": "AI-Powered Event-Driven Notification Platform",
+      "slug": "ai-notification-system",
+      "repoUrl": "https://github.com/dip7501686040/ai-notification-system",
+      "oneLiner": "11-service NestJS platform that routes every event through tenant-scoped rules and an LLM analysis pass so only de-duplicated, severity-ranked notifications reach a person.",
+      "bullets": [
+        "pnpm + Turborepo monorepo of 11 NestJS microservices (gRPC internally, REST at the edge) plus a Python/FastAPI prediction service; each service owns its own Postgres database.",
+        "Asynchronous RabbitMQ event choreography on a single durable topic exchange; synchronous gRPC reserved for auth, tenancy, and template rendering.",
+        "Multi-provider AI event analysis and pgvector RAG duplicate-incident detection; multi-tenant RBAC and API-key management; multi-channel delivery with retry scheduling.",
+        "Tenant-scoped OpenTelemetry → Prometheus / Loki / Jaeger / Grafana observability; k6 + HPA + KEDA load and autoscaling harness; Stripe billing."
+      ],
+      "tech": ["NestJS", "TypeScript", "gRPC", "RabbitMQ", "PostgreSQL", "Redis", "pgvector", "OpenAI", "FastAPI", "Docker", "Kubernetes", "OpenTelemetry"]
+    },
+    {
+      "name": "Platform Infrastructure — Local AWS-shaped Runtime",
+      "slug": "platform-infrastructure",
+      "repoUrl": "https://github.com/dip7501686040/platform-infrastructure",
+      "oneLiner": "Terraform that reproduces a full AWS-shaped runtime (VPC, EKS, ECR, ELBv2) for a 13-service platform on a single laptop, every step idempotent and self-healing.",
+      "bullets": [
+        "Root Terraform module (~2000 lines) plus reusable modules/{network, eks, ecr, addons, loadbalancer}; one flag switches the whole graph between a local emulator and real AWS.",
+        "Serial, idempotent bring-up of two k3s-backed clusters with a containerd registry mirror, a cross-cluster Service/Endpoints bridge, and an ELBv2-emulated ALB.",
+        "ArgoCD, Jenkins, and the Jaeger/OTel/Prometheus/Grafana stack run as pinned-IP Docker containers; shell helpers enforce single-flight Terraform, CPU arbitration, and minimal-touch restart reconcile.",
+        "Self-hosted GitHub Actions runner drives `terraform apply` from manual dispatch."
+      ],
+      "tech": ["Terraform", "Kubernetes (k3s)", "AWS (EKS/ECR/ELBv2)", "Docker", "KEDA", "GitHub Actions", "Bash"]
+    },
+    {
+      "name": "Platform GitOps — Helm + ArgoCD Delivery",
+      "slug": "platform-gitops",
+      "repoUrl": "https://github.com/dip7501686040/platform-gitops",
+      "oneLiner": "Reproducible, auditable Kubernetes delivery for a 13-service platform: every change to what runs in the cluster is a git commit ArgoCD reconciles.",
+      "bullets": [
+        "One shared Helm chart templates all 11 NestJS services, layered with per-service, per-environment values files; web and prediction-service have their own charts.",
+        "ArgoCD auto-syncs from git with a bounded RollingSync ApplicationSet (maxUpdate 1) so a multi-service release doesn't spike CPU.",
+        "Database migrations run as an ArgoCD PreSync hook Job keyed by a schema hash — an unchanged schema is a no-op.",
+        "Jenkins pipeline (itself a Helm-managed Kubernetes workload) builds and pushes each service image and commits the image-tag bump back for ArgoCD to pick up."
+      ],
+      "tech": ["Helm", "ArgoCD", "Kubernetes", "Jenkins", "GitOps"]
+    },
+    {
+      "name": "Personal Growth AI OS",
+      "slug": "personal-growth-ai-os",
+      "repoUrl": "https://github.com/dip7501686040/personal-growth-ai-os",
+      "oneLiner": "A private system that distills real engineering work into a proof-of-skills graph feeding career, content, and learning agents.",
+      "bullets": [
+        "Next.js 16 App Router + Supabase Postgres (Drizzle, RLS); a pgvector RAG knowledge base with cross-source duplicate detection and deterministic entity linking.",
+        "Eight structured LLM agents behind a provider-ladder abstraction (Gemini / OpenAI / Anthropic) with automatic fallback; a LangGraph extraction agent.",
+        "Seven nightly Vercel cron jobs for ingestion, mapping, and briefings; a deterministic per-JD proof-of-work retrieval endpoint."
+      ],
+      "tech": ["Next.js", "TypeScript", "PostgreSQL", "pgvector", "Drizzle", "LangGraph", "OpenAI / Anthropic APIs", "Vercel"]
+    },
+    {
+      "name": "Japshop Admin Panel — Financial Logbook",
+      "slug": "logbook-management",
+      "repoUrl": null,
+      "oneLiner": "Production admin panel replacing paper logbooks with per-customer credit/debit tracking and two-layer RBAC.",
+      "bullets": [
+        "Per-customer GAVE/GOT ledger entries across multiple logbooks with running balances computed per customer.",
+        "Two-layer RBAC — role-based menu permissions plus per-user, per-logbook CRUD permissions — with OTP-gated superadmin login and a database-driven navigation menu.",
+        "Next.js + NestJS + Prisma + PostgreSQL, containerized and deployed to Kubernetes."
+      ],
+      "tech": ["Next.js", "NestJS", "Prisma", "PostgreSQL", "JWT", "Docker", "Kubernetes"]
+    }
+  ],
+  "education": [
+    { "degree": "TODO — add your degree", "institution": "TODO — institution", "period": "TODO", "note": "Fill this in resume/master.json — the generator emits it verbatim." }
+  ],
+  "archetypes": {
+    "backend": {
+      "label": "Backend / Distributed Systems",
+      "summaryKey": "backend",
+      "skillOrder": ["Backend", "Messaging & Architecture", "Databases", "Observability", "Cloud & DevOps", "AI & LLM", "Frontend"],
+      "leadKeywords": ["nestjs", "node", "grpc", "rabbitmq", "microservice", "event-driven", "postgres", "rest api", "graphql", "rbac", "multi-tenant", "typescript"],
+      "projectOrder": ["ai-notification-system", "platform-gitops", "personal-growth-ai-os", "logbook-management", "platform-infrastructure"]
+    },
+    "platform": {
+      "label": "Platform / DevOps",
+      "summaryKey": "platform",
+      "skillOrder": ["Cloud & DevOps", "Observability", "Messaging & Architecture", "Backend", "Databases", "AI & LLM", "Frontend"],
+      "leadKeywords": ["kubernetes", "helm", "argocd", "gitops", "terraform", "eks", "ci/cd", "jenkins", "github actions", "docker", "observability", "prometheus", "grafana", "opentelemetry", "infrastructure"],
+      "projectOrder": ["platform-infrastructure", "platform-gitops", "ai-notification-system", "personal-growth-ai-os", "logbook-management"]
+    },
+    "ai-llm": {
+      "label": "AI / LLM Engineering",
+      "summaryKey": "ai-llm",
+      "skillOrder": ["AI & LLM", "Backend", "Databases", "Messaging & Architecture", "Cloud & DevOps", "Observability", "Frontend"],
+      "leadKeywords": ["llm", "openai", "anthropic", "rag", "pgvector", "embeddings", "agent", "langgraph", "prompt", "generative ai", "vector", "retrieval"],
+      "projectOrder": ["personal-growth-ai-os", "ai-notification-system", "platform-gitops", "logbook-management", "platform-infrastructure"]
+    }
+  }
+}

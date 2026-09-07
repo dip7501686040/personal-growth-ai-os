@@ -89,8 +89,17 @@ export async function getProofForJd(
   userId: string,
   jdText: string,
 ): Promise<JdProof> {
-  // make sure freshly-synced skills/features are embeddable (hash-guarded, ~free)
-  await backfillEntityEmbeddings(userId, DECISION_TARGET_TYPES);
+  // make sure freshly-synced skills/features are embeddable (hash-guarded).
+  // best-effort: an embedding outage just means the kNN half of the match is
+  // skipped this call — lexical name matching still runs.
+  try {
+    await backfillEntityEmbeddings(userId, DECISION_TARGET_TYPES);
+  } catch (err) {
+    console.warn(
+      "[getProofForJd] entity-embedding backfill skipped:",
+      err instanceof Error ? err.message : err,
+    );
+  }
 
   const scored = await matchSkillsAndFeatures(userId, jdText, {
     keepNameMatches: true,

@@ -28,14 +28,25 @@ export async function matchSkillsAndFeatures(
     keepNameMatches?: boolean;
   },
 ): Promise<ScoredCandidate[]> {
-  const provider = getEmbeddingProvider();
-  const [vector] = await provider.embed([text]);
-  const embedHits = await embeddingCandidates(
-    userId,
-    vector,
-    provider.id,
-    DECISION_TARGET_TYPES,
-  );
+  // Embedding is best-effort: on a provider outage / rate-limit, fall back to
+  // lexical-only matching rather than failing the whole call (the JD path
+  // relies on `keepNameMatches` anyway).
+  let embedHits = new Map<string, number>();
+  try {
+    const provider = getEmbeddingProvider();
+    const [vector] = await provider.embed([text]);
+    embedHits = await embeddingCandidates(
+      userId,
+      vector,
+      provider.id,
+      DECISION_TARGET_TYPES,
+    );
+  } catch (err) {
+    console.warn(
+      "[matchSkillsAndFeatures] embedding unavailable, lexical-only:",
+      err instanceof Error ? err.message : err,
+    );
+  }
 
   const byKey = new Map<string, RawCandidate>();
   const upsert = (
