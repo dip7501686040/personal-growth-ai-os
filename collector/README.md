@@ -1,5 +1,13 @@
 # Personal AI Activity Collector
 
+> **DEPRECATED (2026-09-08, skill-graph-manager Phase 1).** Claude Code activity
+> capture and transcript ingestion are retired. `/sync-repo` is now the only
+> pipeline that turns real work into skills, project features, and knowledge.
+> The ingest endpoints this collector posts to (`/api/activity/ingest`,
+> `/api/ingest/transcripts`) have been removed, so `collector/src/sync.ts` will
+> just fail its network calls. The package is left in the tree for reference; do
+> not install the hooks.
+
 A tiny local companion that turns **Claude Code** sessions into evidence of real
 development work, and syncs metadata (only) to your Personal Growth AI OS.
 

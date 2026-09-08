@@ -20,7 +20,14 @@ import {
 import { agentRuns } from "./agents";
 import { projects } from "./projects";
 
-/** Raw development-activity metadata from the local Claude Code collector. */
+/**
+ * Raw development-activity metadata from the local Claude Code collector.
+ *
+ * DEPRECATED (skill-graph-manager Phase 1, 2026-09-08): activity capture is
+ * retired — `/sync-repo` is the only extraction pipeline now. This table and
+ * `activity_analyses` / `ingest_tokens` are kept (Postgres enum/table drops are
+ * costly) but nothing writes them any more; historical rows still read.
+ */
 export const activityEvents = pgTable(
   "activity_events",
   {
@@ -92,7 +99,8 @@ export const activityAnalyses = pgTable(
   ],
 ).enableRLS();
 
-/** Bearer tokens the local collector uses to authenticate to /api/activity/ingest. */
+/** DEPRECATED with the rest of this file — bearer tokens the retired local
+ *  collector used to authenticate to the (now removed) ingest endpoints. */
 export const ingestTokens = pgTable(
   "ingest_tokens",
   {

@@ -72,7 +72,7 @@ export function buildSections(
       priority: 4,
     },
     {
-      title: "Evidence from real development activity",
+      title: "Evidence from synced repositories",
       body: slice.activityEvidence
         .map((e) => `- [${e.skill}] ${e.summary}`)
         .join("\n"),

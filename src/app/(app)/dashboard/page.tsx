@@ -13,7 +13,6 @@ import { listProjects } from "@/modules/projects/service";
 import { listContentItems } from "@/modules/content/service";
 import { getLatestBriefing } from "@/modules/briefing/service";
 import { getAgentConsole, getAgentStatusBoard } from "@/modules/agents/runs";
-import { listRecentEvents } from "@/modules/activity/service";
 import { SKILL_LEVELS } from "@/modules/skills/levels";
 import { LevelBadge } from "@/components/skills/level-badge";
 import { BriefingCard } from "@/components/briefing/briefing-card";
@@ -31,7 +30,6 @@ export default async function DashboardPage() {
     content,
     briefing,
     statusBoard,
-    recentSessions,
     briefingConsole,
   ] = await Promise.all([
     listSkills(userId),
@@ -40,7 +38,6 @@ export default async function DashboardPage() {
     listContentItems(userId),
     getLatestBriefing(userId),
     getAgentStatusBoard(userId),
-    listRecentEvents(userId, 3),
     getAgentConsole(userId, "chief_of_staff"),
   ]);
 
@@ -174,35 +171,6 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Recent development activity</CardTitle>
-            <CardDescription>From Claude Code on your Mac</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentSessions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nothing captured yet —{" "}
-                <Link href="/activity" className="underline">
-                  set up the collector
-                </Link>
-                .
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-1 text-sm">
-                {recentSessions.map((e) => (
-                  <li key={e.id} className="flex justify-between gap-2">
-                    <span className="truncate">{e.projectName ?? "unknown"}</span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {new Date(e.startedAt).toLocaleDateString()} ·{" "}
-                      {Math.round(e.durationSeconds / 60)}m
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

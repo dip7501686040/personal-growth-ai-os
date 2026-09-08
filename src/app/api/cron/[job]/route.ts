@@ -4,19 +4,26 @@ import { recordCronFinish, recordCronStart } from "@/lib/cron-runs";
 import { env } from "@/lib/env";
 import { listDocumentsForMapping } from "@/lib/knowledge";
 import { getOwnerUserId } from "@/lib/owner";
-import { activityAnalyzerAgent } from "@/modules/agents/activity-analyzer-agent";
 import { chiefOfStaffAgent } from "@/modules/agents/chief-of-staff-agent";
-import { extractionAgent } from "@/modules/agents/extraction-agent";
 import { learningAgent } from "@/modules/agents/learning-agent";
 import { backfillEntityEmbeddings, getEntityWatermark } from "@/modules/knowledge/entities";
 import { mapDocument } from "@/modules/knowledge/mapping";
-import { countPendingJobs } from "@/modules/ingestion/queue";
 import { drainContextEvents } from "@/modules/ingestion/refresh";
-import { syncSources } from "@/modules/ingestion/sources";
 
 export const maxDuration = 60;
 
-/** job name → handler. Vercel Cron GETs these on a schedule (see vercel.json). */
+/**
+ * job name → handler.
+ *
+ * Scheduled (see vercel.json): `daily-learning`, `morning-briefing`.
+ *
+ * `knowledge-refresh` / `knowledge-map` are kept here but **no longer
+ * scheduled** — Phase 1 of the skill-graph-manager plan retired every
+ * extraction/maintenance cron (`daily-activity`, `github-sync`, `ingest-drain`
+ * too). Phase 6 folds their bodies into `resyncKnowledge()` (inline at every
+ * mutation) + `pnpm knowledge:resync`. Until then these two remain a manual
+ * stop-gap you can `curl` with the CRON_SECRET.
+ */
 const JOBS: Record<string, (userId: string) => Promise<{ id: string; status: string }>> =
   {
     "daily-learning": async (userId) => {
@@ -36,25 +43,7 @@ const JOBS: Record<string, (userId: string) => Promise<{ id: string; status: str
       });
       return { id: run.id, status: run.status };
     },
-    "daily-activity": async (userId) => {
-      // analyse the previous day's sessions
-      const d = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
-      const run = await activityAnalyzerAgent.run({
-        userId,
-        trigger: "schedule",
-        triggerKey: `activity-${d}`,
-        force: true,
-        input: { date: d },
-      });
-      return { id: run.id, status: run.status };
-    },
-    "github-sync": async (userId) => {
-      const r = await syncSources(userId, "github_repo");
-      return {
-        id: "-",
-        status: `synced ${r.sources} repo(s) → ${r.enqueued} new job(s), ${r.deduped} unchanged, ${r.errors} error(s)`,
-      };
-    },
+    // ── unscheduled: manual knowledge stop-gap until Phase 6's resyncKnowledge ──
     "knowledge-refresh": async (userId) => {
       const r = await drainContextEvents(userId);
       return {
@@ -62,26 +51,14 @@ const JOBS: Record<string, (userId: string) => Promise<{ id: string; status: str
         status: `refreshed ${r.processed} events → ${r.documents} docs / ${r.chunks} chunks`,
       };
     },
-    "ingest-drain": async (userId) => {
-      // Bounded per invocation so we stay under the function time limit.
-      let done = 0;
-      for (let i = 0; i < 6; i++) {
-        if ((await countPendingJobs(userId)) === 0) break;
-        const run = await extractionAgent.run({ userId, trigger: "schedule" });
-        const res = run.result as { skipped?: boolean } | null;
-        if (res?.skipped) break;
-        done++;
-      }
-      return { id: "-", status: `drained ${done} job(s)` };
-    },
     "knowledge-map": async (userId) => {
       // Refresh entity vectors first so new/edited skills, projects, etc. are
       // linkable, then (re-)map documents. Cheap — SQL + JS only, no LLM calls
       // anywhere in this pipeline. Paginates through *every* current document
       // (no row-count cap) but skips one that's already seen both its own
-      // latest edit and the current entity corpus (Phase 3) — steady-state
-      // nights only do work on what's actually new or changed. Bounded by
-      // wall-clock time, not a row limit, to stay under the function timeout.
+      // latest edit and the current entity corpus — steady-state runs only do
+      // work on what's actually new or changed. Bounded by wall-clock time,
+      // not a row limit, to stay under the function timeout.
       await backfillEntityEmbeddings(userId);
       const watermark = await getEntityWatermark(userId);
 

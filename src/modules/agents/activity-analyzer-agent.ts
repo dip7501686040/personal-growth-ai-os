@@ -1,3 +1,9 @@
+/**
+ * DEPRECATED (skill-graph-manager Phase 1, 2026-09-08). Claude Code activity
+ * capture is retired; this agent is no longer registered in `AGENTS` or run by
+ * any cron. Kept in the tree for reference only — do not wire it back without
+ * revisiting the plan.
+ */
 import { hasProviderKey, resolveModelConfig, runStructured } from "@/lib/llm";
 import {
   eventsForDate,

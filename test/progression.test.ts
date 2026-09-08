@@ -57,6 +57,30 @@ test("weak activity_analysis does NOT reach implemented", () => {
   assert.equal(d.level, "practiced");
 });
 
+test("github_repo (not weak) reaches implemented", () => {
+  const d = deriveLevel([
+    ev({ sourceType: "github_repo", supportsLevel: "implemented", strength: "moderate" }),
+  ]);
+  assert.equal(d.level, "implemented");
+});
+
+test("2 project features + github_repo reaches proven", () => {
+  const d = deriveLevel([
+    ev({ sourceType: "project_feature", sourceId: "f1", supportsLevel: "proven", strength: "moderate" }),
+    ev({ sourceType: "project_feature", sourceId: "f2", supportsLevel: "implemented", strength: "moderate" }),
+    ev({ sourceType: "github_repo", supportsLevel: "implemented", strength: "moderate" }),
+  ]);
+  assert.equal(d.level, "proven");
+});
+
+test("practiced → implemented with github_repo evidence applies without approval", () => {
+  const p = planLevelChange(
+    [ev({ sourceType: "github_repo", supportsLevel: "practiced", strength: "moderate" })],
+    "implemented",
+  );
+  assert.equal(p.kind, "apply");
+});
+
 test("single project feature claiming proven is capped at implemented", () => {
   const d = deriveLevel([
     ev({ sourceType: "project_feature", supportsLevel: "proven", strength: "strong" }),

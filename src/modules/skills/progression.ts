@@ -12,11 +12,16 @@ import {
  *
  * Rules (see docs/system-design.md §5):
  *  - level = highest `supportsLevel` among accepted evidence, then capped:
- *  - IMPLEMENTED needs a project_feature or activity_analysis evidence
- *    (strength ≥ moderate), OR a strong manual/agent override.
- *  - PROVEN needs ≥2 distinct project_feature evidences plus corroborating
- *    activity evidence (or ≥3 project_feature), OR a strong manual/agent
+ *  - IMPLEMENTED needs project_feature / github_repo evidence (from `/sync-repo`
+ *    or a repo distillation, strength ≥ moderate), OR a strong manual/agent
+ *    override.
+ *  - PROVEN needs ≥2 distinct project_feature evidences plus a corroborating
+ *    github_repo evidence (or ≥3 project_feature), OR a strong manual/agent
  *    override that explicitly reached PROVEN.
+ *
+ * `activity_analysis` (Claude Code activity capture) was retired in
+ * skill-graph-manager Phase 1 — historical accepted rows still count, but
+ * `github_repo` is the live corroborating source now.
  */
 
 export type EvidenceSourceType =
@@ -57,6 +62,7 @@ function hasImplementedProof(evidence: EvidenceLike[]): boolean {
   const fromWork = evidence.some(
     (e) =>
       (e.sourceType === "project_feature" ||
+        e.sourceType === "github_repo" ||
         e.sourceType === "activity_analysis") &&
       notWeak(e) &&
       levelRank(e.supportsLevel) >= levelRank("implemented"),
@@ -76,7 +82,9 @@ function hasProvenProof(evidence: EvidenceLike[]): boolean {
   );
   const distinctFeatures = new Set(features.map((e) => e.sourceId ?? e.id)).size;
   const hasActivity = evidence.some(
-    (e) => e.sourceType === "activity_analysis" && notWeak(e),
+    (e) =>
+      (e.sourceType === "github_repo" || e.sourceType === "activity_analysis") &&
+      notWeak(e),
   );
   const override = evidence.some(
     (e) =>
@@ -132,7 +140,7 @@ export function deriveLevel(accepted: EvidenceLike[]): DerivedLevel {
   ) {
     level = "implemented";
     rationale.push(
-      "Capped at IMPLEMENTED: PROVEN needs ≥2 project-feature evidences with corroborating activity (or ≥3 project features), or an approved strong override.",
+      "Capped at IMPLEMENTED: PROVEN needs ≥2 project-feature evidences with a corroborating synced-repo evidence (or ≥3 project features), or an approved strong override.",
     );
   }
 
@@ -142,7 +150,7 @@ export function deriveLevel(accepted: EvidenceLike[]): DerivedLevel {
   ) {
     level = "practiced";
     rationale.push(
-      "Capped at PRACTICED: IMPLEMENTED needs project or development-activity evidence, or an approved strong override.",
+      "Capped at PRACTICED: IMPLEMENTED needs project-feature or synced-repo evidence, or an approved strong override.",
     );
   }
 
@@ -189,16 +197,17 @@ export function planLevelChange(
   const hasWorkEvidence = accepted.some(
     (e) =>
       (e.sourceType === "project_feature" ||
+        e.sourceType === "github_repo" ||
         e.sourceType === "activity_analysis") &&
       e.strength !== "weak",
   );
 
-  // Reaching IMPLEMENTED / PROVEN always needs project or development-activity
+  // Reaching IMPLEMENTED / PROVEN always needs project-feature or synced-repo
   // evidence. A self-report can't get there without review.
   if (targetRank >= levelRank("implemented") && !hasWorkEvidence) {
     return {
       kind: "needs_approval",
-      note: `${targetLevel.toUpperCase()} needs project features or captured development activity, which isn't on record yet.`,
+      note: `${targetLevel.toUpperCase()} needs project features or synced-repo evidence, which isn't on record yet.`,
     };
   }
 

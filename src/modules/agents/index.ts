@@ -1,5 +1,4 @@
 import type { BaseAgent } from "./base-agent";
-import { activityAnalyzerAgent } from "./activity-analyzer-agent";
 import { businessAgent } from "./business-agent";
 import { careerAgent } from "./career-agent";
 import { chiefOfStaffAgent } from "./chief-of-staff-agent";
@@ -8,7 +7,15 @@ import { extractionAgent } from "./extraction-agent";
 import { learningAgent } from "./learning-agent";
 import { projectAgent } from "./project-agent";
 
-/** Agents that can be triggered (manually or by cron). Grows each phase. */
+/**
+ * Agents that can be triggered (manually or by cron).
+ *
+ * `activity_analyzer` was retired (skill-graph-manager Phase 1) — Claude Code
+ * activity capture is gone; `/sync-repo` is the only extraction pipeline now.
+ * The agent file stays in the tree (deprecated) but is no longer registered.
+ * `extractor` stays: it still distils manual `/knowledge` uploads (docs,
+ * ChatGPT/LinkedIn exports), run on demand by the "Re-sync knowledge" button.
+ */
 export const AGENTS: Record<string, BaseAgent> = {
   learning: learningAgent,
   project: projectAgent,
@@ -16,7 +23,6 @@ export const AGENTS: Record<string, BaseAgent> = {
   content: contentAgent,
   business: businessAgent,
   chief_of_staff: chiefOfStaffAgent,
-  activity_analyzer: activityAnalyzerAgent,
   extractor: extractionAgent,
 };
 

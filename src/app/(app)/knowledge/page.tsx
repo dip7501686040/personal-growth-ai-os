@@ -33,7 +33,10 @@ import {
 export const metadata = { title: "Knowledge" };
 
 const QUEUE_STATUSES = ["pending", "running", "failed"];
-const CRON_JOBS = ["knowledge-map", "knowledge-refresh", "github-sync", "ingest-drain"] as const;
+// Extraction/maintenance crons were retired (skill-graph-manager Phase 1).
+// These two are no longer scheduled — they remain as a manual stop-gap until
+// Phase 6's resyncKnowledge() lands. `cron_runs` still shows their last run.
+const CRON_JOBS = ["knowledge-map", "knowledge-refresh"] as const;
 
 export default async function KnowledgePage({
   searchParams,
@@ -191,10 +194,11 @@ export default async function KnowledgePage({
       {/* ── System crons ────────────────────────────────────────────────── */}
       <Card id="crons" className="scroll-mt-6">
         <CardHeader>
-          <CardTitle>System crons</CardTitle>
+          <CardTitle>System jobs</CardTitle>
           <CardDescription>
-            Last run of each nightly job, straight from{" "}
-            <code className="text-xs">cron_runs</code>.
+            Last run of each knowledge job, straight from{" "}
+            <code className="text-xs">cron_runs</code>. No longer scheduled —
+            trigger from &ldquo;Re-sync knowledge&rdquo; or by curl.
           </CardDescription>
         </CardHeader>
         <CardContent>
