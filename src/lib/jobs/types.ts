@@ -13,6 +13,8 @@ export interface JobSearchConfig {
   adzunaCountries: string[];
   /** cap results kept per source before merge */
   maxPerSource: number;
+  /** how many titles SerpApi's google_jobs search spends a request on (default 3) */
+  serpapiMaxQueries?: number;
 }
 
 export interface RawJob {

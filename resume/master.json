@@ -15,13 +15,72 @@
     "ai-llm": "Engineer building LLM-backed product features on solid distributed-systems foundations: multi-provider AI analysis pipelines, pgvector RAG (duplicate-incident detection, per-JD retrieval), LangGraph agents behind a provider-ladder abstraction, and the event-driven microservices they run inside."
   },
   "skills": [
-    { "label": "Backend", "items": ["Node.js", "NestJS", "TypeScript", "REST APIs", "GraphQL", "gRPC", "JWT / OAuth2", "RBAC"] },
-    { "label": "Messaging & Architecture", "items": ["RabbitMQ", "Event-Driven Architecture", "Microservices Design", "Monorepo (pnpm / Turborepo)"] },
-    { "label": "Databases", "items": ["PostgreSQL", "pgvector", "MySQL", "MongoDB", "Redis", "Prisma", "Drizzle ORM"] },
-    { "label": "AI & LLM", "items": ["OpenAI API", "RAG (pgvector)", "LangGraph agents", "Prompt Engineering", "LLM Workflow Design"] },
-    { "label": "Cloud & DevOps", "items": ["AWS (EC2, S3, EKS, ECR, ELBv2)", "Kubernetes", "Helm", "ArgoCD (GitOps)", "Terraform", "Docker", "GitHub Actions", "Jenkins", "CI/CD"] },
-    { "label": "Observability", "items": ["OpenTelemetry", "Prometheus", "Grafana", "Jaeger", "Loki"] },
-    { "label": "Frontend", "items": ["React", "Next.js (App Router)", "Tailwind CSS", "Radix UI"] }
+    {
+      "label": "Backend",
+      "items": [
+        "Node.js",
+        "NestJS",
+        "TypeScript",
+        "REST APIs",
+        "GraphQL",
+        "gRPC",
+        "JWT / OAuth2",
+        "RBAC"
+      ]
+    },
+    {
+      "label": "Messaging & Architecture",
+      "items": [
+        "RabbitMQ",
+        "Event-Driven Architecture",
+        "Microservices Design",
+        "Monorepo (pnpm / Turborepo)"
+      ]
+    },
+    {
+      "label": "Databases",
+      "items": [
+        "PostgreSQL",
+        "pgvector",
+        "MySQL",
+        "MongoDB",
+        "Redis",
+        "Prisma",
+        "Drizzle ORM"
+      ]
+    },
+    {
+      "label": "AI & LLM",
+      "items": [
+        "OpenAI API",
+        "RAG (pgvector)",
+        "LangGraph agents",
+        "Prompt Engineering",
+        "LLM Workflow Design"
+      ]
+    },
+    {
+      "label": "Cloud & DevOps",
+      "items": [
+        "AWS (EC2, S3, EKS, ECR, ELBv2)",
+        "Kubernetes",
+        "Helm",
+        "ArgoCD (GitOps)",
+        "Terraform",
+        "Docker",
+        "GitHub Actions",
+        "Jenkins",
+        "CI/CD"
+      ]
+    },
+    {
+      "label": "Observability",
+      "items": ["OpenTelemetry", "Prometheus", "Grafana", "Jaeger", "Loki"]
+    },
+    {
+      "label": "Frontend",
+      "items": ["React", "Next.js (App Router)", "Tailwind CSS", "Radix UI"]
+    }
   ],
   "experience": [
     {
@@ -37,7 +96,21 @@
         "Containerize services with Docker, deploy to Kubernetes on AWS, and maintain CI/CD with GitHub Actions and Jenkins.",
         "Mentor junior engineers on service design, testing, and delivery."
       ],
-      "tech": ["React", "Next.js", "TypeScript", "Node.js", "NestJS", "Docker", "Kubernetes", "MySQL", "MongoDB", "RabbitMQ", "AWS", "GitHub Actions", "Jenkins"]
+      "tech": [
+        "React",
+        "Next.js",
+        "TypeScript",
+        "Node.js",
+        "NestJS",
+        "Docker",
+        "Kubernetes",
+        "MySQL",
+        "MongoDB",
+        "RabbitMQ",
+        "AWS",
+        "GitHub Actions",
+        "Jenkins"
+      ]
     },
     {
       "role": "Software Engineer",
@@ -77,7 +150,20 @@
         "Multi-provider AI event analysis and pgvector RAG duplicate-incident detection; multi-tenant RBAC and API-key management; multi-channel delivery with retry scheduling.",
         "Tenant-scoped OpenTelemetry → Prometheus / Loki / Jaeger / Grafana observability; k6 + HPA + KEDA load and autoscaling harness; Stripe billing."
       ],
-      "tech": ["NestJS", "TypeScript", "gRPC", "RabbitMQ", "PostgreSQL", "Redis", "pgvector", "OpenAI", "FastAPI", "Docker", "Kubernetes", "OpenTelemetry"]
+      "tech": [
+        "NestJS",
+        "TypeScript",
+        "gRPC",
+        "RabbitMQ",
+        "PostgreSQL",
+        "Redis",
+        "pgvector",
+        "OpenAI",
+        "FastAPI",
+        "Docker",
+        "Kubernetes",
+        "OpenTelemetry"
+      ]
     },
     {
       "name": "Platform Infrastructure — Local AWS-shaped Runtime",
@@ -90,7 +176,15 @@
         "ArgoCD, Jenkins, and the Jaeger/OTel/Prometheus/Grafana stack run as pinned-IP Docker containers; shell helpers enforce single-flight Terraform, CPU arbitration, and minimal-touch restart reconcile.",
         "Self-hosted GitHub Actions runner drives `terraform apply` from manual dispatch."
       ],
-      "tech": ["Terraform", "Kubernetes (k3s)", "AWS (EKS/ECR/ELBv2)", "Docker", "KEDA", "GitHub Actions", "Bash"]
+      "tech": [
+        "Terraform",
+        "Kubernetes (k3s)",
+        "AWS (EKS/ECR/ELBv2)",
+        "Docker",
+        "KEDA",
+        "GitHub Actions",
+        "Bash"
+      ]
     },
     {
       "name": "Platform GitOps — Helm + ArgoCD Delivery",
@@ -115,7 +209,16 @@
         "Eight structured LLM agents behind a provider-ladder abstraction (Gemini / OpenAI / Anthropic) with automatic fallback; a LangGraph extraction agent.",
         "Seven nightly Vercel cron jobs for ingestion, mapping, and briefings; a deterministic per-JD proof-of-work retrieval endpoint."
       ],
-      "tech": ["Next.js", "TypeScript", "PostgreSQL", "pgvector", "Drizzle", "LangGraph", "OpenAI / Anthropic APIs", "Vercel"]
+      "tech": [
+        "Next.js",
+        "TypeScript",
+        "PostgreSQL",
+        "pgvector",
+        "Drizzle",
+        "LangGraph",
+        "OpenAI / Anthropic APIs",
+        "Vercel"
+      ]
     },
     {
       "name": "Japshop Admin Panel — Financial Logbook",
@@ -127,33 +230,130 @@
         "Two-layer RBAC — role-based menu permissions plus per-user, per-logbook CRUD permissions — with OTP-gated superadmin login and a database-driven navigation menu.",
         "Next.js + NestJS + Prisma + PostgreSQL, containerized and deployed to Kubernetes."
       ],
-      "tech": ["Next.js", "NestJS", "Prisma", "PostgreSQL", "JWT", "Docker", "Kubernetes"]
+      "tech": [
+        "Next.js",
+        "NestJS",
+        "Prisma",
+        "PostgreSQL",
+        "JWT",
+        "Docker",
+        "Kubernetes"
+      ]
     }
   ],
   "education": [
-    { "degree": "TODO — add your degree", "institution": "TODO — institution", "period": "TODO", "note": "Fill this in resume/master.json — the generator emits it verbatim." }
+    {
+      "degree": "B.Tech in Information Technology",
+      "institution": "Siliguri Institute of Technology",
+      "location": "Siliguri, West Bengal, India",
+      "period": "2016 – 2020"
+    }
   ],
   "archetypes": {
     "backend": {
       "label": "Backend / Distributed Systems",
       "summaryKey": "backend",
-      "skillOrder": ["Backend", "Messaging & Architecture", "Databases", "Observability", "Cloud & DevOps", "AI & LLM", "Frontend"],
-      "leadKeywords": ["nestjs", "node", "grpc", "rabbitmq", "microservice", "event-driven", "postgres", "rest api", "graphql", "rbac", "multi-tenant", "typescript"],
-      "projectOrder": ["ai-notification-system", "platform-gitops", "personal-growth-ai-os", "logbook-management", "platform-infrastructure"]
+      "skillOrder": [
+        "Backend",
+        "Messaging & Architecture",
+        "Databases",
+        "Observability",
+        "Cloud & DevOps",
+        "AI & LLM",
+        "Frontend"
+      ],
+      "leadKeywords": [
+        "nestjs",
+        "node",
+        "grpc",
+        "rabbitmq",
+        "microservice",
+        "event-driven",
+        "postgres",
+        "rest api",
+        "graphql",
+        "rbac",
+        "multi-tenant",
+        "typescript"
+      ],
+      "projectOrder": [
+        "ai-notification-system",
+        "platform-gitops",
+        "personal-growth-ai-os",
+        "logbook-management",
+        "platform-infrastructure"
+      ]
     },
     "platform": {
       "label": "Platform / DevOps",
       "summaryKey": "platform",
-      "skillOrder": ["Cloud & DevOps", "Observability", "Messaging & Architecture", "Backend", "Databases", "AI & LLM", "Frontend"],
-      "leadKeywords": ["kubernetes", "helm", "argocd", "gitops", "terraform", "eks", "ci/cd", "jenkins", "github actions", "docker", "observability", "prometheus", "grafana", "opentelemetry", "infrastructure"],
-      "projectOrder": ["platform-infrastructure", "platform-gitops", "ai-notification-system", "personal-growth-ai-os", "logbook-management"]
+      "skillOrder": [
+        "Cloud & DevOps",
+        "Observability",
+        "Messaging & Architecture",
+        "Backend",
+        "Databases",
+        "AI & LLM",
+        "Frontend"
+      ],
+      "leadKeywords": [
+        "kubernetes",
+        "helm",
+        "argocd",
+        "gitops",
+        "terraform",
+        "eks",
+        "ci/cd",
+        "jenkins",
+        "github actions",
+        "docker",
+        "observability",
+        "prometheus",
+        "grafana",
+        "opentelemetry",
+        "infrastructure"
+      ],
+      "projectOrder": [
+        "platform-infrastructure",
+        "platform-gitops",
+        "ai-notification-system",
+        "personal-growth-ai-os",
+        "logbook-management"
+      ]
     },
     "ai-llm": {
       "label": "AI / LLM Engineering",
       "summaryKey": "ai-llm",
-      "skillOrder": ["AI & LLM", "Backend", "Databases", "Messaging & Architecture", "Cloud & DevOps", "Observability", "Frontend"],
-      "leadKeywords": ["llm", "openai", "anthropic", "rag", "pgvector", "embeddings", "agent", "langgraph", "prompt", "generative ai", "vector", "retrieval"],
-      "projectOrder": ["personal-growth-ai-os", "ai-notification-system", "platform-gitops", "logbook-management", "platform-infrastructure"]
+      "skillOrder": [
+        "AI & LLM",
+        "Backend",
+        "Databases",
+        "Messaging & Architecture",
+        "Cloud & DevOps",
+        "Observability",
+        "Frontend"
+      ],
+      "leadKeywords": [
+        "llm",
+        "openai",
+        "anthropic",
+        "rag",
+        "pgvector",
+        "embeddings",
+        "agent",
+        "langgraph",
+        "prompt",
+        "generative ai",
+        "vector",
+        "retrieval"
+      ],
+      "projectOrder": [
+        "personal-growth-ai-os",
+        "ai-notification-system",
+        "platform-gitops",
+        "logbook-management",
+        "platform-infrastructure"
+      ]
     }
   }
 }

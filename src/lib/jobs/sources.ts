@@ -266,28 +266,36 @@ export async function adzuna(cfg: JobSearchConfig): Promise<RawJob[]> {
 export async function serpapi(cfg: JobSearchConfig): Promise<RawJob[]> {
   const key = env.SERPAPI_KEY;
   if (!key) throw new Error("SERPAPI_KEY not set");
-  const term = cfg.titles[0] ?? "software engineer";
-  const j = await getJson<{ jobs_results?: Record<string, unknown>[] }>(
-    `https://serpapi.com/search.json?engine=google_jobs&q=${encodeURIComponent(term + " remote")}&api_key=${key}`,
-  );
-  return (j.jobs_results ?? []).slice(0, cfg.maxPerSource).map((r) => {
-    const ext = (r.detected_extensions ?? {}) as Record<string, unknown>;
-    const apply = (r.apply_options as { link?: string }[] | undefined)?.[0]?.link;
-    return {
-      source: "serpapi",
-      company: String(r.company_name ?? ""),
-      role: String(r.title ?? ""),
-      location: (r.location as string) || null,
-      remote: ext.work_from_home === true,
-      salaryText: (ext.salary as string) || null,
-      postedAt: null,
-      url: apply ?? String(r.share_link ?? ""),
-      applyUrl: apply ?? null,
-      publisher: (r.via as string)?.replace(/^via\s+/i, "") || null,
-      descriptionSnippet: stripHtml(String(r.description ?? "")).slice(0, 1400),
-      contactEmail: null,
-    } satisfies RawJob;
-  });
+  // One google_jobs search per title = one SerpApi request. `serpapiMaxQueries`
+  // (resume/job-search.json) caps how many titles we spend the monthly quota on.
+  const terms = cfg.titles.slice(0, cfg.serpapiMaxQueries ?? 3);
+  if (terms.length === 0) terms.push("software engineer");
+
+  const out: RawJob[] = [];
+  for (const term of terms) {
+    const j = await getJson<{ jobs_results?: Record<string, unknown>[] }>(
+      `https://serpapi.com/search.json?engine=google_jobs&q=${encodeURIComponent(term + " remote")}&api_key=${key}`,
+    );
+    for (const r of (j.jobs_results ?? []).slice(0, cfg.maxPerSource)) {
+      const ext = (r.detected_extensions ?? {}) as Record<string, unknown>;
+      const apply = (r.apply_options as { link?: string }[] | undefined)?.[0]?.link;
+      out.push({
+        source: "serpapi",
+        company: String(r.company_name ?? ""),
+        role: String(r.title ?? ""),
+        location: (r.location as string) || null,
+        remote: ext.work_from_home === true,
+        salaryText: (ext.salary as string) || null,
+        postedAt: null,
+        url: apply ?? String(r.share_link ?? ""),
+        applyUrl: apply ?? null,
+        publisher: (r.via as string)?.replace(/^via\s+/i, "") || null,
+        descriptionSnippet: stripHtml(String(r.description ?? "")).slice(0, 1400),
+        contactEmail: null,
+      } satisfies RawJob);
+    }
+  }
+  return out;
 }
 
 export const SOURCES = {

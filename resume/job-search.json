@@ -50,5 +50,6 @@
   "minLpa": 18,
   "remoteOnly": false,
   "adzunaCountries": ["in", "gb", "us"],
-  "maxPerSource": 30
+  "maxPerSource": 30,
+  "serpapiMaxQueries": 4
 }
