@@ -87,7 +87,7 @@ export function MergeDialog({
         </DialogHeader>
 
         {preview && (
-          <ul className="grid grid-cols-2 gap-x-6 gap-y-1 py-2 text-sm">
+          <ul className="grid grid-cols-1 gap-x-6 gap-y-1 py-2 text-sm sm:grid-cols-2">
             <Count n={preview.evidence} label="evidence rows" />
             <Count n={preview.projectLinks} label="project-skill links" />
             <Count n={preview.learningLinks} label="learning links" />

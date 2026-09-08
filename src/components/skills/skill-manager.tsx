@@ -217,8 +217,9 @@ function SkillRow({
         ref={setRowRef}
         style={style}
         className={cn(
-          "flex items-center gap-3 px-4 py-3",
-          isChild && "pl-10",
+          "flex flex-wrap items-start gap-x-2 gap-y-2 px-3 py-3",
+          "sm:flex-nowrap sm:items-center sm:gap-x-3 sm:px-4",
+          isChild && "pl-8 sm:pl-10",
           node.excludedAt && "bg-muted/30",
           rowIsOver && edit && "bg-primary/10 ring-1 ring-primary/40",
         )}
@@ -226,7 +227,7 @@ function SkillRow({
         {edit && (
           <button
             type="button"
-            className="cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+            className="mt-0.5 shrink-0 cursor-grab touch-none text-muted-foreground active:cursor-grabbing sm:mt-0"
             {...dragListeners}
             {...dragAttributes}
             aria-label="Drag to merge or re-nest"
@@ -240,7 +241,7 @@ function SkillRow({
             type="button"
             onClick={onToggle}
             className={cn(
-              "text-muted-foreground transition-transform",
+              "mt-0.5 shrink-0 text-muted-foreground transition-transform sm:mt-0",
               expanded && "rotate-90",
               !hasChildren && !edit && "invisible",
             )}
@@ -250,7 +251,7 @@ function SkillRow({
           </button>
         )}
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-40">
           {edit ? (
             <LabelEditor node={node} run={run} />
           ) : (
@@ -277,16 +278,27 @@ function SkillRow({
           </p>
         </div>
 
-        {edit && (
-          <RowEditControls node={node} isChild={isChild} rootChoices={rootChoices} onMerge={onMerge} run={run} />
-        )}
+        <div className="mt-0.5 flex shrink-0 items-center gap-2 sm:mt-0">
+          <ExcludeToggle
+            compact
+            excluded={!!node.excludedAt}
+            action={setSkillExcludedAction}
+            actionArgs={{ skillId: node.id }}
+          />
+          <LevelBadge level={node.level} />
+        </div>
 
-        <ExcludeToggle
-          excluded={!!node.excludedAt}
-          action={setSkillExcludedAction}
-          actionArgs={{ skillId: node.id }}
-        />
-        <LevelBadge level={node.level} />
+        {edit && (
+          <div className="order-last w-full sm:order-none sm:w-auto">
+            <RowEditControls
+              node={node}
+              isChild={isChild}
+              rootChoices={rootChoices}
+              onMerge={onMerge}
+              run={run}
+            />
+          </div>
+        )}
       </div>
 
       {!isChild && expanded && (
@@ -375,15 +387,24 @@ function AddChildInline({
       className="mt-2 flex flex-wrap items-center gap-2"
     >
       <input type="hidden" name="parentId" value={parentId} />
-      <Input name="name" placeholder="new child skill" required className="h-7 w-44 text-xs" />
-      <NativeSelect name="category" defaultValue="tool" className="h-7 w-32 text-xs">
+      <Input
+        name="name"
+        placeholder="new child skill"
+        required
+        className="h-8 min-w-0 flex-1 text-xs sm:h-7 sm:w-44 sm:flex-none"
+      />
+      <NativeSelect
+        name="category"
+        defaultValue="tool"
+        className="h-8 min-w-0 flex-1 text-xs sm:h-7 sm:w-32 sm:flex-none"
+      >
         {SKILL_CATEGORIES.map((c) => (
           <option key={c} value={c}>
             {CATEGORY_LABEL[c]}
           </option>
         ))}
       </NativeSelect>
-      <Button type="submit" size="sm" variant="outline" className="h-7">
+      <Button type="submit" size="sm" variant="outline" className="h-8 sm:h-7">
         Add
       </Button>
     </form>
@@ -409,7 +430,7 @@ function LabelEditor({
     );
   };
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:items-center sm:gap-1.5">
       <Input
         value={val}
         onChange={(e) => setVal(e.target.value)}
@@ -419,9 +440,9 @@ function LabelEditor({
           if (e.key === "Escape") setVal(node.label ?? "");
         }}
         placeholder={node.name}
-        className="h-7 max-w-[220px] text-sm"
+        className="h-8 w-full min-w-0 max-w-[220px] text-sm"
       />
-      <span className="shrink-0 text-xs text-muted-foreground">({node.name})</span>
+      <span className="truncate text-xs text-muted-foreground">({node.name})</span>
     </div>
   );
 }
@@ -445,12 +466,12 @@ function RowEditControls({
   const others = rootChoices.filter((c) => c.id !== node.id);
 
   return (
-    <div className="flex shrink-0 items-center gap-1.5">
+    <div className="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
       <NativeSelect
         aria-label="Merge into"
         value=""
         onChange={(e) => e.target.value && onMerge(e.target.value)}
-        className="h-7 w-28 text-xs"
+        className="h-8 min-w-0 flex-1 text-xs sm:h-7 sm:w-28 sm:flex-none"
       >
         <option value="">Merge into…</option>
         {others.map((c) => (
@@ -465,7 +486,7 @@ function RowEditControls({
           type="button"
           size="sm"
           variant="ghost"
-          className="h-7 text-xs"
+          className="h-8 flex-1 text-xs sm:h-7 sm:flex-none"
           onClick={() => run(setSkillParentAction({ skillId: node.id, parentId: null }), "Moved to top level.")}
         >
           Unnest
@@ -478,7 +499,7 @@ function RowEditControls({
             e.target.value &&
             run(setSkillParentAction({ skillId: node.id, parentId: e.target.value }), "Nested.")
           }
-          className="h-7 w-28 text-xs"
+          className="h-8 min-w-0 flex-1 text-xs sm:h-7 sm:w-28 sm:flex-none"
         >
           <option value="">Nest under…</option>
           {others.map((c) => (

@@ -18,12 +18,15 @@ export function ExcludeToggle<T extends Record<string, unknown>>({
   actionArgs,
   labels = { on: "In use", off: "Skipped" },
   className,
+  compact = false,
 }: {
   excluded: boolean;
   action: (input: T & { excluded: boolean }) => Promise<Result>;
   actionArgs: T;
   labels?: { on: string; off: string };
   className?: string;
+  /** hide the text label below `sm` (for dense rows) — the switch + title stay */
+  compact?: boolean;
 }) {
   const [isExcluded, setIsExcluded] = useState(excluded);
   const [pending, startTransition] = useTransition();
@@ -56,7 +59,13 @@ export function ExcludeToggle<T extends Record<string, unknown>>({
         disabled={pending}
         aria-label={isExcluded ? labels.off : labels.on}
       />
-      <span className={cn("tabular-nums", isExcluded && "text-amber-600 dark:text-amber-500")}>
+      <span
+        className={cn(
+          "tabular-nums",
+          compact && "hidden sm:inline",
+          isExcluded && "text-amber-600 dark:text-amber-500",
+        )}
+      >
         {isExcluded ? labels.off : labels.on}
       </span>
     </label>
