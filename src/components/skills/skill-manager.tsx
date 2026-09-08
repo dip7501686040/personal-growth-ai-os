@@ -13,7 +13,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { ChevronRightIcon, GripVerticalIcon } from "lucide-react";
+import { ChevronRightIcon, GripVerticalIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { LevelBadge } from "@/components/skills/level-badge";
 import { MergeDialog, type MergeIntent } from "@/components/skills/merge-dialog";
@@ -48,7 +48,9 @@ export function SkillManager({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [merge, setMerge] = useState<MergeIntent | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
+  const [refreshing, startRefresh] = useTransition();
+  const busy = isPending || refreshing;
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -70,13 +72,24 @@ export function SkillManager({
       return n;
     });
 
+  /** Run a skills server action, toast the result, then refresh the server tree.
+   *  `busy` stays true for the whole thing (action + resync + RSC refetch). */
   const run = useCallback(
     (p: Promise<ActionState>, okFallback = "Done.") =>
       startTransition(async () => {
-        const res = await p;
-        if (res && !res.ok) toast.error(res.message);
-        else toast.success(res?.message ?? okFallback);
-        router.refresh();
+        let ok = false;
+        try {
+          const res = await p;
+          if (res && !res.ok) {
+            toast.error(res.message);
+          } else {
+            toast.success(res?.message ?? okFallback);
+            ok = true;
+          }
+        } catch (e) {
+          toast.error(e instanceof Error ? e.message : "Something went wrong.");
+        }
+        if (ok) startRefresh(() => router.refresh());
       }),
     [router],
   );
@@ -104,17 +117,33 @@ export function SkillManager({
       onDragCancel={() => setDragging(null)}
       onDragEnd={onDragEnd}
     >
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-3">
+        {busy && (
+          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Loader2Icon className="size-3.5 animate-spin" />
+            Saving…
+          </span>
+        )}
         <Button
           size="sm"
           variant={edit ? "default" : "outline"}
+          disabled={busy}
           onClick={() => setEdit((v) => !v)}
         >
           {edit ? "Done editing" : "Edit layout"}
         </Button>
       </div>
 
-      <div className="mt-4 flex flex-col gap-8">
+      <div
+        aria-busy={busy}
+        className={cn(
+          "relative mt-4 flex flex-col gap-8 transition-opacity",
+          busy && "pointer-events-none opacity-60",
+        )}
+      >
+        {busy && (
+          <div className="absolute inset-x-0 -top-2 h-0.5 animate-pulse rounded bg-primary/60" />
+        )}
         {groups.map((g) => (
           <section key={g.category} className="flex flex-col gap-3">
             <h2 className="text-sm font-semibold text-muted-foreground">
@@ -158,7 +187,7 @@ export function SkillManager({
         onClose={() => setMerge(null)}
         onDone={() => {
           setMerge(null);
-          router.refresh();
+          startRefresh(() => router.refresh());
         }}
       />
     </DndContext>
