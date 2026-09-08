@@ -20,6 +20,7 @@ import {
   setEvidenceStatus,
   setSkillExcluded,
   setSkillParent,
+  updateSkillCategory,
   updateSkillLabel,
   type MergePreview,
 } from "@/modules/skills/service";
@@ -266,6 +267,29 @@ export async function setSkillParentAction(
     ok: true,
     message: parsed.data.parentId ? "Nested under parent." : "Moved to top level.",
   };
+}
+
+const categorySchema = z.object({
+  skillId: z.uuid(),
+  category: z.enum(SKILL_CATEGORIES),
+  slug: z.string().optional(),
+});
+
+export async function setSkillCategoryAction(
+  input: z.infer<typeof categorySchema>,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = categorySchema.safeParse(input);
+  if (!parsed.success) return err(parsed.error.issues[0].message);
+  try {
+    await updateSkillCategory(userId, parsed.data.skillId, parsed.data.category);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Could not move skill.");
+  }
+  await bestEffortResync(userId);
+  revalidatePath("/skills");
+  if (parsed.data.slug) revalidatePath(`/skills/${parsed.data.slug}`);
+  return { ok: true, message: "Category updated." };
 }
 
 const childSchema = z.object({

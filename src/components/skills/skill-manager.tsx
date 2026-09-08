@@ -7,6 +7,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  pointerWithin,
   useDraggable,
   useDroppable,
   useSensor,
@@ -25,11 +26,13 @@ import { CATEGORY_LABEL, SKILL_CATEGORIES } from "@/modules/skills/levels";
 import type { SkillWithCounts } from "@/modules/skills/service";
 import {
   createChildSkillAction,
+  setSkillCategoryAction,
   setSkillExcludedAction,
   setSkillParentAction,
   updateSkillLabelAction,
   type ActionState,
 } from "@/app/(app)/skills/actions";
+import type { SkillCategory } from "@/modules/skills/levels";
 import { cn } from "@/lib/utils";
 
 type Node = SkillWithCounts & { children: SkillWithCounts[] };
@@ -60,6 +63,16 @@ export function SkillManager({
       for (const r of g.roots) {
         m.set(r.id, r.label ?? r.name);
         for (const c of r.children) m.set(c.id, c.label ?? c.name);
+      }
+    return m;
+  }, [groups]);
+
+  const categoryById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const g of groups)
+      for (const r of g.roots) {
+        m.set(r.id, r.category);
+        for (const c of r.children) m.set(c.id, c.category);
       }
     return m;
   }, [groups]);
@@ -103,6 +116,10 @@ export function SkillManager({
       const parentId = over.slice(7);
       if (parentId === activeId) return;
       run(setSkillParentAction({ skillId: activeId, parentId }));
+    } else if (over.startsWith("cat:")) {
+      const category = over.slice(4) as SkillCategory;
+      if (categoryById.get(activeId) === category) return;
+      run(setSkillCategoryAction({ skillId: activeId, category }), "Category updated.");
     } else if (over.startsWith("row:")) {
       const targetId = over.slice(4);
       if (targetId === activeId) return;
@@ -113,6 +130,7 @@ export function SkillManager({
   return (
     <DndContext
       sensors={sensors}
+      collisionDetection={pointerWithin}
       onDragStart={(e) => setDragging(String(e.active.id))}
       onDragCancel={() => setDragging(null)}
       onDragEnd={onDragEnd}
@@ -149,6 +167,9 @@ export function SkillManager({
             <h2 className="text-sm font-semibold text-muted-foreground">
               {CATEGORY_LABEL[g.category as keyof typeof CATEGORY_LABEL] ?? g.category}
             </h2>
+            {dragging && categoryById.get(dragging) !== g.category && (
+              <CategoryDropStrip category={g.category} />
+            )}
             <div className="divide-y rounded-lg border">
               {g.roots.map((r) => (
                 <SkillRow
@@ -191,6 +212,26 @@ export function SkillManager({
         }}
       />
     </DndContext>
+  );
+}
+
+// ── category drop band (shows only while dragging, above a category's rows) ──
+
+function CategoryDropStrip({ category }: { category: string }) {
+  const { setNodeRef, isOver } = useDroppable({ id: `cat:${category}` });
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "rounded-md border border-dashed px-3 py-1.5 text-xs transition-colors",
+        isOver
+          ? "border-primary bg-primary/10 text-foreground"
+          : "border-border text-muted-foreground",
+      )}
+    >
+      Drop here → move to{" "}
+      {CATEGORY_LABEL[category as keyof typeof CATEGORY_LABEL] ?? category}
+    </div>
   );
 }
 

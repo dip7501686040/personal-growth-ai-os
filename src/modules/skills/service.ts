@@ -325,6 +325,22 @@ export async function updateSkillLabel(
   if (!row) throw new Error("Skill not found.");
 }
 
+/** Move a skill to a different category (browsing/grouping only — category is
+ *  part of the entity's embed text, so this records a context event). */
+export async function updateSkillCategory(
+  userId: string,
+  skillId: string,
+  category: SkillCategory,
+): Promise<void> {
+  const [row] = await db
+    .update(skills)
+    .set({ category, updatedAt: new Date() })
+    .where(and(eq(skills.userId, userId), eq(skills.id, skillId)))
+    .returning({ id: skills.id });
+  if (!row) throw new Error("Skill not found.");
+  await recordContextEvent({ userId, kind: "skill_changed", refId: skillId });
+}
+
 /**
  * Set (or clear, with `null`) a skill's parent. Grouping is **one level only**:
  * the parent must itself be top-level, and a skill that already has children

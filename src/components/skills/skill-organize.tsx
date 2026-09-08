@@ -9,22 +9,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect } from "@/components/ui/native-select";
 import {
+  setSkillCategoryAction,
   setSkillParentAction,
   updateSkillLabelAction,
   type ActionState,
 } from "@/app/(app)/skills/actions";
+import { CATEGORY_LABEL, SKILL_CATEGORIES, type SkillCategory } from "@/modules/skills/levels";
 
 export function SkillOrganize({
   skillId,
+  slug,
   name,
   label,
+  category,
   parentId,
   hasChildren,
   choices,
 }: {
   skillId: string;
+  slug: string;
   name: string;
   label: string | null;
+  category: SkillCategory;
   parentId: string | null;
   hasChildren: boolean;
   /** other top-level skills — parent / merge candidates */
@@ -66,6 +72,33 @@ export function SkillOrganize({
         </div>
         <p className="text-xs text-muted-foreground">
           Internal name <code>{name}</code> is fixed — links and matching use it.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="skill-category">Category</Label>
+        <NativeSelect
+          id="skill-category"
+          defaultValue={category}
+          disabled={pending}
+          onChange={(e) =>
+            run(
+              setSkillCategoryAction({
+                skillId,
+                slug,
+                category: e.target.value as SkillCategory,
+              }),
+            )
+          }
+        >
+          {SKILL_CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {CATEGORY_LABEL[c]}
+            </option>
+          ))}
+        </NativeSelect>
+        <p className="text-xs text-muted-foreground">
+          Grouping only — for browsing on the Skills page.
         </p>
       </div>
 

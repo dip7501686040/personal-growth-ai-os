@@ -126,8 +126,10 @@ export default async function SkillDetailPage({
         <CardContent>
           <SkillOrganize
             skillId={skill.id}
+            slug={skill.slug}
             name={skill.name}
             label={skill.label}
+            category={skill.category}
             parentId={skill.parentId}
             hasChildren={hasChildren}
             choices={organizeChoices}
