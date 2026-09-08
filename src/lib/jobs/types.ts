@@ -15,6 +15,21 @@ export interface JobSearchConfig {
   maxPerSource: number;
   /** how many titles SerpApi's google_jobs search spends a request on (default 3) */
   serpapiMaxQueries?: number;
+  /** blend the knowledge-graph match into `skillMatch` (default true) */
+  useGraphMatch?: boolean;
+  /** cap on per-run graph-match embedding calls (default 50) */
+  graphMatchLimit?: number;
+  /** extra source-query terms derived from the graph — set at runtime by
+   *  `runJobSearch`, never in `resume/job-search.json`. */
+  graphTitles?: string[];
+}
+
+/** One job's knowledge-graph match — from the same matcher `get_proof_for_jd` uses. */
+export interface GraphMatch {
+  /** 0..1, blended into `skillMatch` as `max(substring, this)` */
+  score: number;
+  skills: { name: string; score: number }[];
+  features: { title: string; score: number }[];
 }
 
 export interface RawJob {
@@ -51,7 +66,15 @@ export interface ScoredJob extends RawJob {
   contactName: string | null;
   flags: string[];
   replyLikelihood: number;
+  /** final skill match — `max(substringSkillMatch, graphMatch ?? 0)` */
   skillMatch: number;
+  /** keyword-only match against `job-search.json`'s `skills` */
+  substringSkillMatch: number;
+  /** knowledge-graph match score, or null when not computed for this job */
+  graphMatch: number | null;
+  /** skills the graph matcher hit in this JD (for the provenance file) */
+  graphSkills: { name: string; score: number }[];
+  graphFeatures: { title: string; score: number }[];
   score: number;
   group: "A" | "B";
 }
@@ -64,4 +87,8 @@ export interface JobSearchResult {
   fetched: number;
   afterDedupe: number;
   usdInr: number;
+  /** extra query terms the knowledge graph contributed this run */
+  graphTerms: string[];
+  /** how many jobs got a knowledge-graph score */
+  graphMatched: number;
 }

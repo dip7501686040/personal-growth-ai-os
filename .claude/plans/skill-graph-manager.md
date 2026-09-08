@@ -65,6 +65,17 @@ same filtering for free.
 
 ## Phase 1 — Retire activity + transcript + github-sync extraction
 
+**STATUS: applied 2026-09-08.** typecheck + lint + 63 tests + `next build` all
+green. Deviations from the scope below: (a) `/activity` page was *not* deleted —
+it's dual-purpose; the Claude-Code cards (coding sessions, daily analysis,
+collector token setup) were stripped, the Phase 9 agent status board + run
+timeline kept, nav entry kept. (b) `knowledge-refresh` / `knowledge-map` cron
+*handlers* were kept (unscheduled, manual curl stop-gap) — only their
+`vercel.json` schedule entries were removed — since Phase 6 hasn't built
+`resyncKnowledge()` yet. (c) Orphaned components (`token-manager`,
+`sessions-list`, `analyses-list`) and `activity/actions.ts` were deleted;
+`/knowledge` "System crons" panel trimmed to the 2 remaining jobs.
+
 **Scope**
 - `vercel.json`: remove `daily-activity`, `github-sync`, `ingest-drain`,
   **`knowledge-refresh`, and `knowledge-map`** crons. Only `daily-learning` and
@@ -99,6 +110,15 @@ evidence now counting. Verify `test/progression.test.ts` green.
 
 ## Phase 2 — `/sync-repo` also builds the knowledge base
 
+**STATUS: applied 2026-09-08.** typecheck + lint + 63 tests + `next build` green,
+plus a live end-to-end smoke test against the DB (create → embed → 23 links →
+idempotent re-run → supersede-on-drop → cleaned up). Notes: (a) `sourceKind` is
+`"github_repo"` (not a new kind); repo anchor = `repoUrl` (or `sync-repo:<slug>`
+with no repoUrl), `sourceRef = "<anchor>#<slug>"`, `meta.via = "sync-repo"`.
+(b) `SyncProposal.knowledge` is opt-in: omit the key → knowledge untouched;
+`[]` → clears this repo's docs. (c) embed/link is per-doc best-effort — a failed
+doc keeps its row (counted `embedErrors`) for a later resync.
+
 **Scope**
 - Extend `SyncProposal` (`modules/projects/sync.ts`) with optional
   `knowledge: { docType, title, body, sourceRef, meta? }[]` — distilled facts
@@ -125,6 +145,22 @@ dedupe false positives — already handled in `lib/knowledge/dedupe.ts`.
 ---
 
 ## Phase 3 — "Skip" switch (exclusion) across every read path
+
+**STATUS: applied 2026-09-08.** Migration `0021` applied; typecheck + lint + 63
+tests + `next build` green; two live DB smoke tests (skill exclude → dropped
+from `getProofForJd` + `entity_embeddings` purged + `listSkills` default omits;
+project exclude → its features stop contributing proof; both restored clean).
+Notes: (a) `excluded_at timestamptz` on all 3 tables + partial `…_user_active_idx`.
+(b) `matchSkillsAndFeatures` filters via a final `dropExcluded()` pass so stale
+kNN hits can't leak. (c) `listSkills` / `listProjects` gained
+`{ includeExcluded }` (default false); only `/skills` + `/projects` pages pass
+true — dashboard, career-agent, `getProjectSnapshot`, `resolveSkillIdsByName`
+use the default. (d) exclude also purges `entity_embeddings` + suggested
+`knowledge_links` (+ `entity_skill_links` for a skill); un-skip relies on the
+next backfill / `/sync-repo`. (e) `Switch` (Base UI) + `ExcludeToggle` shared
+component; wired into `/skills` rows, `/projects` cards, `/projects/[slug]`
+header + `FeatureManager` rows. (f) invariant documented in
+`docs/system-design.md` §"Exclusion invariant".
 
 **Scope**
 - **Migration:** `excluded_at timestamptz` on `skills`, `projects`,
@@ -158,6 +194,22 @@ the phase summary mitigate.
 ---
 
 ## Phase 4 — Skill model: label/value split, one-level parent/child, merge
+
+**STATUS: applied 2026-09-08.** Migration `0022` applied; typecheck + lint + 63
+tests + `next build` green; live DB smoke test (label edit leaves name/slug +
+matching untouched; both one-level guards reject; merge re-points evidence,
+re-parents children, cancels approvals, deletes sources — verified & cleaned
+up). Notes: (a) `skills.label` is **nullable** (no data backfill) — everything
+reads `label ?? name`; (b) `mergeSkills` runs in a single `db.transaction`
+with raw-SQL dedupe-then-repoint for the three unique-keyed tables
+(`learning_session_skills` PK, `knowledge_links`, `entity_skill_links`);
+(c) merged sources' children land under `target.parentId ?? target.id` to stay
+one level; (d) `listSkills` gained `childCount`; still returns a **flat** list
+(Phase 5 does the nested tree UI); (e) matchers + `resolveSkillIdsByName` +
+context + MCP `list_skills` + `getProofForJd` now use `label` OR `name`.
+Server actions added: `updateSkillLabelAction`, `setSkillParentAction`,
+`createChildSkillAction`, `mergePreviewAction`, `mergeSkillsAction` (Phase 5
+wires the drag-drop UI to these).
 
 **Scope**
 - **Migration:** `skills.label text` (backfill `= name`); `skills.parent_id uuid
@@ -205,6 +257,22 @@ the phase summary mitigate.
 
 ## Phase 5 — Skills page: edit mode, drag-merge, child groups, label editing
 
+**STATUS: applied 2026-09-08.** typecheck + strict lint (react-hooks/refs,
+react-compiler) + 63 tests + `next build` (23 routes) green; `/skills` route
+runtime-smoked (auth-gated 307, no 500). Underlying actions were end-to-end
+verified in Phase 4. Notes: (a) dep added: `@dnd-kit/core` only (transform
+inlined, no `@dnd-kit/utilities`); (b) `/skills` page is now a thin server
+component that builds the one-level tree + renders `<SkillManager>` (client);
+(c) `MergeDialog` extracted to its own file, remounted per-intent via `key` so
+no reset-in-effect; (d) `SkillManager` has an "Edit layout" toggle — off =
+browse + expand/collapse + skip switches; on = drag grip (drag row → row =
+merge w/ preview dialog; drag row → child drop-zone = nest), inline label
+editor, per-row "Merge into…" / "Nest under…" / "Unnest" selects (the no-drag
+fallback), and "Add child" inline form; (e) `/skills/[slug]` gained an
+"Organize" card (`<SkillOrganize>`: label field, parent select, "Merge into…").
+Interactive drag/dialog behaviour not headless-tested (auth wall) — relies on
+lint + build + the Phase 4 action smoke.
+
 **Scope**
 - Add dep `@dnd-kit/core` + `@dnd-kit/sortable` (bundler dep — not a CDN
   concern; this is the Next app).
@@ -231,6 +299,39 @@ enhancement.
 ---
 
 ## Phase 6 — Inline knowledge re-sync on graph edits
+
+**STATUS: applied 2026-09-08.** Migration `0023` applied; typecheck + lint + 63
+tests + `next build` green; live smoke: `pnpm knowledge:resync --all` drained
+the whole Phase 1–5 backlog (~130 context_events → 66 internal docs, all 37→73
+docs re-mapped), steady-state `pnpm knowledge:resync` is a ~0-event no-op in
+~3s, and an idempotent `pnpm sync-repo` now ends with a clean `resyncKnowledge`.
+Notes:
+- `src/modules/knowledge/resync.ts` — `resyncKnowledge({full?})`,
+  `bestEffortResync` (swallows, awaited), `resyncEntity`,
+  `purgePolymorphicRefs`, `remapStaleDocuments`.
+- **Inline path is bounded**: drains ≤15 outbox rows, backfills only
+  `DECISION_TARGET_TYPES` embeddings, 6s remap deadline, and **skips the remap
+  entirely** when the drain produced no doc and no entity vector moved. `--all`
+  drains ≤200, re-embeds every type, 120s deadline, always full sweep.
+- **6c done**: `career_opportunity` + `business_opportunity` removed from
+  `KNOWLEDGE_TARGET_TYPES` / `fetchEntities` / `RELATION_BY_TYPE` / the doc
+  filter chips; `linkEntityToSkills` / `linkOpportunity` / `getRelatedEntities`
+  calls stripped from career+business agents and their detail pages (`related`
+  is now `{content:[],learning:[]}`); `EntitySkillSourceType` narrowed to
+  `"content_item"`. Migration `0023` purged their `entity_embeddings` /
+  `entity_skill_links` / `knowledge_links` rows. `content_item` enters the
+  graph only on `markPublishedAction` (via `resyncEntity`); drafts don't; a
+  now-unpublished / deleted content item is `purgePolymorphicRefs`'d;
+  `get_proof_for_jd` related-content query filters `status='published'`.
+- **Wired** `bestEffortResync` into every mutating action in
+  `skills/actions.ts`, `projects/actions.ts`, `learning/actions.ts`
+  (logSession); `applySyncProposal` ends with `resyncKnowledge`;
+  `content/actions.ts` publish/edit/delete → `resyncEntity` /
+  `purgePolymorphicRefs`; `knowledge/actions.ts` `uploadAction` kicks a bounded
+  extractor drain, `drainNowAction` → full `resyncKnowledge`,
+  `updateDocumentAction` → `relinkDocument`.
+- `pnpm knowledge:resync [--all]` + the renamed "Re-sync knowledge" button.
+- `specFor`'s `activity_analyzed` branch removed.
 
 **No nightly backstop.** `knowledge-refresh`, `knowledge-map`, and `ingest-drain`
 crons are all removed in Phase 1. `resyncKnowledge()` is the *only* mechanism —
@@ -358,6 +459,32 @@ only unbounded path and it's manual. If latency bites, move the drain to a
 ---
 
 ## Phase 7 — Job search uses the knowledge base too
+
+**STATUS: applied 2026-09-08.** typecheck + lint + 63 tests + `next build` green;
+**live smoke** — `pnpm jobs` (310 fetched → 283 deduped) graph-scored 62 of the
+top jobs, 59 rose on `max(substring, graph)` (e.g. Astoria AI "Founding AI
+Engineer" 0.61→0.97 on LangChain/RAG/multi-agent matches the keyword list
+missed; Product Genius 0.39→0.72 on pgvector/OpenAI-API). `search-provenance.md`
+generated correctly. Notes:
+- `resume/job-search.json` stays 100% manual; added `useGraphMatch` (default
+  true) + `graphMatchLimit` (50).
+- New `src/modules/jobs/graph.ts` — `deriveGraphSearchTerms(userId)` (implemented/
+  proven non-excluded skill labels first, then top-4 knowledge-taxonomy tags,
+  ≤8) and `makeGraphMatcher(userId)` (per-JD `matchSkillsAndFeatures`, names
+  cached; `score = min(1, Σ skill scores / 3)`).
+- `runJobSearch(cfg, opts)` gained `extraTerms` (ride alongside `titles` in the
+  4 term-driven sources, bounded) + `graphMatch` (top `graphMatchLimit` jobs by
+  substring score get `applyGraphMatch` → `skillMatch = max(substring, graph)`,
+  score recomputed, group unchanged since it's flag-based). `ScoredJob` now
+  carries `substringSkillMatch` / `graphMatch` / `graphSkills` / `graphFeatures`;
+  `JobSearchResult` carries `graphTerms` / `graphMatched`.
+- `scripts/jobs.ts` builds the matcher from `getOwnerUserId()`, `--no-graph`
+  disables, output shows a `graph:` line + per-row `skill`/`graph` scores.
+- `scripts/apply-prep.ts` writes **`search-provenance.md`** per folder (manual
+  layer: titles + which keywords hit + filters; graph layer: matched skills/
+  features w/ scores, graph vs substring; sources; score math) and the new
+  fields flow through `job.json`.
+- `apply-morning` SKILL.md updated (§1 + folder contents).
 
 **Scope**
 - `resume/job-search.json` stays fully manual.

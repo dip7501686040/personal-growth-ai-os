@@ -12,7 +12,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { getOwnerUserId } from "@/lib/owner";
-import type { JobSearchResult, ScoredJob } from "@/lib/jobs/types";
+import { loadJobSearchConfig } from "@/lib/jobs/search";
+import type { JobSearchConfig, JobSearchResult, ScoredJob } from "@/lib/jobs/types";
 import { getProofForJd, type JdProof } from "@/modules/knowledge/jd-proof";
 import { loadMaster, suggestArchetype } from "@/modules/resume/master";
 import {
@@ -97,6 +98,58 @@ function proofBundleMd(j: ScoredJob, proof: JdProof): string {
   return L.join("\n");
 }
 
+function searchProvenanceMd(
+  j: ScoredJob,
+  cfg: JobSearchConfig,
+  result: JobSearchResult,
+): string {
+  const hay = `${j.role} ${j.descriptionSnippet ?? ""}`.toLowerCase();
+  const manualSkills = cfg.skills.filter((s) => hay.includes(s.toLowerCase()));
+  const titleHit = cfg.titles.find((t) => j.role.toLowerCase().includes(t.toLowerCase()));
+  const L: string[] = [
+    `# How this job surfaced — ${j.company} / ${j.role}`,
+    ``,
+    `Search score **${j.score.toFixed(2)}** · Group ${j.group} · reply-likelihood ${j.replyLikelihood.toFixed(2)}`,
+    ``,
+    `## Manual layer — resume/job-search.json`,
+    `- Titles searched: ${cfg.titles.join(", ")}`,
+    `- This role matches the title term: ${titleHit ?? "_(surfaced via description / a graph term)_"}`,
+    `- Skill keywords present in the JD: ${manualSkills.join(", ") || "_none_"}  (${manualSkills.length}/${cfg.skills.length} → substring skillMatch ${j.substringSkillMatch.toFixed(2)})`,
+    `- Filters applied: minLpa ${cfg.minLpa} · remoteOnly ${cfg.remoteOnly} · adzuna ${cfg.adzunaCountries.join("/")}`,
+    ``,
+    `## Knowledge-graph layer`,
+  ];
+  if (j.graphMatch == null) {
+    L.push(`- Not graph-scored (outside the top ${cfg.graphMatchLimit ?? 50}, or graph off).`);
+  } else {
+    L.push(
+      `- Extra query terms from the graph this run: ${result.graphTerms.join(", ") || "_none_"}`,
+      `- Skills the graph matched in this JD: ${
+        j.graphSkills.map((s) => `${s.name} (${s.score})`).join(", ") || "_none_"
+      }`,
+      `- Project features matched: ${
+        j.graphFeatures.map((f) => `${f.title} (${f.score})`).join(", ") || "_none_"
+      }`,
+      `- graphMatch ${j.graphMatch.toFixed(2)} vs substring skillMatch ${j.substringSkillMatch.toFixed(2)} → used **${j.skillMatch.toFixed(2)}**`,
+    );
+  }
+  L.push(
+    ``,
+    `## Sources`,
+    `- This posting was returned by: ${j.seenIn.join(", ")}`,
+    `- All sources this run: ${result.sourcesUsed.join(", ")}`,
+    result.sourcesSkipped.length
+      ? `- Skipped: ${result.sourcesSkipped.map((s) => `${s.source} (${s.reason})`).join(", ")}`
+      : ``,
+    ``,
+    `## Score math`,
+    `\`replyLikelihood ${j.replyLikelihood.toFixed(2)} × (0.4 + 0.6 × skillMatch ${j.skillMatch.toFixed(2)}) = ${j.score.toFixed(2)}\``,
+    j.flags.length ? `Flags: ${j.flags.join(", ")}` : `No flags.`,
+    ``,
+  );
+  return L.filter((x) => x !== undefined).join("\n");
+}
+
 function outreachMd(j: ScoredJob): string {
   const L: string[] = [`# Outreach — ${j.company} / ${j.role}`, ``];
   if (j.contactName || j.contactEmail) {
@@ -127,6 +180,7 @@ async function main() {
 
   const userId = await getOwnerUserId();
   const master = loadMaster();
+  const cfg = loadJobSearchConfig();
 
   for (const i of idxs) {
     const j = all[i];
@@ -160,6 +214,7 @@ async function main() {
     writeFileSync(join(dir, "resume.docx"), await toDocxBuffer(model));
     writeFileSync(join(dir, "proof-bundle.md"), proofBundleMd(j, proof));
     writeFileSync(join(dir, "outreach-targets.md"), outreachMd(j));
+    writeFileSync(join(dir, "search-provenance.md"), searchProvenanceMd(j, cfg, result));
     writeFileSync(
       join(dir, "job.json"),
       JSON.stringify(

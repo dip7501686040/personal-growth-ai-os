@@ -51,5 +51,7 @@
   "remoteOnly": false,
   "adzunaCountries": ["in", "gb", "us"],
   "maxPerSource": 30,
-  "serpapiMaxQueries": 4
+  "serpapiMaxQueries": 4,
+  "useGraphMatch": true,
+  "graphMatchLimit": 50
 }

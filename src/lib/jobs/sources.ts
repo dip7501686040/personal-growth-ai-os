@@ -4,6 +4,14 @@ import type { JobSearchConfig, RawJob } from "./types";
 const UA = "Mozilla/5.0 (compatible; personal-job-search/1.0)";
 const TIMEOUT = 12_000;
 
+/** Manual titles first, then up to `graphMax` knowledge-graph terms (Phase 7). */
+function queryTerms(cfg: JobSearchConfig, base: number, graphMax = 2): string[] {
+  return [
+    ...cfg.titles.slice(0, base),
+    ...(cfg.graphTitles ?? []).slice(0, graphMax),
+  ];
+}
+
 async function getJson<T>(url: string, headers?: Record<string, string>): Promise<T> {
   const res = await fetch(url, {
     headers: { "user-agent": UA, accept: "application/json", ...headers },
@@ -70,7 +78,7 @@ export async function remoteok(cfg: JobSearchConfig): Promise<RawJob[]> {
 
 export async function remotive(cfg: JobSearchConfig): Promise<RawJob[]> {
   const out: RawJob[] = [];
-  for (const term of cfg.titles.slice(0, 4)) {
+  for (const term of queryTerms(cfg, 4)) {
     const j = await getJson<{ jobs?: Record<string, unknown>[] }>(
       `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(term)}&limit=${cfg.maxPerSource}`,
     );
@@ -197,7 +205,7 @@ export async function jsearch(cfg: JobSearchConfig): Promise<RawJob[]> {
   const key = env.JSEARCH_API_KEY;
   if (!key) throw new Error("JSEARCH_API_KEY not set");
   const out: RawJob[] = [];
-  for (const term of cfg.titles.slice(0, 3)) {
+  for (const term of queryTerms(cfg, 3)) {
     const j = await getJson<{ data?: Record<string, unknown>[] }>(
       `https://jsearch.p.rapidapi.com/search?query=${encodeURIComponent(term + " remote")}&num_pages=1`,
       { "x-rapidapi-key": key, "x-rapidapi-host": "jsearch.p.rapidapi.com" },
@@ -232,7 +240,7 @@ export async function adzuna(cfg: JobSearchConfig): Promise<RawJob[]> {
   if (!id || !key) throw new Error("ADZUNA_APP_ID / ADZUNA_APP_KEY not set");
   const out: RawJob[] = [];
   for (const country of cfg.adzunaCountries.slice(0, 3)) {
-    for (const term of cfg.titles.slice(0, 2)) {
+    for (const term of queryTerms(cfg, 2, 1)) {
       const j = await getJson<{ results?: Record<string, unknown>[] }>(
         `https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${id}&app_key=${key}` +
           `&what=${encodeURIComponent(term)}&results_per_page=${cfg.maxPerSource}&content-type=application/json`,
@@ -268,7 +276,7 @@ export async function serpapi(cfg: JobSearchConfig): Promise<RawJob[]> {
   if (!key) throw new Error("SERPAPI_KEY not set");
   // One google_jobs search per title = one SerpApi request. `serpapiMaxQueries`
   // (resume/job-search.json) caps how many titles we spend the monthly quota on.
-  const terms = cfg.titles.slice(0, cfg.serpapiMaxQueries ?? 3);
+  const terms = queryTerms(cfg, cfg.serpapiMaxQueries ?? 3);
   if (terms.length === 0) terms.push("software engineer");
 
   const out: RawJob[] = [];

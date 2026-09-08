@@ -1,28 +1,55 @@
 /**
  * Fetch, score and group today's matching jobs from every available source.
  *
- *   pnpm jobs [--json] [--b]     # --json: raw result · --b: also print Group B
+ *   pnpm jobs [--json] [--b] [--no-graph]
+ *     --json     raw JobSearchResult
+ *     --b        also print all of Group B
+ *     --no-graph skip the knowledge-graph layer (query terms + skillMatch)
  *
- * Tune resume/job-search.json. This is the precursor to J5's /apply-morning.
+ * Tune resume/job-search.json (manual layer). The knowledge-graph layer is
+ * automatic unless `useGraphMatch: false` there or `--no-graph` here.
  */
 import { loadJobSearchConfig, runJobSearch } from "@/lib/jobs/search";
 import type { ScoredJob } from "@/lib/jobs/types";
+import { getOwnerUserId } from "@/lib/owner";
+import { deriveGraphSearchTerms, makeGraphMatcher } from "@/modules/jobs/graph";
 
 function line(j: ScoredJob): string {
   const sal = j.salaryLpa != null ? `${j.salaryLpa}LPA` : "—";
   const flags = j.flags.length ? `  {${j.flags.join(", ")}}` : "";
+  const gm =
+    j.graphMatch != null && j.graphMatch > j.substringSkillMatch
+      ? ` graph ${j.graphMatch.toFixed(2)}`
+      : "";
   return (
     `  ${j.score.toFixed(2)}  ${(j.company + " — " + j.role).slice(0, 62).padEnd(63)}` +
     ` ${j.remoteKind.padEnd(13)} ${sal.padEnd(8)} reply ${j.replyLikelihood.toFixed(2)}` +
-    ` [${j.seenIn.join("/")}]${flags}\n        ${j.url}`
+    ` skill ${j.skillMatch.toFixed(2)}${gm} [${j.seenIn.join("/")}]${flags}\n        ${j.url}`
   );
 }
 
 async function main() {
   const json = process.argv.includes("--json");
   const showB = process.argv.includes("--b");
+  const noGraph = process.argv.includes("--no-graph");
   const cfg = loadJobSearchConfig();
-  const r = await runJobSearch(cfg);
+
+  const graphOn = !noGraph && cfg.useGraphMatch !== false;
+  let extraTerms: string[] = [];
+  let graphMatch: ((jd: string) => Promise<import("@/lib/jobs/types").GraphMatch | null>) | undefined;
+  if (graphOn) {
+    try {
+      const userId = await getOwnerUserId();
+      extraTerms = await deriveGraphSearchTerms(userId);
+      graphMatch = makeGraphMatcher(userId);
+    } catch (e) {
+      console.error(
+        `graph layer unavailable (${e instanceof Error ? e.message : e}) — manual only`,
+      );
+    }
+  }
+
+  const r = await runJobSearch(cfg, { extraTerms, graphMatch });
 
   if (json) {
     console.log(JSON.stringify(r, null, 2));
@@ -36,7 +63,12 @@ async function main() {
         : ""),
   );
   console.log(
-    `fetched ${r.fetched} → ${r.afterDedupe} after dedupe · USD/INR ${r.usdInr.toFixed(1)}\n`,
+    `fetched ${r.fetched} → ${r.afterDedupe} after dedupe · USD/INR ${r.usdInr.toFixed(1)}`,
+  );
+  console.log(
+    r.graphTerms.length || r.graphMatched
+      ? `graph: +${r.graphTerms.length} query term(s) [${r.graphTerms.join(", ")}], scored ${r.graphMatched} job(s)\n`
+      : `graph: off\n`,
   );
 
   console.log(`━━ GROUP A — clean (${r.groupA.length}) ━━`);

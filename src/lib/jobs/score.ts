@@ -1,6 +1,6 @@
 import { companyTypeOf, contactOf, fundingOf, remoteKindOf } from "./classify";
 import { salaryToLpa } from "./salary";
-import type { JobSearchConfig, RawJob, ScoredJob } from "./types";
+import type { GraphMatch, JobSearchConfig, RawJob, ScoredJob } from "./types";
 
 const DIRECT_BOARDS = new Set(["wwr", "remoteok", "remotive", "hn"]);
 const AGENCY_PUBLISHER =
@@ -88,11 +88,11 @@ export function scoreJob(
 
   const hay = `${j.role} ${j.descriptionSnippet ?? ""}`.toLowerCase();
   const hits = cfg.skills.filter((s) => hay.includes(s.toLowerCase())).length;
-  const skillMatch = cfg.skills.length
+  const substringSkillMatch = cfg.skills.length
     ? Math.min(1, hits / Math.min(cfg.skills.length, 8))
     : 0;
 
-  const score = replyLikelihood * (0.4 + 0.6 * skillMatch);
+  const score = replyLikelihood * (0.4 + 0.6 * substringSkillMatch);
 
   const toB =
     flags.some((f) => f.startsWith("stale:")) ||
@@ -109,8 +109,29 @@ export function scoreJob(
     contactEmail: contact.email,
     flags,
     replyLikelihood,
-    skillMatch,
+    skillMatch: substringSkillMatch,
+    substringSkillMatch,
+    graphMatch: null,
+    graphSkills: [],
+    graphFeatures: [],
     score,
     group: toB ? "B" : "A",
+  };
+}
+
+/**
+ * Fold a job's knowledge-graph match into its score: `skillMatch` becomes
+ * `max(substring, graph)` and the final score is recomputed on it. Returns a
+ * new object; group is flag-based so it never changes here.
+ */
+export function applyGraphMatch(j: ScoredJob, gm: GraphMatch): ScoredJob {
+  const skillMatch = Math.max(j.substringSkillMatch, gm.score);
+  return {
+    ...j,
+    graphMatch: gm.score,
+    graphSkills: gm.skills,
+    graphFeatures: gm.features,
+    skillMatch,
+    score: j.replyLikelihood * (0.4 + 0.6 * skillMatch),
   };
 }

@@ -14,7 +14,11 @@ pnpm jobs --json > /tmp/jobs.json
 pnpm jobs            # human view: Group A (clean) then Group B (flagged)
 ```
 
-Show the user the Group A list (and the top of B). Each row: score · company — role · remote-kind · LPA · reply-likelihood · [sources] · flags. Indices in `/tmp/jobs.json` are `groupA` then `groupB` concatenated (0-based).
+The search blends two layers:
+- **Manual** — `resume/job-search.json` (`titles`, `excludeTitles`, `skills` keyword list, filters). Hand-tuned.
+- **Knowledge graph** — automatic (unless `useGraphMatch: false` or `pnpm jobs --no-graph`). Adds a few source-query terms from your implemented/proven skills, and re-scores the top ~50 jobs with the same matcher `get_proof_for_jd` uses. `skillMatch = max(keyword, graph)`, so a job the keyword list misses but your real projects match still rises.
+
+Show the user the Group A list (and the top of B). Each row: score · company — role · remote-kind · LPA · reply-likelihood · skillMatch (with `graph N.NN` when the graph beat the keyword score) · [sources] · flags. The `graph:` header line reports the extra terms + how many jobs were graph-scored. Indices in `/tmp/jobs.json` are `groupA` then `groupB` concatenated (0-based).
 
 If `pnpm jobs` reports skipped sources (missing keys), mention it once — coverage is lower without JSearch/Adzuna/SerpApi.
 
@@ -28,7 +32,7 @@ Ask which to prep — the user names indices, or says "prep the top N of Group A
 pnpm apply-prep --jobs /tmp/jobs.json --pick 0,1,4,6
 ```
 
-Writes `applications/<date>/<company>__<role>/` per pick with: `resume.md` / `.html` / `.docx` (archetype auto-picked, tailored to the JD via get_proof_for_jd), `proof-bundle.md`, `outreach-targets.md`, `job.json`.
+Writes `applications/<date>/<company>__<role>/` per pick with: `resume.md` / `.html` / `.docx` (archetype auto-picked, tailored to the JD via get_proof_for_jd), `proof-bundle.md`, `outreach-targets.md`, `search-provenance.md` (why this job surfaced — manual vs knowledge-graph layer + score math), `job.json`.
 
 ## 4. Write the prose files (your judgment — Sonnet)
 
