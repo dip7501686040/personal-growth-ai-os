@@ -8,7 +8,11 @@ import { getProject } from "@/modules/projects/service";
 import { ProjectDetailsForm } from "@/components/projects/project-details-form";
 import { FeatureManager } from "@/components/projects/feature-manager";
 import { SkillLinker } from "@/components/projects/skill-linker";
-import { deleteProjectAction } from "@/app/(app)/projects/actions";
+import { ExcludeToggle } from "@/components/shared/exclude-toggle";
+import {
+  deleteProjectAction,
+  setProjectExcludedAction,
+} from "@/app/(app)/projects/actions";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -56,12 +60,23 @@ export default async function ProjectDetailPage({
         >
           ← Projects
         </Link>
-        <div className="mt-2 flex items-center gap-3">
+        <div className="mt-2 flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">
             {project.name}
           </h1>
           <Badge variant="secondary">{project.status}</Badge>
+          <ExcludeToggle
+            excluded={!!project.excludedAt}
+            action={setProjectExcludedAction}
+            actionArgs={{ id: project.id, slug: project.slug }}
+          />
         </div>
+        {project.excludedAt && (
+          <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+            This project and all its features are skipped — hidden from AI, job
+            search, proof-of-work, and the public portfolio.
+          </p>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

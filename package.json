@@ -17,6 +17,7 @@
     "set-password": "node --env-file=.env.local --import tsx scripts/set-password.ts",
     "llm:smoke": "node --env-file=.env.local --import tsx scripts/llm-smoke.ts",
     "sync-repo": "node --env-file=.env.local --import tsx scripts/sync-repo.ts",
+    "knowledge:resync": "node --env-file=.env.local --import tsx scripts/knowledge-resync.ts",
     "resume": "node --env-file=.env.local --import tsx scripts/resume.ts",
     "jobs": "node --env-file=.env.local --import tsx scripts/jobs.ts",
     "apply-prep": "node --env-file=.env.local --import tsx scripts/apply-prep.ts",
@@ -28,6 +29,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
+    "@dnd-kit/core": "^6.3.1",
     "@huggingface/transformers": "^4.2.0",
     "@langchain/core": "^1.2.9",
     "@langchain/langgraph": "^1.4.13",

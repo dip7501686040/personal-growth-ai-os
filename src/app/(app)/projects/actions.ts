@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUserId } from "@/lib/user";
+import { bestEffortResync } from "@/modules/knowledge/resync";
 import { slugify } from "@/lib/slug";
 import {
   addFeature,
@@ -11,7 +12,9 @@ import {
   createProjectFromIdea,
   deleteProject,
   linkSkill,
+  setFeatureExcluded,
   setFeatureStatus,
+  setProjectExcluded,
   unlinkSkill,
   updateProject,
   type ProjectIdea,
@@ -50,6 +53,7 @@ export async function createProjectAction(
   } catch (e) {
     return err(e instanceof Error ? e.message : "Could not create project.");
   }
+  await bestEffortResync(userId);
   revalidatePath("/projects");
   return { ok: true, message: `Created "${parsed.data.name}".` };
 }
@@ -84,6 +88,7 @@ export async function updateProjectAction(
     return err(e instanceof Error ? e.message : "Could not update project.");
   }
   revalidatePath(`/projects/${slug}`);
+  await bestEffortResync(userId);
   revalidatePath("/projects");
   return { ok: true, message: "Saved." };
 }
@@ -93,8 +98,54 @@ export async function deleteProjectAction(fd: FormData): Promise<void> {
   const projectId = z.uuid().parse(fd.get("projectId"));
   await deleteProject(userId, projectId);
   revalidatePath("/projects");
+  await bestEffortResync(userId);
   revalidatePath("/skills");
   redirect("/projects");
+}
+
+// ── Skip / un-skip ────────────────────────────────────────────────────────
+
+const excludedSchema = z.object({ id: z.uuid(), excluded: z.boolean(), slug: z.string().optional() });
+
+export async function setProjectExcludedAction(
+  input: z.infer<typeof excludedSchema>,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = excludedSchema.safeParse(input);
+  if (!parsed.success) return err(parsed.error.issues[0].message);
+  try {
+    await setProjectExcluded(userId, parsed.data.id, parsed.data.excluded);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Could not update project.");
+  }
+  await bestEffortResync(userId);
+  revalidatePath("/projects");
+  revalidatePath("/skills");
+  if (parsed.data.slug) revalidatePath(`/projects/${parsed.data.slug}`);
+  return {
+    ok: true,
+    message: parsed.data.excluded ? "Project skipped." : "Project back in use.",
+  };
+}
+
+export async function setFeatureExcludedAction(
+  input: z.infer<typeof excludedSchema>,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = excludedSchema.safeParse(input);
+  if (!parsed.success) return err(parsed.error.issues[0].message);
+  try {
+    await setFeatureExcluded(userId, parsed.data.id, parsed.data.excluded);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Could not update feature.");
+  }
+  await bestEffortResync(userId);
+  if (parsed.data.slug) revalidatePath(`/projects/${parsed.data.slug}`);
+  revalidatePath("/skills");
+  return {
+    ok: true,
+    message: parsed.data.excluded ? "Feature skipped." : "Feature back in use.",
+  };
 }
 
 // ── Feature ────────────────────────────────────────────────────────────────
@@ -130,6 +181,7 @@ export async function addFeatureAction(
     return err(e instanceof Error ? e.message : "Could not add feature.");
   }
   revalidatePath(`/projects/${parsed.data.slug}`);
+  await bestEffortResync(userId);
   revalidatePath("/skills");
   return { ok: true, message: "Feature added." };
 }
@@ -157,6 +209,7 @@ export async function setFeatureStatusAction(
     return err(e instanceof Error ? e.message : "Could not update feature.");
   }
   revalidatePath(`/projects/${parsed.data.slug}`);
+  await bestEffortResync(userId);
   revalidatePath("/skills");
   return {
     ok: true,
@@ -201,6 +254,7 @@ export async function linkSkillAction(
     return err(e instanceof Error ? e.message : "Could not link skill.");
   }
   revalidatePath(`/projects/${parsed.data.slug}`);
+  await bestEffortResync(userId);
   revalidatePath("/skills");
   return { ok: true, message: "Skill linked." };
 }
@@ -219,6 +273,7 @@ export async function unlinkSkillAction(
     return err(e instanceof Error ? e.message : "Could not unlink skill.");
   }
   revalidatePath(`/projects/${slug}`);
+  await bestEffortResync(userId);
   revalidatePath("/skills");
   return { ok: true, message: "Unlinked." };
 }
@@ -230,6 +285,7 @@ export async function createFromIdeaAction(fd: FormData): Promise<void> {
   const idea = JSON.parse(String(fd.get("idea"))) as ProjectIdea;
   const project = await createProjectFromIdea(userId, idea);
   revalidatePath("/projects");
+  await bestEffortResync(userId);
   revalidatePath("/skills");
   redirect(`/projects/${slugify(project.name)}`);
 }

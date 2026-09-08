@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUserId } from "@/lib/user";
+import { bestEffortResync } from "@/modules/knowledge/resync";
 import {
   createDsaProblem,
   createLearningSession,
@@ -62,6 +63,7 @@ export async function logSessionAction(
   } catch (e) {
     return err(e instanceof Error ? e.message : "Could not save session.");
   }
+  await bestEffortResync(userId);
   revalidatePath("/learning");
   revalidatePath("/skills");
   return { ok: true, message: "Learning session logged." };

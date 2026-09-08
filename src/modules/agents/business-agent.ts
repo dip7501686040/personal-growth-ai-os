@@ -6,7 +6,7 @@ import {
   titleExists,
   type OpportunityInput,
 } from "@/modules/business/service";
-import { getProofOfWork, linkEntityToSkills } from "@/modules/knowledge/entity-skill-links";
+import { getProofOfWork } from "@/modules/knowledge/entity-skill-links";
 import { resolveSkillIdsByName } from "@/modules/skills/service";
 import { BaseAgent } from "./base-agent";
 import { BusinessOpportunitiesSchema } from "./business-schema";
@@ -31,23 +31,6 @@ interface Context {
   /** "SkillName: shipped in 'Feature' (Project)" — real proof for the
    *  buildable-with skills, resolved name→id first (tech_stack is loose text). */
   proofOfWork: string[];
-}
-
-/** After a business opportunity is (re)persisted, refresh its skill/feature
- *  matches so the cross-module bridge (related content/learning) works from
- *  its detail page — the same "map it the same run it's created" pattern
- *  mapDocument and the career agent use. */
-async function linkOpportunity(
-  userId: string,
-  id: string,
-  o: { title: string; problem: string; proposedSolution: string; techStack?: string[] },
-): Promise<void> {
-  await linkEntityToSkills(
-    userId,
-    "business_opportunity",
-    id,
-    `${o.title}. ${o.problem} ${o.proposedSolution} ${(o.techStack ?? []).join(", ")}`,
-  );
 }
 
 const SYSTEM = `You are the Business Opportunity Agent for one senior backend/full-stack engineer who wants realistic side income.
@@ -206,8 +189,7 @@ export class BusinessAgent extends BaseAgent<Context, BusinessAgentResult> {
       const created: BusinessAgentResult["created"] = [];
       for (const opp of deterministicOpportunities(context)) {
         if (await titleExists(ctx.userId, opp.title)) continue;
-        const row = await createOpportunity(ctx.userId, { ...opp, agentRunId: ctx.agentRunId });
-        await linkOpportunity(ctx.userId, row.id, opp);
+        await createOpportunity(ctx.userId, { ...opp, agentRunId: ctx.agentRunId });
         created.push({
           title: opp.title,
           skillMatchScore: opp.skillMatchScore ?? 0,
@@ -239,7 +221,7 @@ export class BusinessAgent extends BaseAgent<Context, BusinessAgentResult> {
     const created: BusinessAgentResult["created"] = [];
     for (const o of data.opportunities) {
       if (await titleExists(ctx.userId, o.title)) continue;
-      const row = await createOpportunity(ctx.userId, {
+      await createOpportunity(ctx.userId, {
         title: o.title,
         problem: o.problem,
         targetCustomer: o.targetCustomer,
@@ -253,7 +235,6 @@ export class BusinessAgent extends BaseAgent<Context, BusinessAgentResult> {
         businessType: context.businessType || undefined,
         agentRunId: ctx.agentRunId,
       });
-      await linkOpportunity(ctx.userId, row.id, o);
       created.push({ title: o.title, skillMatchScore: o.skillMatchScore });
     }
 

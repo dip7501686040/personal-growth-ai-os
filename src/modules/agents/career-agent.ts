@@ -8,7 +8,7 @@ import {
   saveMatch,
   type MatchData,
 } from "@/modules/career/service";
-import { getProofOfWork, getRelatedEntities, linkEntityToSkills } from "@/modules/knowledge/entity-skill-links";
+import { getProofOfWork } from "@/modules/knowledge/entity-skill-links";
 import { listProjects } from "@/modules/projects/service";
 import { BaseAgent } from "./base-agent";
 import {
@@ -139,17 +139,10 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
     const opp = await getOpportunity(ctx.userId, opportunityId);
     if (!opp) throw new Error("Opportunity not found.");
 
-    // Refresh this opportunity's skill/feature matches the same run it's
-    // analyzed (mirrors mapDocument mapping a doc the same run it's created),
-    // so the cross-module bridge below reflects the current job text.
-    await linkEntityToSkills(
-      ctx.userId,
-      "career_opportunity",
-      opportunityId,
-      `${opp.opportunity.role} at ${opp.opportunity.company}. ${opp.opportunity.description}`,
-    );
-
-    const [skillRows, evRows, projectRows, pc, related] = await Promise.all([
+    // A career opportunity is a terminal output — it is NOT embedded or linked
+    // into the knowledge graph (skill-graph-manager Phase 6). The agent still
+    // pulls rich context below; it just never feeds its own conclusions back.
+    const [skillRows, evRows, projectRows, pc] = await Promise.all([
       db
         .select({
           id: skills.id,
@@ -175,9 +168,7 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
         userId: ctx.userId,
         purpose: "career_match",
         query: opp.opportunity.description.slice(0, 4000),
-        focusEntities: [{ targetType: "career_opportunity", targetId: opportunityId }],
       }),
-      getRelatedEntities(ctx.userId, "career_opportunity", opportunityId),
     ]);
 
     const proof = await getProofOfWork(ctx.userId, skillRows.map((s) => s.id));
@@ -186,7 +177,11 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
     );
     const byActivity = new Set(
       evRows
-        .filter((e) => e.sourceType === "activity_analysis")
+        .filter(
+          (e) =>
+            e.sourceType === "github_repo" ||
+            e.sourceType === "activity_analysis",
+        )
         .map((e) => e.skillId),
     );
 
@@ -210,10 +205,7 @@ export class CareerAgent extends BaseAgent<Context, CareerAgentResult> {
         skills: p.skillsCount,
       })),
       personal: pc.toPromptString(),
-      related: {
-        content: related.content.map((c) => `${c.title} [${c.status}]`),
-        learning: related.learning.map((l) => `${l.topic} (${l.category})`),
-      },
+      related: { content: [] as string[], learning: [] as string[] },
     };
   }
 

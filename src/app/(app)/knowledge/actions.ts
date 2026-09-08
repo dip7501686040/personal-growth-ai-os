@@ -23,7 +23,8 @@ import {
   updateJobPayload,
   type JobListItem,
 } from "@/modules/ingestion/queue";
-import { drainContextEvents } from "@/modules/ingestion/refresh";
+import { resyncKnowledge } from "@/modules/knowledge/resync";
+import { relinkDocument } from "@/modules/knowledge/mapping";
 import { KNOWLEDGE_TARGET_TYPES } from "@/modules/knowledge/target-types";
 
 const QUEUE_STATUSES = ["pending", "running", "failed"];
@@ -153,10 +154,22 @@ export async function uploadAction(
 
   try {
     const r = await ingestUpload({ userId, category, title, text });
+    // Extraction is off-cron now — drain a bit right away so an upload is
+    // usable without a second click (bounded; "Re-sync knowledge" finishes it).
+    let processed = 0;
+    for (let i = 0; i < 3; i++) {
+      if ((await countPendingJobs(userId)) === 0) break;
+      const run = await extractionAgent.run({ userId, trigger: "manual" });
+      if ((run.result as { skipped?: boolean } | null)?.skipped) break;
+      processed++;
+    }
     revalidatePath("/knowledge");
     return {
       ok: true,
-      message: `${r.enqueued} item(s) queued, ${r.deduped} already ingested. Run "Process queue".`,
+      message:
+        `${r.enqueued} item(s) queued, ${r.deduped} already ingested` +
+        (processed ? `; extracted ${processed} now` : "") +
+        `. Use "Re-sync knowledge" to finish + link.`,
     };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Upload failed" };
@@ -260,6 +273,7 @@ export async function updateDocumentAction(
   const { id, title, body } = parsed.data;
   try {
     const r = await updateKnowledgeDocument(userId, id, { title, body });
+    if (r.ok) await relinkDocument(userId, id).catch(() => {});
     revalidatePath("/knowledge");
     revalidatePath(`/knowledge/documents/${id}`);
     if (!r.ok) return { ok: false, message: "Document not found." };
@@ -319,7 +333,7 @@ export async function drainNowAction(): Promise<ActionState> {
     if ((run.result as { skipped?: boolean } | null)?.skipped) break;
     processed++;
   }
-  const kr = await drainContextEvents(userId);
+  const rk = await resyncKnowledge(userId, { full: true });
   revalidatePath("/knowledge");
   const left = await countPendingJobs(userId);
   return {
@@ -327,7 +341,7 @@ export async function drainNowAction(): Promise<ActionState> {
     message:
       `Processed ${processed} job(s)` +
       (left ? `, ${left} still queued` : "") +
-      `; refreshed ${kr.processed} internal change(s).`,
+      `; drained ${rk.events} change(s), re-mapped ${rk.remap.mapped} doc(s).`,
   };
 }
 

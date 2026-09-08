@@ -5,8 +5,11 @@ import { getAgentConsole, getLatestRun } from "@/modules/agents/runs";
 import type { ProjectAgentResult } from "@/modules/agents/project-agent";
 import { ProjectAgentPanel } from "@/components/projects/project-agent-panel";
 import { NewProjectDialog } from "@/components/projects/new-project-dialog";
+import { ExcludeToggle } from "@/components/shared/exclude-toggle";
+import { setProjectExcludedAction } from "@/app/(app)/projects/actions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Projects" };
 
@@ -21,7 +24,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "outline"> = {
 export default async function ProjectsPage() {
   const userId = await requireUserId();
   const [projects, run, agentConsole] = await Promise.all([
-    listProjects(userId),
+    listProjects(userId, { includeExcluded: true }),
     getLatestRun(userId, "project"),
     getAgentConsole(userId, "project"),
   ]);
@@ -60,13 +63,23 @@ export default async function ProjectsPage() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {projects.map((p) => (
-              <Link
+              <div
                 key={p.id}
-                href={`/projects/${p.slug}`}
-                className="rounded-lg border p-4 transition-colors hover:bg-muted/50"
+                className={cn(
+                  "rounded-lg border p-4",
+                  p.excludedAt && "bg-muted/30",
+                )}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium">{p.name}</span>
+                  <Link
+                    href={`/projects/${p.slug}`}
+                    className={cn(
+                      "font-medium hover:underline",
+                      p.excludedAt && "text-muted-foreground line-through",
+                    )}
+                  >
+                    {p.name}
+                  </Link>
                   <Badge variant={STATUS_VARIANT[p.status] ?? "outline"}>
                     {p.status}
                   </Badge>
@@ -76,11 +89,18 @@ export default async function ProjectsPage() {
                     {p.description}
                   </p>
                 )}
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {p.featuresDone}/{p.featuresTotal} features done ·{" "}
-                  {p.skillsCount} skill{p.skillsCount === 1 ? "" : "s"} linked
-                </p>
-              </Link>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    {p.featuresDone}/{p.featuresTotal} features done ·{" "}
+                    {p.skillsCount} skill{p.skillsCount === 1 ? "" : "s"} linked
+                  </p>
+                  <ExcludeToggle
+                    excluded={!!p.excludedAt}
+                    action={setProjectExcludedAction}
+                    actionArgs={{ id: p.id, slug: p.slug }}
+                  />
+                </div>
+              </div>
             ))}
           </div>
         )}

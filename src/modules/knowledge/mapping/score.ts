@@ -20,9 +20,7 @@ const RELATION_BY_TYPE: Record<
   skill: { matched: "demonstrates", default: "relevant_to" },
   project_feature: { matched: "demonstrates", default: "used_in" },
   learning_session: { matched: "evidence_for", default: "relevant_to" },
-  career_opportunity: { matched: "relevant_to", default: "relevant_to" },
   content_item: { matched: "relevant_to", default: "relevant_to" },
-  business_opportunity: { matched: "relevant_to", default: "relevant_to" },
 };
 
 /**

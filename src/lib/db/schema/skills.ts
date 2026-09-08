@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   check,
   index,
   integer,
@@ -28,20 +29,44 @@ export const skills = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     userId,
+    /** Canonical internal name — drives the slug, name-matching, and every
+     *  `*_skills` join. Read-only in the UI once created. */
     name: text("name").notNull(),
     slug: text("slug").notNull(),
+    /** Free display label the owner can rename without touching `name`/`slug`
+     *  or any link. NULL → fall back to `name`. */
+    label: text("label"),
+    /** One level of grouping only: a skill with `parentId` set is a child and
+     *  may not itself be a parent (enforced in `modules/skills/service.ts`).
+     *  Children are still independent skills for evidence + matching. */
+    parentId: uuid("parent_id").references((): AnyPgColumn => skills.id, {
+      onDelete: "set null",
+    }),
     category: skillCategoryEnum("category").notNull(),
     /** Derived from accepted evidence by the progression engine. */
     level: skillLevelEnum("level").notNull().default("interested"),
     confidence: integer("confidence").notNull().default(0),
     notes: text("notes"),
     lastActivityAt: timestamp("last_activity_at", { withTimezone: true }),
+    /**
+     * When set, this skill is "skipped" — excluded from every read that feeds
+     * AI, job search, proof-of-work, or public output. Only management UIs
+     * (the /skills page) see it. NULL = active. See docs/system-design.md
+     * §"Exclusion invariant".
+     */
+    excludedAt: timestamp("excluded_at", { withTimezone: true }),
     createdAt,
     updatedAt,
   },
   (t) => [
     uniqueIndex("skills_user_slug_idx").on(t.userId, t.slug),
     index("skills_user_category_idx").on(t.userId, t.category),
+    index("skills_user_active_idx")
+      .on(t.userId)
+      .where(sql`${t.excludedAt} is null`),
+    index("skills_parent_idx")
+      .on(t.parentId)
+      .where(sql`${t.parentId} is not null`),
     check("skills_confidence_range", sql`${t.confidence} between 0 and 100`),
   ],
 ).enableRLS();

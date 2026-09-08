@@ -8,12 +8,20 @@ import {
   SKILL_CATEGORIES,
   SKILL_LEVELS,
 } from "@/modules/skills/levels";
+import { bestEffortResync } from "@/modules/knowledge/resync";
 import {
   acceptAllSuggestedEvidence,
   addEvidence,
+  createChildSkill,
   createSkill,
+  getMergePreview,
+  mergeSkills,
   requestLevelChange,
   setEvidenceStatus,
+  setSkillExcluded,
+  setSkillParent,
+  updateSkillLabel,
+  type MergePreview,
 } from "@/modules/skills/service";
 
 export type ActionState = { ok: boolean; message: string } | null;
@@ -45,6 +53,7 @@ export async function createSkillAction(
   } catch (e) {
     return err(e instanceof Error ? e.message : "Could not add skill.");
   }
+  await bestEffortResync(userId);
   revalidatePath("/skills");
   return { ok: true, message: `Added "${parsed.data.name}".` };
 }
@@ -79,6 +88,7 @@ export async function changeLevelAction(
       parsed.data.justification,
     );
     revalidatePath(`/skills/${parsed.data.slug}`);
+    await bestEffortResync(userId);
     revalidatePath("/skills");
     revalidatePath("/approvals");
     return result.applied
@@ -133,6 +143,7 @@ export async function addEvidenceAction(
     return err(e instanceof Error ? e.message : "Could not add evidence.");
   }
   revalidatePath(`/skills/${parsed.data.slug}`);
+  await bestEffortResync(userId);
   revalidatePath("/skills");
   return { ok: true, message: "Evidence added." };
 }
@@ -163,6 +174,7 @@ export async function decideEvidenceAction(
     return err(e instanceof Error ? e.message : "Could not update evidence.");
   }
   revalidatePath(`/skills/${parsed.data.slug}`);
+  await bestEffortResync(userId);
   revalidatePath("/skills");
   return { ok: true, message: `Evidence ${parsed.data.decision}.` };
 }
@@ -173,11 +185,161 @@ export async function acceptAllEvidenceAction(): Promise<ActionState> {
   const userId = await requireUserId();
   try {
     const n = await acceptAllSuggestedEvidence(userId);
+    await bestEffortResync(userId);
     revalidatePath("/skills");
     return n > 0
       ? { ok: true, message: `Accepted ${n} evidence row${n === 1 ? "" : "s"}; levels recomputed.` }
       : { ok: true, message: "Nothing to accept." };
   } catch (e) {
     return err(e instanceof Error ? e.message : "Could not accept evidence.");
+  }
+}
+
+// ── Skip / un-skip a skill ────────────────────────────────────────────────
+
+const skillExcludedSchema = z.object({
+  skillId: z.uuid(),
+  excluded: z.boolean(),
+});
+
+export async function setSkillExcludedAction(
+  input: z.infer<typeof skillExcludedSchema>,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = skillExcludedSchema.safeParse(input);
+  if (!parsed.success) return err(parsed.error.issues[0].message);
+  try {
+    await setSkillExcluded(userId, parsed.data.skillId, parsed.data.excluded);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Could not update skill.");
+  }
+  await bestEffortResync(userId);
+  revalidatePath("/skills");
+  return {
+    ok: true,
+    message: parsed.data.excluded ? "Skill skipped." : "Skill back in use.",
+  };
+}
+
+// ── Label / parent / child / merge (Phase 4) ─────────────────────────────
+
+const labelSchema = z.object({
+  skillId: z.uuid(),
+  label: z.string().trim().max(80).nullable(),
+});
+
+export async function updateSkillLabelAction(
+  input: z.infer<typeof labelSchema>,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = labelSchema.safeParse(input);
+  if (!parsed.success) return err(parsed.error.issues[0].message);
+  try {
+    await updateSkillLabel(userId, parsed.data.skillId, parsed.data.label || null);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Could not rename.");
+  }
+  await bestEffortResync(userId);
+  revalidatePath("/skills");
+  return { ok: true, message: "Label updated." };
+}
+
+const parentSchema = z.object({
+  skillId: z.uuid(),
+  parentId: z.uuid().nullable(),
+});
+
+export async function setSkillParentAction(
+  input: z.infer<typeof parentSchema>,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = parentSchema.safeParse(input);
+  if (!parsed.success) return err(parsed.error.issues[0].message);
+  try {
+    await setSkillParent(userId, parsed.data.skillId, parsed.data.parentId);
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Could not group skill.");
+  }
+  await bestEffortResync(userId);
+  revalidatePath("/skills");
+  return {
+    ok: true,
+    message: parsed.data.parentId ? "Nested under parent." : "Moved to top level.",
+  };
+}
+
+const childSchema = z.object({
+  parentId: z.uuid(),
+  name: z.string().trim().min(1, "Name is required.").max(80),
+  label: z.string().trim().max(80).optional(),
+  category: z.enum(SKILL_CATEGORIES),
+});
+
+export async function createChildSkillAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = childSchema.safeParse({
+    parentId: formData.get("parentId"),
+    name: formData.get("name"),
+    label: formData.get("label") || undefined,
+    category: formData.get("category"),
+  });
+  if (!parsed.success) return err(parsed.error.issues[0].message);
+  try {
+    await createChildSkill(userId, parsed.data.parentId, {
+      name: parsed.data.name,
+      label: parsed.data.label,
+      category: parsed.data.category,
+    });
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Could not add child skill.");
+  }
+  await bestEffortResync(userId);
+  revalidatePath("/skills");
+  return { ok: true, message: `Added "${parsed.data.label || parsed.data.name}".` };
+}
+
+const mergeSchema = z.object({
+  targetId: z.uuid(),
+  sourceIds: z.array(z.uuid()).min(1),
+});
+
+export async function mergePreviewAction(
+  input: z.infer<typeof mergeSchema>,
+): Promise<{ ok: true; preview: MergePreview } | { ok: false; message: string }> {
+  const userId = await requireUserId();
+  const parsed = mergeSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0].message };
+  try {
+    const preview = await getMergePreview(
+      userId,
+      parsed.data.targetId,
+      parsed.data.sourceIds,
+    );
+    return { ok: true, preview };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : "Could not preview merge." };
+  }
+}
+
+export async function mergeSkillsAction(
+  input: z.infer<typeof mergeSchema>,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = mergeSchema.safeParse(input);
+  if (!parsed.success) return err(parsed.error.issues[0].message);
+  try {
+    const { merged } = await mergeSkills(
+      userId,
+      parsed.data.targetId,
+      parsed.data.sourceIds,
+    );
+    await bestEffortResync(userId);
+    revalidatePath("/skills");
+    return { ok: true, message: `Merged ${merged} skill${merged === 1 ? "" : "s"} in.` };
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Could not merge skills.");
   }
 }

@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { projectFeatures, projects, skills } from "@/lib/db/schema";
 import { type KnowledgeTargetType } from "../target-types";
@@ -135,30 +135,49 @@ export async function generateCandidates(
     upsert(targetType, targetId, { embedScore: sim });
   }
 
+  // Exclusion invariant: skipped skills / features (and every feature of a
+  // skipped project) never become knowledge-link candidates.
   const userSkills = await db
-    .select({ id: skills.id, name: skills.name })
+    .select({ id: skills.id, name: skills.name, label: skills.label })
     .from(skills)
-    .where(eq(skills.userId, userId));
+    .where(and(eq(skills.userId, userId), isNull(skills.excludedAt)));
   for (const s of userSkills) {
-    if (containsName(text, s.name)) upsert("skill", s.id, { nameMatch: s.name });
+    const hit =
+      (s.label && containsName(text, s.label) && s.label) ||
+      (containsName(text, s.name) && s.name);
+    if (hit) upsert("skill", s.id, { nameMatch: hit });
   }
 
   const userFeatures = await db
     .select({ id: projectFeatures.id, title: projectFeatures.title })
     .from(projectFeatures)
-    .where(eq(projectFeatures.userId, userId));
+    .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
+    .where(
+      and(
+        eq(projectFeatures.userId, userId),
+        isNull(projectFeatures.excludedAt),
+        isNull(projects.excludedAt),
+      ),
+    );
   for (const f of userFeatures) {
     if (containsName(text, f.title)) upsert("project_feature", f.id, { nameMatch: f.title });
   }
 
-  /** Every current feature of one project — used to fan a project-level
-   *  signal (shared source, repo-name match) out to the concrete things. */
+  /** Every current (non-skipped) feature of one non-skipped project — used to
+   *  fan a project-level signal (shared source, repo-name match) out to the
+   *  concrete things. */
   const featuresOfProject = (projectId: string) =>
     db
       .select({ id: projectFeatures.id })
       .from(projectFeatures)
+      .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
       .where(
-        and(eq(projectFeatures.userId, userId), eq(projectFeatures.projectId, projectId)),
+        and(
+          eq(projectFeatures.userId, userId),
+          eq(projectFeatures.projectId, projectId),
+          isNull(projectFeatures.excludedAt),
+          isNull(projects.excludedAt),
+        ),
       );
 
   if (doc.sourceKind === "internal" && doc.sourceRef) {
@@ -182,7 +201,7 @@ export async function generateCandidates(
       const userProjects = await db
         .select({ id: projects.id, name: projects.name, slug: projects.slug })
         .from(projects)
-        .where(eq(projects.userId, userId));
+        .where(and(eq(projects.userId, userId), isNull(projects.excludedAt)));
       for (const p of userProjects) {
         if (slugish(p.name) === shortSlug || slugish(p.slug) === shortSlug) {
           for (const f of await featuresOfProject(p.id)) {

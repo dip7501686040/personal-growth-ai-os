@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   contentItems,
@@ -71,9 +71,14 @@ export async function getPublicContent(userId: string): Promise<PublicContentIte
     );
   const skillIds = [...new Set(links.filter((l) => l.targetType === "skill").map((l) => l.targetId))];
   const featIds = [...new Set(links.filter((l) => l.targetType === "project_feature").map((l) => l.targetId))];
+  // exclusion invariant: a skipped skill / feature name never reaches the
+  // public portfolio, even via a published content item's links.
   const skillName = new Map(
     (skillIds.length
-      ? await db.select({ id: skills.id, name: skills.name }).from(skills).where(inArray(skills.id, skillIds))
+      ? await db
+          .select({ id: skills.id, name: skills.name })
+          .from(skills)
+          .where(and(inArray(skills.id, skillIds), isNull(skills.excludedAt)))
       : []
     ).map((s) => [s.id, s.name]),
   );
@@ -82,7 +87,14 @@ export async function getPublicContent(userId: string): Promise<PublicContentIte
       ? await db
           .select({ id: projectFeatures.id, title: projectFeatures.title })
           .from(projectFeatures)
-          .where(inArray(projectFeatures.id, featIds))
+          .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
+          .where(
+            and(
+              inArray(projectFeatures.id, featIds),
+              isNull(projectFeatures.excludedAt),
+              isNull(projects.excludedAt),
+            ),
+          )
       : []
     ).map((f) => [f.id, f.title]),
   );
@@ -130,6 +142,8 @@ export async function getPublicFeatures(userId: string): Promise<PublicFeature[]
         eq(projects.userId, userId),
         eq(projects.isPublic, true),
         eq(projectFeatures.status, "done"),
+        isNull(projects.excludedAt),
+        isNull(projectFeatures.excludedAt),
       ),
     );
 

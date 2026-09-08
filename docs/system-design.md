@@ -132,6 +132,25 @@ Code activity alone can only produce a `suggested` evidence row supporting
 `IMPLEMENTED`; nothing auto-promotes. Ambiguous changes (conflicting signals, a
 ≥2-level jump) create a `promote_skill` approval instead of applying.
 
+### Exclusion invariant ("skip" switch)
+
+`skills`, `projects`, and `project_features` each carry a nullable `excluded_at`.
+When set, the row is **skipped**: it must not appear in any read that feeds an
+agent's context, job search / `get_proof_for_jd`, proof-of-work, or the public
+portfolio API. A feature is also skipped when its project is.
+
+- **Every such read filters `excluded_at IS NULL`** (features additionally
+  require `projects.excluded_at IS NULL`). Enforced in: `matchSkillsAndFeatures`
+  + `generateCandidates` (the entity matchers), `getProofOfWork` / `getProofForJd`,
+  `context/structured.ts`, `fetchEntities` (so a skipped row is never embedded),
+  `modules/public/service.ts`, and `list_skills` (MCP + `listSkills`).
+- **Only management UIs see skipped rows** — `listSkills(userId, { includeExcluded: true })`
+  on the `/skills` page, and the `/projects` pages. Nothing else passes the flag.
+- On skip, `setSkillExcluded` / `setFeatureExcluded` also delete the row's cached
+  graph edges (`entity_embeddings`, not-yet-reviewed `knowledge_links`, and for a
+  skill its `entity_skill_links`) so a stale kNN hit can't leak it. Un-skip
+  relies on the next embedding backfill / `/sync-repo` to rebuild them.
+
 ---
 
 ## 6. Human-in-the-loop

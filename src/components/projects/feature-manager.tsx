@@ -7,11 +7,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
 import { useActionToast } from "@/components/use-action-toast";
 import { SkillLinker } from "@/components/projects/skill-linker";
+import { ExcludeToggle } from "@/components/shared/exclude-toggle";
 import {
   addFeatureAction,
+  setFeatureExcludedAction,
   setFeatureStatusAction,
   type ActionState,
 } from "@/app/(app)/projects/actions";
+import { cn } from "@/lib/utils";
 import type { FeatureWithSkills } from "@/modules/projects/service";
 
 function FeatureRow({
@@ -32,30 +35,44 @@ function FeatureRow({
   useActionToast(state);
 
   return (
-    <li className="rounded-lg border p-3">
+    <li className={cn("rounded-lg border p-3", feature.excludedAt && "bg-muted/30")}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium">{feature.title}</p>
+          <p
+            className={cn(
+              "font-medium",
+              feature.excludedAt && "text-muted-foreground line-through",
+            )}
+          >
+            {feature.title}
+          </p>
           {feature.description && (
             <p className="text-sm text-muted-foreground">
               {feature.description}
             </p>
           )}
         </div>
-        <form action={formAction} className="shrink-0">
-          <input type="hidden" name="featureId" value={feature.id} />
-          <input type="hidden" name="slug" value={slug} />
-          <NativeSelect
-            name="status"
-            defaultValue={feature.status}
-            className="w-36"
-            onChange={(e) => e.currentTarget.form?.requestSubmit()}
-          >
-            <option value="planned">planned</option>
-            <option value="in_progress">in progress</option>
-            <option value="done">done</option>
-          </NativeSelect>
-        </form>
+        <div className="flex shrink-0 items-center gap-3">
+          <ExcludeToggle
+            excluded={!!feature.excludedAt}
+            action={setFeatureExcludedAction}
+            actionArgs={{ id: feature.id, slug }}
+          />
+          <form action={formAction}>
+            <input type="hidden" name="featureId" value={feature.id} />
+            <input type="hidden" name="slug" value={slug} />
+            <NativeSelect
+              name="status"
+              defaultValue={feature.status}
+              className="w-36"
+              onChange={(e) => e.currentTarget.form?.requestSubmit()}
+            >
+              <option value="planned">planned</option>
+              <option value="in_progress">in progress</option>
+              <option value="done">done</option>
+            </NativeSelect>
+          </form>
+        </div>
       </div>
 
       <div className="mt-3">

@@ -106,10 +106,11 @@ server.registerTool(
     const skills = await listSkills(userId);
     const rows = (level ? skills.filter((s) => s.level === level) : skills).map(
       (s) => ({
-        name: s.name,
+        name: s.label ?? s.name,
         level: s.level,
         category: s.category,
         confidence: s.confidence,
+        ...(s.parentId ? { child: true } : {}),
       }),
     );
     return text(JSON.stringify(rows, null, 2));

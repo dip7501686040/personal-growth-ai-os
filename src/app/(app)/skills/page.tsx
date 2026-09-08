@@ -1,15 +1,11 @@
-import Link from "next/link";
 import { requireUserId } from "@/lib/user";
 import { countSuggestedEvidence, listSkills } from "@/modules/skills/service";
-import {
-  CATEGORY_LABEL,
-  SKILL_CATEGORIES,
-  SKILL_LEVELS,
-  type SkillCategory,
-} from "@/modules/skills/levels";
+import type { SkillWithCounts } from "@/modules/skills/service";
+import { SKILL_CATEGORIES, SKILL_LEVELS } from "@/modules/skills/levels";
 import { AcceptAllEvidence } from "@/components/skills/accept-all-evidence";
 import { LevelBadge } from "@/components/skills/level-badge";
 import { AddSkillDialog } from "@/components/skills/add-skill-dialog";
+import { SkillManager } from "@/components/skills/skill-manager";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const metadata = { title: "Skills" };
@@ -17,19 +13,34 @@ export const metadata = { title: "Skills" };
 export default async function SkillsPage() {
   const userId = await requireUserId();
   const [skills, suggestedCount] = await Promise.all([
-    listSkills(userId),
+    listSkills(userId, { includeExcluded: true }),
     countSuggestedEvidence(userId),
   ]);
 
   const byLevel = SKILL_LEVELS.map((lvl) => ({
     level: lvl,
-    count: skills.filter((s) => s.level === lvl).length,
+    count: skills.filter((s) => s.level === lvl && !s.parentId).length,
   }));
 
-  const grouped = SKILL_CATEGORIES.map((cat) => ({
-    category: cat as SkillCategory,
-    items: skills.filter((s) => s.category === cat),
-  })).filter((g) => g.items.length > 0);
+  // Build the one-level tree: roots grouped by category, children nested under
+  // their parent regardless of the child's own category.
+  const childrenOf = new Map<string, SkillWithCounts[]>();
+  for (const s of skills) {
+    if (s.parentId) {
+      const arr = childrenOf.get(s.parentId) ?? [];
+      arr.push(s);
+      childrenOf.set(s.parentId, arr);
+    }
+  }
+  const roots = skills.filter((s) => !s.parentId);
+  const groups = SKILL_CATEGORIES.map((category) => ({
+    category,
+    roots: roots
+      .filter((r) => r.category === category)
+      .map((r) => ({ ...r, children: childrenOf.get(r.id) ?? [] })),
+  })).filter((g) => g.roots.length > 0);
+
+  const rootChoices = roots.map((r) => ({ id: r.id, label: r.label ?? r.name }));
 
   return (
     <div className="flex flex-col gap-6">
@@ -62,43 +73,12 @@ export default async function SkillsPage() {
                 className="inline-flex items-center gap-1.5 rounded-md border bg-card px-2.5 py-1 text-xs"
               >
                 <LevelBadge level={level} />
-                <span className="tabular-nums text-muted-foreground">
-                  {count}
-                </span>
+                <span className="tabular-nums text-muted-foreground">{count}</span>
               </span>
             ))}
           </div>
 
-          <div className="flex flex-col gap-8">
-            {grouped.map(({ category, items }) => (
-              <section key={category} className="flex flex-col gap-3">
-                <h2 className="text-sm font-semibold text-muted-foreground">
-                  {CATEGORY_LABEL[category]}
-                </h2>
-                <div className="divide-y rounded-lg border">
-                  {items.map((s) => (
-                    <Link
-                      key={s.id}
-                      href={`/skills/${s.slug}`}
-                      className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{s.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {s.acceptedCount} accepted
-                          {s.suggestedCount > 0
-                            ? ` · ${s.suggestedCount} to review`
-                            : ""}
-                          {" · "}confidence {s.confidence}
-                        </p>
-                      </div>
-                      <LevelBadge level={s.level} />
-                    </Link>
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
+          <SkillManager groups={groups} rootChoices={rootChoices} />
         </>
       )}
     </div>

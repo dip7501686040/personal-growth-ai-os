@@ -1,6 +1,8 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  entityEmbeddings,
+  knowledgeLinks,
   projectFeatures,
   projectSkills,
   projects,
@@ -26,7 +28,16 @@ export type ProjectListItem = Project & {
   skillsCount: number;
 };
 
-export async function listProjects(userId: string): Promise<ProjectListItem[]> {
+/**
+ * @param opts.includeExcluded  include "skipped" projects (`excluded_at` set).
+ *   Default false — only management UIs (`/projects`) pass true; every read
+ *   that feeds an agent uses the default. See docs/system-design.md
+ *   §"Exclusion invariant".
+ */
+export async function listProjects(
+  userId: string,
+  opts?: { includeExcluded?: boolean },
+): Promise<ProjectListItem[]> {
   const rows = await db
     .select({
       project: projects,
@@ -37,7 +48,12 @@ export async function listProjects(userId: string): Promise<ProjectListItem[]> {
     .from(projects)
     .leftJoin(projectFeatures, eq(projectFeatures.projectId, projects.id))
     .leftJoin(projectSkills, eq(projectSkills.projectId, projects.id))
-    .where(eq(projects.userId, userId))
+    .where(
+      and(
+        eq(projects.userId, userId),
+        opts?.includeExcluded ? undefined : sql`${projects.excludedAt} is null`,
+      ),
+    )
     .groupBy(projects.id)
     .orderBy(desc(projects.updatedAt));
 
@@ -259,6 +275,91 @@ export async function deleteProject(
   for (const skillId of new Set(affected)) {
     await recomputeSkill(userId, skillId);
   }
+}
+
+/** Purge a feature's cached graph edges so a skip can't leak via a stale kNN
+ *  hit. On un-skip the next embedding backfill / `/sync-repo` rebuilds them. */
+async function purgeFeatureGraphRefs(
+  userId: string,
+  featureId: string,
+): Promise<void> {
+  await db
+    .delete(entityEmbeddings)
+    .where(
+      and(
+        eq(entityEmbeddings.userId, userId),
+        eq(entityEmbeddings.targetType, "project_feature"),
+        eq(entityEmbeddings.targetId, featureId),
+      ),
+    );
+  await db
+    .delete(knowledgeLinks)
+    .where(
+      and(
+        eq(knowledgeLinks.userId, userId),
+        eq(knowledgeLinks.targetType, "project_feature"),
+        eq(knowledgeLinks.targetId, featureId),
+        eq(knowledgeLinks.status, "suggested"),
+      ),
+    );
+}
+
+/**
+ * "Skip" / un-skip a whole project — excludes the project AND every one of its
+ * features from every read that feeds AI, job search, proof, or public output.
+ * See docs/system-design.md §"Exclusion invariant".
+ */
+export async function setProjectExcluded(
+  userId: string,
+  projectId: string,
+  excluded: boolean,
+): Promise<void> {
+  const [row] = await db
+    .update(projects)
+    .set({ excludedAt: excluded ? new Date() : null, updatedAt: new Date() })
+    .where(and(eq(projects.userId, userId), eq(projects.id, projectId)))
+    .returning({ id: projects.id });
+  if (!row) throw new Error("Project not found.");
+
+  if (excluded) {
+    const featureIds = (
+      await db
+        .select({ id: projectFeatures.id })
+        .from(projectFeatures)
+        .where(eq(projectFeatures.projectId, projectId))
+    ).map((r) => r.id);
+    for (const fid of featureIds) await purgeFeatureGraphRefs(userId, fid);
+  }
+
+  await recordContextEvent({
+    userId,
+    kind: "project_updated",
+    refId: projectId,
+    payload: { excluded },
+  });
+}
+
+/** "Skip" / un-skip a single feature. */
+export async function setFeatureExcluded(
+  userId: string,
+  featureId: string,
+  excluded: boolean,
+): Promise<void> {
+  const [row] = await db
+    .update(projectFeatures)
+    .set({ excludedAt: excluded ? new Date() : null })
+    .where(and(eq(projectFeatures.userId, userId), eq(projectFeatures.id, featureId)))
+    .returning({ id: projectFeatures.id, projectId: projectFeatures.projectId });
+  if (!row) throw new Error("Feature not found.");
+
+  if (excluded) await purgeFeatureGraphRefs(userId, featureId);
+
+  await recordContextEvent({
+    userId,
+    kind: "project_updated",
+    refId: row.projectId,
+    payload: { featureExcluded: excluded },
+  });
 }
 
 export async function addFeature(
@@ -504,7 +605,7 @@ export async function getProjectSnapshot(userId: string) {
     db
       .select({ id: skills.id, name: skills.name, level: skills.level, category: skills.category })
       .from(skills)
-      .where(eq(skills.userId, userId)),
+      .where(and(eq(skills.userId, userId), sql`${skills.excludedAt} is null`)),
     db
       .select({ skillId: skillEvidence.skillId })
       .from(skillEvidence)

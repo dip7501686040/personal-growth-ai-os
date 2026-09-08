@@ -8,11 +8,11 @@ import { cn } from "@/lib/utils";
 import { TARGET_TYPE_LABEL } from "@/modules/knowledge/target-types";
 import type { ModuleFacet, SkillFacet } from "@/lib/knowledge";
 
+// career_opportunity / business_opportunity dropped in skill-graph-manager
+// Phase 6 (terminal outputs, no longer linked).
 const MODULE_TYPES = [
   "project_feature",
-  "career_opportunity",
   "content_item",
-  "business_opportunity",
   "learning_session",
 ] as const;
 
@@ -137,7 +137,7 @@ export function DocumentFilters({
                     : "border-border text-muted-foreground hover:bg-muted",
                 )}
               >
-                {TARGET_TYPE_LABEL[t]} · {moduleCount.get(t)}
+                {TARGET_TYPE_LABEL[t] ?? t} · {moduleCount.get(t)}
               </button>
             );
           })}

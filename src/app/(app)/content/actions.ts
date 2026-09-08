@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { requireUserId } from "@/lib/user";
+import { purgePolymorphicRefs, resyncEntity } from "@/modules/knowledge/resync";
 import { createApproval, listApprovals } from "@/modules/approvals/service";
 import {
   createIdea,
@@ -73,6 +74,17 @@ export async function updateContentAction(
   if (!parsed.success) return err(parsed.error.issues[0].message);
   const { id, ...patch } = parsed.data;
   await updateContentItem(userId, id, patch);
+  const after = await getContentItem(userId, id);
+  if (after?.item.status === "published") {
+    await resyncEntity(
+      userId,
+      "content_item",
+      id,
+      [after.item.title, after.item.hook, after.item.angle].filter(Boolean).join(". "),
+    );
+  } else {
+    await purgePolymorphicRefs(userId, "content_item", id);
+  }
   revalidatePath(`/content/${id}`);
   revalidatePath("/content");
   return { ok: true, message: "Saved." };
@@ -81,6 +93,7 @@ export async function updateContentAction(
 export async function deleteContentAction(fd: FormData): Promise<void> {
   const userId = await requireUserId();
   const id = z.uuid().parse(fd.get("id"));
+  await purgePolymorphicRefs(userId, "content_item", id);
   await deleteContentItem(userId, id);
   revalidatePath("/content");
   redirect("/content");
@@ -133,6 +146,15 @@ export async function markPublishedAction(
   const id = z.uuid().safeParse(fd.get("id"));
   if (!id.success) return err("Bad id.");
   await updateContentItem(userId, id.data, { status: "published" });
+  const pub = await getContentItem(userId, id.data);
+  if (pub) {
+    await resyncEntity(
+      userId,
+      "content_item",
+      id.data,
+      [pub.item.title, pub.item.hook, pub.item.angle].filter(Boolean).join(". "),
+    );
+  }
   revalidatePath("/content");
   revalidatePath(`/content/${id.data}`);
   return { ok: true, message: "Marked published." };

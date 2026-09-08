@@ -41,10 +41,18 @@ export const projects = pgTable(
     /** When true, this project's `done` features are served by the public
      *  proof API (`/api/public/features`) for the portfolio site (J6). */
     isPublic: boolean("is_public").notNull().default(false),
+    /** "Skipped" — excludes the project AND all its features from every read
+     *  that feeds AI, job search, proof, or public output. NULL = active. */
+    excludedAt: timestamp("excluded_at", { withTimezone: true }),
     createdAt,
     updatedAt,
   },
-  (t) => [uniqueIndex("projects_user_slug_idx").on(t.userId, t.slug)],
+  (t) => [
+    uniqueIndex("projects_user_slug_idx").on(t.userId, t.slug),
+    index("projects_user_active_idx")
+      .on(t.userId)
+      .where(sql`${t.excludedAt} is null`),
+  ],
 ).enableRLS();
 
 export const projectFeatures = pgTable(
@@ -69,10 +77,17 @@ export const projectFeatures = pgTable(
     sourceKey: text("source_key"),
     /** Last `/sync-repo` run that still detected this feature in the repo. */
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    /** "Skipped" — excludes this feature from every read that feeds AI, job
+     *  search, proof, or public output (a feature is also effectively skipped
+     *  when its project is). NULL = active. */
+    excludedAt: timestamp("excluded_at", { withTimezone: true }),
     createdAt,
   },
   (t) => [
     index("project_features_project_idx").on(t.projectId),
+    index("project_features_user_active_idx")
+      .on(t.userId)
+      .where(sql`${t.excludedAt} is null`),
     uniqueIndex("project_features_source_key_idx")
       .on(t.userId, t.sourceKey)
       .where(sql`${t.sourceKey} is not null`),

@@ -9,12 +9,19 @@
  * own `category`. Kept as a TS const so app code gets a real union type
  * without re-deriving it from Drizzle's enum column metadata everywhere.
  */
+/**
+ * `career_opportunity` and `business_opportunity` were removed here in
+ * skill-graph-manager Phase 6: they are terminal *outputs* the app derives
+ * from skills/features/knowledge, so feeding them back in was a
+ * self-referential loop. Only `content_item` (and only once **published** — a
+ * real external artifact) still enters the graph among the derived types.
+ * The DB enum keeps the values for legacy rows; a one-time migration purged
+ * this user's.
+ */
 export const KNOWLEDGE_TARGET_TYPES = [
   "skill",
   "project_feature",
-  "career_opportunity",
   "content_item",
-  "business_opportunity",
   "learning_session",
 ] as const;
 
@@ -23,9 +30,7 @@ export type KnowledgeTargetType = (typeof KNOWLEDGE_TARGET_TYPES)[number];
 export const TARGET_TYPE_LABEL: Record<KnowledgeTargetType, string> = {
   skill: "Skill",
   project_feature: "Project feature",
-  career_opportunity: "Career opportunity",
   content_item: "Content",
-  business_opportunity: "Business opportunity",
   learning_session: "Learning session",
 };
 
@@ -33,9 +38,7 @@ export const TARGET_TYPE_LABEL: Record<KnowledgeTargetType, string> = {
 export const TARGET_TYPE_AGENT: Record<KnowledgeTargetType, string> = {
   skill: "learning",
   project_feature: "project",
-  career_opportunity: "career",
   content_item: "content",
-  business_opportunity: "business",
   learning_session: "learning",
 };
 

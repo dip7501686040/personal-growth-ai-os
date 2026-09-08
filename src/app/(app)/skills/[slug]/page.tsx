@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/user";
-import { getSkillBySlug } from "@/modules/skills/service";
+import { getSkillBySlug, listSkills } from "@/modules/skills/service";
 import { deriveLevel } from "@/modules/skills/progression";
 import { CATEGORY_LABEL, LEVEL_LABEL } from "@/modules/skills/levels";
 import { LevelBadge } from "@/components/skills/level-badge";
 import { ChangeLevelForm } from "@/components/skills/change-level-form";
 import { AddEvidenceForm } from "@/components/skills/add-evidence-form";
 import { EvidenceList } from "@/components/skills/evidence-list";
+import { SkillOrganize } from "@/components/skills/skill-organize";
 import {
   Card,
   CardContent,
@@ -31,10 +32,17 @@ export default async function SkillDetailPage({
 }) {
   const { slug } = await params;
   const userId = await requireUserId();
-  const data = await getSkillBySlug(userId, slug);
+  const [data, allSkills] = await Promise.all([
+    getSkillBySlug(userId, slug),
+    listSkills(userId, { includeExcluded: true }),
+  ]);
   if (!data) notFound();
 
   const { skill, evidence } = data;
+  const hasChildren = allSkills.some((s) => s.parentId === skill.id);
+  const organizeChoices = allSkills
+    .filter((s) => s.id !== skill.id && !s.parentId)
+    .map((s) => ({ id: s.id, label: s.label ?? s.name }));
   const accepted = evidence.filter((e) => e.status === "accepted");
   const derived = deriveLevel(
     accepted.map((e) => ({
@@ -56,10 +64,15 @@ export default async function SkillDetailPage({
           ← Skills
         </Link>
         <div className="mt-2 flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{skill.name}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {skill.label ?? skill.name}
+          </h1>
           <LevelBadge level={skill.level} />
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
+          {skill.label && skill.label !== skill.name
+            ? `internal name: ${skill.name} · `
+            : ""}
           {CATEGORY_LABEL[skill.category]} · confidence {skill.confidence}
           {skill.notes ? ` · ${skill.notes}` : ""}
         </p>
@@ -105,6 +118,22 @@ export default async function SkillDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Organize</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SkillOrganize
+            skillId={skill.id}
+            name={skill.name}
+            label={skill.label}
+            parentId={skill.parentId}
+            hasChildren={hasChildren}
+            choices={organizeChoices}
+          />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

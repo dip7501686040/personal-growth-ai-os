@@ -17,6 +17,7 @@ import { slugify } from "@/lib/slug";
 import { recordContextEvent } from "@/modules/context/events";
 import { backfillEntityEmbeddings } from "@/modules/knowledge/entities";
 import { mapDocument } from "@/modules/knowledge/mapping";
+import { resyncKnowledge } from "@/modules/knowledge/resync";
 import type { SkillCategory } from "@/modules/skills/levels";
 
 type FeatureStatus = "planned" | "in_progress" | "done";
@@ -500,6 +501,18 @@ export async function applySyncProposal(
     kind: "project_updated",
     refId: projectId,
   });
+
+  // Fold this run's changes through the knowledge base now — drain the outbox,
+  // re-embed touched skills/features, re-map anything that could now match.
+  // Best-effort: a failure just leaves the outbox for the next resync.
+  try {
+    await resyncKnowledge(userId);
+  } catch (err) {
+    console.warn(
+      "[applySyncProposal] resyncKnowledge skipped:",
+      err instanceof Error ? err.message : err,
+    );
+  }
 
   return {
     project: { id: projectId, slug, statusBefore, statusAfter },

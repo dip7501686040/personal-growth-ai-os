@@ -1,4 +1,4 @@
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   contentItems,
@@ -120,12 +120,18 @@ export async function getProofForJd(
     ? await db
         .select({
           id: skills.id,
-          name: skills.name,
+          name: sql<string>`coalesce(${skills.label}, ${skills.name})`,
           level: skills.level,
           category: skills.category,
         })
         .from(skills)
-        .where(and(eq(skills.userId, userId), inArray(skills.id, skillIds)))
+        .where(
+          and(
+            eq(skills.userId, userId),
+            inArray(skills.id, skillIds),
+            isNull(skills.excludedAt),
+          ),
+        )
     : [];
 
   const proofMap = await getProofOfWork(userId, skillIds);
@@ -153,6 +159,8 @@ export async function getProofForJd(
         and(
           eq(projectFeatures.userId, userId),
           inArray(projectFeatures.id, [...allFeatureIds]),
+          isNull(projectFeatures.excludedAt),
+          isNull(projects.excludedAt),
         ),
       );
     for (const r of rows) {
@@ -199,10 +207,13 @@ export async function getProofForJd(
           status: projectFeatures.status,
         })
         .from(projectFeatures)
+        .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
         .where(
           and(
             eq(projectFeatures.userId, userId),
             inArray(projectFeatures.id, directFeatureIds),
+            isNull(projectFeatures.excludedAt),
+            isNull(projects.excludedAt),
           ),
         )
     : [];
@@ -252,6 +263,8 @@ export async function getProofForJd(
         and(
           eq(entitySkillLinks.userId, userId),
           eq(entitySkillLinks.sourceType, "content_item"),
+          // only real published artifacts are proof (Phase 6)
+          eq(contentItems.status, "published"),
           or(...targetConds),
         ),
       );

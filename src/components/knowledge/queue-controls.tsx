@@ -11,8 +11,10 @@ import type { AgentConsoleData } from "@/modules/agents/runs";
  * Queue processing for the Knowledge page.
  * - Primary: the shared agent run console for `extractor` — one queued job per
  *   click, streaming its LangGraph steps live (same UX as every other agent).
- * - Secondary: "Process all (no log)" runs the bounded server drain
- *   (`drainNowAction`) which also refreshes internal context events.
+ * - Secondary: "Re-sync knowledge" runs the bounded server drain
+ *   (`drainNowAction`) — extract a few queued items, then a full
+ *   `resyncKnowledge` (drain the outbox, re-embed entities, re-map every doc).
+ *   This is the manual catch-up now that no cron does it.
  *
  * Combining duplicate queue items is handled by <QueueList> (per-row selection).
  */
@@ -51,13 +53,14 @@ export function QueueControls({
           disabled={pending}
           className="text-muted-foreground"
         >
-          {pending ? "Processing…" : "Process all (no log)"}
+          {pending ? "Re-syncing…" : "Re-sync knowledge"}
         </Button>
       </form>
       <p className="text-xs text-muted-foreground">
         &ldquo;Process queue now&rdquo; extracts one queued item and streams its
-        steps. &ldquo;Process all&rdquo; drains up to 3 items and refreshes
-        context from recent app activity — no live log.
+        steps. &ldquo;Re-sync knowledge&rdquo; drains a few queued items then
+        re-embeds entities and re-maps every document — the manual catch-up
+        (nothing runs on a schedule any more).
       </p>
     </div>
   );

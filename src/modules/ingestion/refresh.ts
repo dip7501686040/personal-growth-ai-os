@@ -1,7 +1,6 @@
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  activityAnalyses,
   contextEvents,
   learningSessions,
   projectFeatures,
@@ -112,26 +111,8 @@ async function specFor(
     };
   }
 
-  if (ev.kind === "activity_analyzed") {
-    const [a] = await db
-      .select()
-      .from(activityAnalyses)
-      .where(
-        and(
-          eq(activityAnalyses.userId, userId),
-          eq(activityAnalyses.id, ev.refId),
-        ),
-      )
-      .limit(1);
-    if (!a) return null;
-    return {
-      docType: "learning",
-      title: `Dev activity ${a.analysisDate}`,
-      body: `${a.summary}\nWork: ${JSON.stringify(a.workCategories)}`,
-      sourceRef: `activity_analysis:${a.id}`,
-    };
-  }
-
+  // `activity_analyzed` was retired (skill-graph-manager Phase 1); its context
+  // events no longer occur.
   return null;
 }
 

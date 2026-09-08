@@ -1,10 +1,69 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { projectFeatures, skills } from "@/lib/db/schema";
+import { projectFeatures, projects, skills } from "@/lib/db/schema";
 import { getEmbeddingProvider } from "@/lib/embeddings";
 import { DECISION_TARGET_TYPES } from "../target-types";
 import { containsName, embeddingCandidates, type RawCandidate } from "./candidates";
 import { scoreCandidate, SCORE_FLOOR, type ScoredCandidate } from "./score";
+
+/**
+ * Drop any candidate whose skill / project_feature is "skipped" (`excluded_at`
+ * set — a feature also counts as skipped when its project is). Covers every
+ * signal at once: embedding kNN (whose `entity_embeddings` rows can lag an
+ * exclusion), literal name match, and shared-source. See the exclusion
+ * invariant in docs/system-design.md.
+ */
+async function dropExcluded(
+  userId: string,
+  candidates: ScoredCandidate[],
+): Promise<ScoredCandidate[]> {
+  const skillIds = candidates.filter((c) => c.targetType === "skill").map((c) => c.targetId);
+  const featureIds = candidates
+    .filter((c) => c.targetType === "project_feature")
+    .map((c) => c.targetId);
+
+  const activeSkills = skillIds.length
+    ? new Set(
+        (
+          await db
+            .select({ id: skills.id })
+            .from(skills)
+            .where(
+              and(
+                eq(skills.userId, userId),
+                inArray(skills.id, skillIds),
+                isNull(skills.excludedAt),
+              ),
+            )
+        ).map((r) => r.id),
+      )
+    : new Set<string>();
+
+  const activeFeatures = featureIds.length
+    ? new Set(
+        (
+          await db
+            .select({ id: projectFeatures.id })
+            .from(projectFeatures)
+            .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
+            .where(
+              and(
+                eq(projectFeatures.userId, userId),
+                inArray(projectFeatures.id, featureIds),
+                isNull(projectFeatures.excludedAt),
+                isNull(projects.excludedAt),
+              ),
+            )
+        ).map((r) => r.id),
+      )
+    : new Set<string>();
+
+  return candidates.filter((c) =>
+    c.targetType === "skill"
+      ? activeSkills.has(c.targetId)
+      : activeFeatures.has(c.targetId),
+  );
+}
 
 /**
  * The same three-signal match `generateCandidates` runs for a knowledge
@@ -72,26 +131,39 @@ export async function matchSkillsAndFeatures(
   }
 
   const userSkills = await db
-    .select({ id: skills.id, name: skills.name })
+    .select({ id: skills.id, name: skills.name, label: skills.label })
     .from(skills)
-    .where(eq(skills.userId, userId));
+    .where(and(eq(skills.userId, userId), isNull(skills.excludedAt)));
   for (const s of userSkills) {
-    if (containsName(text, s.name)) upsert("skill", s.id, { nameMatch: s.name });
+    const hit =
+      (s.label && containsName(text, s.label) && s.label) ||
+      (containsName(text, s.name) && s.name);
+    if (hit) upsert("skill", s.id, { nameMatch: hit });
   }
 
   const userFeatures = await db
     .select({ id: projectFeatures.id, title: projectFeatures.title })
     .from(projectFeatures)
-    .where(eq(projectFeatures.userId, userId));
+    .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
+    .where(
+      and(
+        eq(projectFeatures.userId, userId),
+        isNull(projectFeatures.excludedAt),
+        isNull(projects.excludedAt),
+      ),
+    );
   for (const f of userFeatures) {
     if (containsName(text, f.title)) upsert("project_feature", f.id, { nameMatch: f.title });
   }
 
-  return [...byKey.values()]
+  const scored = [...byKey.values()]
     .map(scoreCandidate)
     .filter(
       (c) =>
         c.score >= SCORE_FLOOR ||
         (opts?.keepNameMatches === true && !!c.nameMatch),
     );
+  // Name matches are already exclusion-filtered above; this second pass covers
+  // embedding-kNN hits whose entity_embeddings row can lag an exclusion.
+  return dropExcluded(userId, scored);
 }

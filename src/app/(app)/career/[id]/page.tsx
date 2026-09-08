@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUserId } from "@/lib/user";
 import { getOpportunity } from "@/modules/career/service";
 import { listApprovals } from "@/modules/approvals/service";
-import { getProofOfWorkByNames, getRelatedEntities } from "@/modules/knowledge/entity-skill-links";
+import { getProofOfWorkByNames } from "@/modules/knowledge/entity-skill-links";
 import { MatchReport } from "@/components/career/match-report";
 import { OpportunityActions } from "@/components/career/opportunity-actions";
 import { ProofOfWorkCard } from "@/components/knowledge/proof-of-work-card";
@@ -55,10 +55,8 @@ export default async function OpportunityPage({
         ...((match.implementedMatches ?? []) as string[]),
       ]
     : [];
-  const [proof, related] = await Promise.all([
-    getProofOfWorkByNames(userId, matchedSkillNames),
-    getRelatedEntities(userId, "career_opportunity", id),
-  ]);
+  const proof = await getProofOfWorkByNames(userId, matchedSkillNames);
+  const related = { content: [], learning: [] };
 
   return (
     <div className="flex flex-col gap-6">

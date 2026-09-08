@@ -1,4 +1,4 @@
-import { and, eq, inArray, or } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   contentItems,
@@ -13,10 +13,12 @@ import {
 import { resolveSkillIdsByName } from "@/modules/skills/service";
 import { matchSkillsAndFeatures } from "./mapping/entity-candidates";
 
-export type EntitySkillSourceType =
-  | "career_opportunity"
-  | "content_item"
-  | "business_opportunity";
+/**
+ * Only `content_item` remains: `career_opportunity` / `business_opportunity`
+ * were dropped from the graph in skill-graph-manager Phase 6 (terminal outputs,
+ * not inputs). The DB enum still carries them for legacy rows.
+ */
+export type EntitySkillSourceType = "content_item";
 
 export interface LinkEntityResult {
   candidates: number;
@@ -160,6 +162,9 @@ export async function getProofOfWork(
         eq(projectSkills.userId, userId),
         inArray(projectSkills.skillId, skillIds),
         inArray(projectSkills.role, ["used", "demonstrated"]),
+        // exclusion invariant: a skipped feature / project proves nothing
+        isNull(projectFeatures.excludedAt),
+        isNull(projects.excludedAt),
       ),
     );
 

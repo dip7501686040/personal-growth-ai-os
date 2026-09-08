@@ -1,4 +1,4 @@
-import { and, desc, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { skillEvidence, skills } from "@/lib/db/schema";
 import {
@@ -23,9 +23,12 @@ const PER_LEVEL_CAP = 18;
 
 async function fetchSkillsByLevel(userId: string): Promise<SkillsByLevel> {
   const rows = await db
-    .select({ name: skills.name, level: skills.level })
+    .select({
+      name: sql<string>`coalesce(${skills.label}, ${skills.name})`,
+      level: skills.level,
+    })
     .from(skills)
-    .where(eq(skills.userId, userId))
+    .where(and(eq(skills.userId, userId), isNull(skills.excludedAt)))
     .orderBy(desc(skills.confidence), skills.name);
 
   const byLevel = Object.fromEntries(
@@ -43,12 +46,12 @@ async function fetchInProgressSkills(
 ): Promise<InProgressSkill[]> {
   const rows = await db
     .select({
-      name: skills.name,
+      name: sql<string>`coalesce(${skills.label}, ${skills.name})`,
       level: skills.level,
       category: skills.category,
     })
     .from(skills)
-    .where(eq(skills.userId, userId))
+    .where(and(eq(skills.userId, userId), isNull(skills.excludedAt)))
     .orderBy(desc(skills.updatedAt))
     .limit(60);
   return rows
@@ -83,21 +86,32 @@ async function fetchRecentAttempts(
   }));
 }
 
+/**
+ * Recent accepted evidence that came from real code — synced repositories
+ * (`/sync-repo`) and their shipped features. Replaces the old
+ * `activity_analysis` source (Claude Code activity capture, retired in
+ * skill-graph-manager Phase 1).
+ */
 async function fetchActivityEvidence(
   userId: string,
 ): Promise<ActivityEvidenceItem[]> {
   return db
-    .select({ skill: skills.name, summary: skillEvidence.summary })
+    .select({
+      skill: sql<string>`coalesce(${skills.label}, ${skills.name})`,
+      summary: skillEvidence.summary,
+    })
     .from(skillEvidence)
     .innerJoin(skills, eq(skills.id, skillEvidence.skillId))
     .where(
       and(
         eq(skillEvidence.userId, userId),
-        eq(skillEvidence.sourceType, "activity_analysis"),
+        inArray(skillEvidence.sourceType, ["github_repo", "project_feature"]),
         eq(skillEvidence.status, "accepted"),
-        gte(skillEvidence.createdAt, new Date(Date.now() - 14 * 864e5)),
+        isNull(skills.excludedAt),
+        gte(skillEvidence.createdAt, new Date(Date.now() - 30 * 864e5)),
       ),
     )
+    .orderBy(desc(skillEvidence.createdAt))
     .limit(20);
 }
 

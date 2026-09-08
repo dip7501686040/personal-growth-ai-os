@@ -1,9 +1,7 @@
 import { createHash } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  businessOpportunities,
-  careerOpportunities,
   contentItems,
   entityEmbeddings,
   learningSessions,
@@ -30,18 +28,28 @@ async function fetchEntities(
 ): Promise<EntityRow[]> {
   switch (type) {
     case "skill": {
+      // Exclusion invariant: a skipped skill is never embedded, so it never
+      // becomes a knowledge-link or entity-skill-link candidate.
       const rows = await db
         .select({
           id: skills.id,
           name: skills.name,
+          label: skills.label,
           category: skills.category,
           notes: skills.notes,
         })
         .from(skills)
-        .where(eq(skills.userId, userId));
+        .where(and(eq(skills.userId, userId), isNull(skills.excludedAt)));
       return rows.map((r) => ({
         id: r.id,
-        text: [`${r.name} (${r.category})`, r.notes].filter(Boolean).join(". "),
+        text: [
+          r.label && r.label !== r.name
+            ? `${r.label} / ${r.name} (${r.category})`
+            : `${r.name} (${r.category})`,
+          r.notes,
+        ]
+          .filter(Boolean)
+          .join(". "),
       }));
     }
     case "project_feature": {
@@ -55,27 +63,18 @@ async function fetchEntities(
         })
         .from(projectFeatures)
         .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
-        .where(eq(projectFeatures.userId, userId));
+        .where(
+          and(
+            eq(projectFeatures.userId, userId),
+            isNull(projectFeatures.excludedAt),
+            isNull(projects.excludedAt),
+          ),
+        );
       return rows.map((r) => ({
         id: r.id,
         text: [`${r.title} (${r.projectName}, ${r.status})`, r.description]
           .filter(Boolean)
           .join(". "),
-      }));
-    }
-    case "career_opportunity": {
-      const rows = await db
-        .select({
-          id: careerOpportunities.id,
-          role: careerOpportunities.role,
-          company: careerOpportunities.company,
-          description: careerOpportunities.description,
-        })
-        .from(careerOpportunities)
-        .where(eq(careerOpportunities.userId, userId));
-      return rows.map((r) => ({
-        id: r.id,
-        text: `${r.role} at ${r.company}. ${r.description}`,
       }));
     }
     case "content_item": {
@@ -91,21 +90,6 @@ async function fetchEntities(
       return rows.map((r) => ({
         id: r.id,
         text: [r.title, r.hook, r.angle].filter(Boolean).join(". "),
-      }));
-    }
-    case "business_opportunity": {
-      const rows = await db
-        .select({
-          id: businessOpportunities.id,
-          title: businessOpportunities.title,
-          problem: businessOpportunities.problem,
-          proposedSolution: businessOpportunities.proposedSolution,
-        })
-        .from(businessOpportunities)
-        .where(eq(businessOpportunities.userId, userId));
-      return rows.map((r) => ({
-        id: r.id,
-        text: `${r.title}. ${r.problem} ${r.proposedSolution}`,
       }));
     }
     case "learning_session": {
