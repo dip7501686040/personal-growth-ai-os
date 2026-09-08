@@ -1,14 +1,22 @@
-import { and, eq, notInArray, sql } from "drizzle-orm";
+import { and, eq, isNull, like, notInArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  knowledgeDocuments,
   projectFeatures,
   projectSkills,
   projects,
   skillEvidence,
   skills,
 } from "@/lib/db/schema";
+import {
+  checkCrossSourceDuplicate,
+  embedDocument,
+  upsertDocumentRow,
+} from "@/lib/knowledge";
 import { slugify } from "@/lib/slug";
 import { recordContextEvent } from "@/modules/context/events";
+import { backfillEntityEmbeddings } from "@/modules/knowledge/entities";
+import { mapDocument } from "@/modules/knowledge/mapping";
 import type { SkillCategory } from "@/modules/skills/levels";
 
 type FeatureStatus = "planned" | "in_progress" | "done";
@@ -33,6 +41,22 @@ export interface SyncProposalFeature {
   skills: SyncProposalSkill[];
 }
 
+export type KnowledgeDocType = "repo_summary" | "decision" | "concept" | "learning";
+
+/**
+ * A distilled fact about the repo to fold into the knowledge base — a repo
+ * summary, an architecture decision, a concept, a per-feature note. Written by
+ * the `/sync-repo` skill (local analysis, no app LLM cost). NOT raw files.
+ */
+export interface SyncProposalKnowledge {
+  /** stable kebab id, unique within this repo — the reconcile anchor
+   *  (sourceRef becomes `<repoUrl|sync-repo:slug>#<slug>`). */
+  slug: string;
+  docType: KnowledgeDocType;
+  title: string;
+  body: string;
+}
+
 export interface SyncProposal {
   project: {
     name: string;
@@ -47,6 +71,12 @@ export interface SyncProposal {
     lastSyncedSha?: string;
   };
   features: SyncProposalFeature[];
+  /**
+   * Optional. When present (even as `[]`) the sync **reconciles** this repo's
+   * knowledge documents: upsert each, then supersede any repo-scoped doc not in
+   * this run. Omit the key entirely to leave knowledge untouched.
+   */
+  knowledge?: SyncProposalKnowledge[];
 }
 
 export interface SyncResult {
@@ -63,6 +93,22 @@ export interface SyncResult {
   evidenceSuggested: number;
   evidenceSkipped: number;
   skillsCreated: string[];
+  knowledge: {
+    /** rows created or refreshed (content changed) this run */
+    upserted: number;
+    /** identical content — nothing to re-embed */
+    unchanged: number;
+    /** chunks embedded across all upserted docs */
+    embedded: number;
+    /** knowledge_links inserted by mapDocument */
+    linked: number;
+    /** cross-source duplicates — superseded, not linked */
+    duplicates: number;
+    /** repo-scoped docs absent from this run — superseded */
+    superseded: number;
+    /** docs whose embed/link step failed (row kept for a later resync) */
+    embedErrors: number;
+  };
 }
 
 const RANK: Record<Exclude<ProjectStatus, "paused">, number> = {
@@ -364,6 +410,91 @@ export async function applySyncProposal(
       ),
     );
 
+  // ── knowledge documents (Phase 2) ───────────────────────────────────────
+  // Fold the repo's distilled facts into the knowledge base, idempotently, in
+  // the same run — replaces the retired `github-sync` cron + Extraction Agent.
+  const knowledge: SyncResult["knowledge"] = {
+    upserted: 0,
+    unchanged: 0,
+    embedded: 0,
+    linked: 0,
+    duplicates: 0,
+    superseded: 0,
+    embedErrors: 0,
+  };
+  const manageKnowledge = Array.isArray(proposal.knowledge);
+
+  if (manageKnowledge) {
+    const repoAnchor = p.repoUrl?.trim().replace(/\/+$/, "") || `sync-repo:${slug}`;
+    const proposed = proposal.knowledge ?? [];
+    const seenRefs: string[] = [];
+
+    // Make freshly-synced skills/features linkable before mapping docs to them.
+    // Best-effort: an embedding outage just skips the kNN half of the match.
+    try {
+      await backfillEntityEmbeddings(userId, ["skill", "project_feature"]);
+    } catch (err) {
+      console.warn(
+        "[applySyncProposal] entity-embedding backfill skipped:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+
+    for (const k of proposed) {
+      const sourceRef = `${repoAnchor}#${k.slug}`;
+      seenRefs.push(sourceRef);
+      const body = k.body.trim();
+      const { document, created } = await upsertDocumentRow({
+        userId,
+        docType: k.docType,
+        title: k.title.trim(),
+        body,
+        sourceKind: "github_repo",
+        sourceRef,
+        meta: { via: "sync-repo", projectSlug: slug, repoUrl: p.repoUrl ?? null },
+      });
+      if (!created) {
+        knowledge.unchanged++;
+        continue;
+      }
+      knowledge.upserted++;
+      try {
+        knowledge.embedded += await embedDocument(userId, document.id, body);
+        const duplicateOf = await checkCrossSourceDuplicate(userId, document.id);
+        if (duplicateOf) {
+          knowledge.duplicates++;
+        } else {
+          const r = await mapDocument(userId, document.id);
+          knowledge.linked += r.inserted;
+        }
+      } catch (err) {
+        knowledge.embedErrors++;
+        console.warn(
+          `[applySyncProposal] knowledge "${k.slug}" embed/link skipped:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
+    // Stale: repo-scoped docs from a prior run that this run no longer emits.
+    const superseded = await db
+      .update(knowledgeDocuments)
+      .set({ supersededAt: new Date() })
+      .where(
+        and(
+          eq(knowledgeDocuments.userId, userId),
+          eq(knowledgeDocuments.sourceKind, "github_repo"),
+          like(knowledgeDocuments.sourceRef, `${repoAnchor}#%`),
+          isNull(knowledgeDocuments.supersededAt),
+          seenRefs.length
+            ? notInArray(knowledgeDocuments.sourceRef, seenRefs)
+            : sql`true`,
+        ),
+      )
+      .returning({ id: knowledgeDocuments.id });
+    knowledge.superseded = superseded.length;
+  }
+
   await recordContextEvent({
     userId,
     kind: "project_updated",
@@ -383,11 +514,13 @@ export async function applySyncProposal(
     evidenceSuggested,
     evidenceSkipped,
     skillsCreated,
+    knowledge,
   };
 }
 
-/** State a `/sync-repo` run needs for an incremental diff: the last synced SHA
- *  and every feature sourceKey already recorded for this project. */
+/** State a `/sync-repo` run needs for an incremental diff: the last synced SHA,
+ *  every feature sourceKey, and every knowledge-doc slug already recorded for
+ *  this project. */
 export async function getSyncState(
   userId: string,
   slug: string,
@@ -396,18 +529,26 @@ export async function getSyncState(
   status: ProjectStatus | null;
   lastSyncedSha: string | null;
   featureKeys: string[];
+  knowledgeSlugs: string[];
 }> {
   const [project] = await db
     .select({
       id: projects.id,
       status: projects.status,
       lastSyncedSha: projects.lastSyncedSha,
+      repoUrl: projects.repoUrl,
     })
     .from(projects)
     .where(and(eq(projects.userId, userId), eq(projects.slug, slug)))
     .limit(1);
   if (!project) {
-    return { found: false, status: null, lastSyncedSha: null, featureKeys: [] };
+    return {
+      found: false,
+      status: null,
+      lastSyncedSha: null,
+      featureKeys: [],
+      knowledgeSlugs: [],
+    };
   }
   const feats = await db
     .select({ sourceKey: projectFeatures.sourceKey })
@@ -418,10 +559,28 @@ export async function getSyncState(
         sql`${projectFeatures.sourceKey} is not null`,
       ),
     );
+
+  const repoAnchor =
+    project.repoUrl?.trim().replace(/\/+$/, "") || `sync-repo:${slug}`;
+  const kdocs = await db
+    .select({ sourceRef: knowledgeDocuments.sourceRef })
+    .from(knowledgeDocuments)
+    .where(
+      and(
+        eq(knowledgeDocuments.userId, userId),
+        eq(knowledgeDocuments.sourceKind, "github_repo"),
+        like(knowledgeDocuments.sourceRef, `${repoAnchor}#%`),
+        isNull(knowledgeDocuments.supersededAt),
+      ),
+    );
+
   return {
     found: true,
     status: project.status as ProjectStatus,
     lastSyncedSha: project.lastSyncedSha,
     featureKeys: feats.map((f) => f.sourceKey!).filter(Boolean),
+    knowledgeSlugs: kdocs
+      .map((d) => d.sourceRef?.split("#").slice(1).join("#"))
+      .filter((s): s is string => !!s),
   };
 }

@@ -38,6 +38,7 @@ async function main() {
   }
 
   const r = await applySyncProposal(userId, proposal);
+  const k = r.knowledge;
   console.log(
     [
       `project ${r.project.slug}: status ${r.project.statusBefore} → ${r.project.statusAfter}`,
@@ -47,6 +48,9 @@ async function main() {
       r.staleFeatures.length
         ? `stale (not in repo this run): ${r.staleFeatures.map((s) => s.title).join(", ")}`
         : "no stale features",
+      `knowledge: ${k.upserted} upserted (${k.embedded} chunks, ${k.linked} links), ` +
+        `${k.unchanged} unchanged, ${k.duplicates} dup, ${k.superseded} superseded` +
+        (k.embedErrors ? `, ${k.embedErrors} embed error(s)` : ""),
     ].join("\n"),
   );
   if (r.evidenceSuggested > 0) {

@@ -19,10 +19,10 @@ A repo, given as a local path (preferred — instant) or a GitHub URL (clone to 
 pnpm sync-repo --state <project-slug>
 ```
 
-`<project-slug>` = kebab-case of the repo/project name (e.g. `ai-notification-system`). Output JSON has `found`, `status`, `lastSyncedSha`, `featureKeys`.
+`<project-slug>` = kebab-case of the repo/project name (e.g. `ai-notification-system`). Output JSON has `found`, `status`, `lastSyncedSha`, `featureKeys`, `knowledgeSlugs`.
 
 - If `found` is false or `lastSyncedSha` is null → **full analysis** (step 2).
-- Else → `git -C <repo> log --oneline <lastSyncedSha>..HEAD` and focus on what changed; still re-emit the full feature list (the reconcile needs every current `sourceKey` to detect stale ones), but you only need to deeply re-examine changed areas.
+- Else → `git -C <repo> log --oneline <lastSyncedSha>..HEAD` and focus on what changed; still re-emit the full feature list AND the full `knowledge` list (the reconcile needs every current `sourceKey` / knowledge `slug` to detect stale ones), but you only need to deeply re-examine changed areas.
 
 ### 2. Analyze the repo
 
@@ -56,6 +56,36 @@ A *feature* = a coherent capability a reviewer would recognize (from README feat
   - `role`: `used` (present, wired in) or `demonstrated` (central, non-trivial use — the feature is a real showcase of it).
   - Match names to the user's existing skills where possible (k8s → "Kubernetes", "next" → "Next.js"). New names become new skill rows.
   - Be conservative — only skills a reviewer would agree the feature proves.
+
+### 3b. Distil knowledge documents
+
+`/sync-repo` is now the **only** pipeline that feeds the knowledge base (the
+`github-sync` cron + Extraction Agent were retired). Emit a `knowledge` array of
+**distilled facts** — never raw file contents. Aim for:
+
+- **1 `repo_summary`** — what the project is, the problem it solves, the shape of
+  the architecture, the stack. 1–2 paragraphs.
+- **3–8 `decision` / `concept` docs** — real architecture decisions ("chose
+  RabbitMQ over Kafka because…", "RLS enforced at the DB, not the app"),
+  non-obvious patterns, hard-won lessons. One idea per doc.
+- **1 `learning` doc per major feature** (optional) — the interesting technical
+  substance of that feature, phrased as a fact a reviewer would find credible.
+
+Per knowledge doc:
+
+- `slug`: stable kebab id, **unique within this repo**, reused verbatim across
+  runs (it's the reconcile anchor — reuse the exact slug from `knowledgeSlugs`
+  when it's the same fact). e.g. `repo-summary`, `why-rabbitmq`, `rls-model`.
+- `docType`: `repo_summary` | `decision` | `concept` | `learning`.
+- `title`: short, specific.
+- `body`: the distilled fact. Plain prose, self-contained, no code dumps. A few
+  sentences to a couple of paragraphs.
+
+The app upserts each (idempotent by content hash — an unchanged body is a
+no-op), embeds it, links it to your skills/features, and **supersedes any
+knowledge doc from a previous run of this repo that you don't re-emit**. Send
+`"knowledge": []` to explicitly clear this repo's knowledge; omit the key only
+if you deliberately want to leave it untouched.
 
 ### 4. Write the proposal + apply
 
@@ -94,6 +124,20 @@ Proposal shape:
         { "name": "Node.js", "category": "language", "role": "used" }
       ]
     }
+  ],
+  "knowledge": [
+    {
+      "slug": "repo-summary",
+      "docType": "repo_summary",
+      "title": "AI Notification System — overview",
+      "body": "A multi-channel notification service that fans real-time events out to connected clients. NestJS microservices behind RabbitMQ; Redis-backed pub/sub for the WebSocket layer; Postgres for delivery state. Deployed on Kubernetes."
+    },
+    {
+      "slug": "why-rabbitmq",
+      "docType": "decision",
+      "title": "RabbitMQ over Kafka for event transport",
+      "body": "Chose RabbitMQ because delivery is per-user and low-volume with strict ordering per recipient, not a high-throughput log. Topic exchanges give per-channel routing without partition management."
+    }
   ]
 }
 ```
@@ -105,10 +149,12 @@ Print the script output. Then tell the user:
 - what changed (status move, features added/updated, skills created)
 - how many **suggested** evidence rows were created, and that they should open **/skills** and Accept the ones that look right — **levels only move after they accept** (the sync never sets a level directly)
 - any **stale** features (in the app but no longer detected in the repo) — the user decides keep or archive; the sync never deletes them
+- the `knowledge:` line — docs upserted / embedded / linked / superseded. High-confidence links to skills & features are auto-accepted; the rest wait in the `/knowledge` review queue
 
 ## Rules
 
-- Never invent features or skills. Only what the code supports.
+- Never invent features, skills, or knowledge. Only what the code supports.
+- Knowledge docs are **distilled facts**, never raw file contents or long code blocks.
 - One repo per run. For several, run once each.
 - The script is the only writer — don't touch the DB directly.
-- Re-running on an unchanged repo must produce `+0 new` features and `+0 suggested` evidence.
+- Re-running on an unchanged repo must produce `+0 new` features, `+0 suggested` evidence, and `0 upserted` knowledge (all `unchanged`).
