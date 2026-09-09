@@ -1,5 +1,3 @@
-<!-- Readable view of resume/master.json (backend archetype, no JD). Edit master.json, not this file; regenerate with: pnpm resume backend --out /tmp && cp /tmp/resume.md resume/master.md -->
-
 # Dipankar Saha
 Senior Backend / Full-Stack Engineer
 
@@ -77,5 +75,4 @@ Production admin panel replacing paper logbooks with per-customer credit/debit t
 *Tech: Next.js, NestJS, Prisma, PostgreSQL, JWT, Docker, Kubernetes*
 
 ## Education
-**TODO — add your degree**, TODO — institution — TODO
-*Fill this in resume/master.json — the generator emits it verbatim.*
+**B.Tech in Information Technology**, Siliguri Institute of Technology — 2016 – 2020

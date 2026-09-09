@@ -7,10 +7,10 @@
  *
  * `jobs.json` is the output of `pnpm jobs --json`. Per pick it writes
  * <root>/<date>/<company>__<role>/ with: job.json, proof-bundle.md,
- * outreach-targets.md, resume.md/.html/.docx.
+ * outreach-targets.md, search-provenance.md, resume.md/.html/.pdf.
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { getOwnerUserId } from "@/lib/owner";
 import { loadJobSearchConfig } from "@/lib/jobs/search";
 import type { JobSearchConfig, JobSearchResult, ScoredJob } from "@/lib/jobs/types";
@@ -18,7 +18,7 @@ import { getProofForJd, type JdProof } from "@/modules/knowledge/jd-proof";
 import { loadMaster, suggestArchetype } from "@/modules/resume/master";
 import {
   buildResumeModel,
-  toDocxBuffer,
+  htmlToPdf,
   toHtml,
   toMarkdown,
 } from "@/modules/resume/render";
@@ -213,8 +213,9 @@ async function main() {
     });
 
     writeFileSync(join(dir, "resume.md"), toMarkdown(model));
-    writeFileSync(join(dir, "resume.html"), toHtml(model));
-    writeFileSync(join(dir, "resume.docx"), await toDocxBuffer(model));
+    const htmlPath = join(dir, "resume.html");
+    writeFileSync(htmlPath, toHtml(model));
+    const pdfOk = htmlToPdf(resolve(htmlPath), resolve(join(dir, "resume.pdf")));
     writeFileSync(join(dir, "proof-bundle.md"), proofBundleMd(j, proof));
     writeFileSync(join(dir, "outreach-targets.md"), outreachMd(j));
     writeFileSync(join(dir, "search-provenance.md"), searchProvenanceMd(j, cfg, result));
@@ -230,8 +231,9 @@ async function main() {
     console.log(
       `  [${i}] ${j.company} — ${j.role}\n` +
         `      ${dir}\n` +
-        `      archetype=${archetype} · proof: ${proof.skills.length} skills / ${proof.features.length} features\n` +
-        `      write next: why-fit.md, cover-letter.md (if the JD asks), pitch-recruiter.md, pitch-referral.md`,
+        `      archetype=${archetype} · proof: ${proof.skills.length} skills / ${proof.features.length} features` +
+        (pdfOk ? " · resume.pdf ✓" : " · resume.pdf ✗ (no Chrome — print resume.html by hand)") +
+        `\n      write next: why-fit.md, cover-letter.md (if the JD asks), pitch-recruiter.md, pitch-referral.md`,
     );
   }
   process.exit(0);

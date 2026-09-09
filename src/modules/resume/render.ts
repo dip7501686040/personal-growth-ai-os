@@ -1,3 +1,5 @@
+import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import {
   AlignmentType,
   Document,
@@ -192,17 +194,54 @@ export function toHtml(m: ResumeModel): string {
 
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(m.name)} — Résumé</title>
 <style>
-  body{font-family:Calibri,Arial,Helvetica,sans-serif;font-size:11pt;line-height:1.35;color:#111;max-width:7.5in;margin:0.5in auto;padding:0 0.2in}
-  h1{font-size:20pt;margin:0 0 2pt}
-  h2{font-size:13pt;margin:14pt 0 4pt;border-bottom:1px solid #ccc;padding-bottom:2pt}
-  h3{font-size:11.5pt;margin:8pt 0 1pt}
-  p{margin:2pt 0}
-  ul{margin:2pt 0 4pt 18pt;padding:0}
-  li{margin:1pt 0}
+  @page{size:letter;margin:0.45in}
+  body{font-family:Calibri,Arial,Helvetica,sans-serif;font-size:10.3pt;line-height:1.26;color:#111;max-width:7.6in;margin:0.45in auto;padding:0 0.15in}
+  h1{font-size:18pt;margin:0 0 1pt}
+  h2{font-size:11.5pt;margin:9pt 0 3pt;border-bottom:1px solid #ccc;padding-bottom:1pt}
+  h3{font-size:10.6pt;margin:6pt 0 1pt}
+  p{margin:1.5pt 0}
+  ul{margin:1.5pt 0 3pt 16pt;padding:0}
+  li{margin:0.5pt 0}
+  h2,h3{break-after:avoid}
+  li,h3+p{break-inside:avoid}
   .title{font-weight:600}
-  .contact,.meta,.tech{color:#555;font-size:10pt}
-  @media print{body{margin:0.5in}}
+  .contact,.meta,.tech{color:#555;font-size:9.3pt}
+  @media print{body{margin:0;max-width:none;padding:0}}
 </style></head><body>${parts.join("\n")}</body></html>`;
+}
+
+// ── PDF via headless Chrome (ATS-safe: it's just the printed HTML) ────────
+
+const CHROME_CANDIDATES = [
+  process.env.CHROME_PATH,
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+].filter((p): p is string => !!p);
+
+function findChrome(): string | null {
+  for (const p of CHROME_CANDIDATES) if (existsSync(p)) return p;
+  return null;
+}
+
+/**
+ * Render `htmlPath` to `pdfPath` using an already-installed Chrome/Chromium/Edge.
+ * Returns false (no throw) when no browser is found — callers keep the HTML as
+ * the fallback and print it by hand.
+ */
+export function htmlToPdf(htmlPath: string, pdfPath: string): boolean {
+  const chrome = findChrome();
+  if (!chrome) return false;
+  execSync(
+    `"${chrome}" --headless --disable-gpu --no-pdf-header-footer ` +
+      `--print-to-pdf="${pdfPath}" "file://${htmlPath}"`,
+    { stdio: "ignore", timeout: 60_000 },
+  );
+  return true;
 }
 
 // ── DOCX (single column, Calibri 11, Heading styles, no tables/images) ────

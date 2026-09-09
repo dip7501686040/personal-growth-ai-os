@@ -3,14 +3,13 @@
  *
  *   pnpm resume <backend|platform|ai-llm|auto> [--jd <file>] [--out <dir>]
  *
- * Always writes resume.md + resume.html + resume.docx. `--jd` reorders skills,
- * bullets and projects to lead with what the job description matched (via the
- * same deterministic `get_proof_for_jd` engine). PDF: open resume.html and
- * Print → Save as PDF, or run pandoc if you have it.
+ * Always writes resume.md + resume.html + resume.pdf (PDF via a locally
+ * installed Chrome/Chromium/Edge printing the HTML — ATS-safe). `--jd`
+ * reorders skills, bullets and projects to lead with what the JD matched
+ * (via the same deterministic `get_proof_for_jd` engine).
  */
-import { execSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { getOwnerUserId } from "@/lib/owner";
 import { getProofForJd } from "@/modules/knowledge/jd-proof";
 import {
@@ -21,7 +20,7 @@ import {
 } from "@/modules/resume/master";
 import {
   buildResumeModel,
-  toDocxBuffer,
+  htmlToPdf,
   toHtml,
   toMarkdown,
   type JdTailor,
@@ -85,30 +84,21 @@ async function main() {
   const model = buildResumeModel(master, archetype, jd);
   const md = toMarkdown(model);
   const html = toHtml(model);
-  const docx = await toDocxBuffer(model);
 
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, "resume.md"), md);
-  writeFileSync(join(outDir, "resume.html"), html);
-  writeFileSync(join(outDir, "resume.docx"), docx);
-
-  let pdf = "open resume.html → Print → Save as PDF";
-  try {
-    execSync("pandoc --version", { stdio: "ignore" });
-    execSync(`pandoc "${join(outDir, "resume.md")}" -o "${join(outDir, "resume.pdf")}"`, {
-      stdio: "ignore",
-    });
-    pdf = "resume.pdf (pandoc)";
-  } catch {
-    /* pandoc / pdf engine not available — html fallback stands */
-  }
+  const htmlPath = join(outDir, "resume.html");
+  writeFileSync(htmlPath, html);
+  const pdf = htmlToPdf(resolve(htmlPath), resolve(join(outDir, "resume.pdf")))
+    ? "resume.pdf"
+    : "no Chrome found — open resume.html → Print → Save as PDF";
 
   const problems = atsLint(md);
   console.log(
     [
       `archetype: ${archetype} (${model.archetypeLabel})`,
       jd ? "tailored to the JD" : "generic",
-      `→ ${outDir}/resume.{md,html,docx}`,
+      `→ ${outDir}/resume.{md,html,pdf}`,
       `pdf: ${pdf}`,
       `skills groups: ${model.skills.length} · experience: ${model.experience.length} · projects: ${model.projects.length}`,
       problems.length ? `ATS LINT FAILED: ${problems.join("; ")}` : "ATS lint: clean",
