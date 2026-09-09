@@ -1,5 +1,5 @@
 {
-  "_note": "Edit to tune the morning job search. `titles` = role names to search (word-level match). `excludeTitles` = kill any posting whose title contains these. `skills` feeds a rough keyword skill-match; J5 uses the real get_proof_for_jd. Run: pnpm jobs",
+  "_note": "Morning job search config. `titles`/`excludeTitles` = word-level title match. `skills` feeds the keyword skill-match (get_proof_for_jd does the real matching). Only Adzuna is country-parameterised (`adzunaCountries`); the other boards are global-remote and get filtered by `remoteOnly` + `targetCountries`. Run: pnpm jobs",
   "titles": [
     "Senior Backend Engineer",
     "Backend Engineer",
@@ -48,8 +48,17 @@
     "openai"
   ],
   "minLpa": 18,
-  "remoteOnly": false,
-  "adzunaCountries": ["in", "gb", "us"],
+  "remoteOnly": true,
+  "preferFunded": true,
+  "targetCountries": [
+    "United States", "Canada", "Mexico",
+    "United Kingdom", "Ireland", "Germany", "Netherlands", "France", "Switzerland",
+    "Sweden", "Norway", "Denmark", "Finland", "Iceland",
+    "Belgium", "Austria", "Spain", "Portugal", "Poland", "Estonia", "Czechia",
+    "India", "United Arab Emirates", "Singapore", "Malaysia", "Indonesia", "Thailand", "Japan"
+  ],
+  "adzunaCountries": ["us", "gb", "de", "nl", "in", "ca", "ch", "fr", "sg", "es", "it", "be", "at", "pl", "mx"],
+  "adzunaMaxCountries": 6,
   "maxPerSource": 30,
   "serpapiMaxQueries": 4,
   "useGraphMatch": true,

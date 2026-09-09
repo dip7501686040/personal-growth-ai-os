@@ -109,13 +109,16 @@ function searchProvenanceMd(
   const L: string[] = [
     `# How this job surfaced — ${j.company} / ${j.role}`,
     ``,
-    `Search score **${j.score.toFixed(2)}** · Group ${j.group} · reply-likelihood ${j.replyLikelihood.toFixed(2)}`,
+    `Search score **${j.score.toFixed(2)}** · Group ${j.group} · reply-likelihood ${j.replyLikelihood.toFixed(2)}` +
+      (j.employmentType ? ` · ${j.employmentType}` : ""),
     ``,
     `## Manual layer — resume/job-search.json`,
     `- Titles searched: ${cfg.titles.join(", ")}`,
     `- This role matches the title term: ${titleHit ?? "_(surfaced via description / a graph term)_"}`,
     `- Skill keywords present in the JD: ${manualSkills.join(", ") || "_none_"}  (${manualSkills.length}/${cfg.skills.length} → substring skillMatch ${j.substringSkillMatch.toFixed(2)})`,
-    `- Filters applied: minLpa ${cfg.minLpa} · remoteOnly ${cfg.remoteOnly} · adzuna ${cfg.adzunaCountries.join("/")}`,
+    `- Location: ${j.location ?? "—"} · remoteKind ${j.remoteKind}`,
+    `- Filters: minLpa ${cfg.minLpa} · remoteOnly ${cfg.remoteOnly} · preferFunded ${cfg.preferFunded ?? false} · adzuna ${cfg.adzunaCountries.slice(0, cfg.adzunaMaxCountries ?? 6).join("/")}`,
+    `- Funding signal: ${j.funding.stage ?? "_not detected_"}`,
     ``,
     `## Knowledge-graph layer`,
   ];

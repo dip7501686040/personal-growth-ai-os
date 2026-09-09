@@ -1,4 +1,10 @@
-import { companyTypeOf, contactOf, fundingOf, remoteKindOf } from "./classify";
+import {
+  companyTypeOf,
+  contactOf,
+  fundingOf,
+  regionOf,
+  remoteKindOf,
+} from "./classify";
 import { salaryToLpa } from "./salary";
 import type { GraphMatch, JobSearchConfig, RawJob, ScoredJob } from "./types";
 
@@ -15,6 +21,8 @@ const B_FLAGS = new Set([
   "body_shop",
   "weak_funding",
   "onsite",
+  "excluded_region",
+  "region_restricted",
 ]);
 
 function daysAgo(iso: string | null): number | null {
@@ -34,6 +42,7 @@ export function scoreJob(
   const { companyType, namedClient } = companyTypeOf(j);
   const fund = fundingOf(j);
   const contact = contactOf(j);
+  const region = regionOf(j, cfg.targetCountries);
   const age = daysAgo(j.postedAt);
 
   let reply = 0.5;
@@ -73,8 +82,14 @@ export function scoreJob(
 
   if (fund.weak) {
     flags.push("weak_funding");
-    bump(-0.1);
-  } else if (!fund.stage) flags.push("verify_funding");
+    bump(cfg.preferFunded ? -0.2 : -0.1);
+  } else if (fund.stage) {
+    // detectable funding signal — reward it harder when the user asked to
+    if (cfg.preferFunded) bump(0.12);
+  } else {
+    flags.push("verify_funding");
+    if (cfg.preferFunded) bump(-0.05);
+  }
 
   if (
     remoteKind === "onsite_foreign" ||
@@ -82,6 +97,14 @@ export function scoreJob(
     (cfg.remoteOnly && remoteKind !== "remote")
   ) {
     flags.push("onsite");
+  }
+
+  if (region.excluded) {
+    flags.push("excluded_region");
+    bump(-0.3);
+  } else if (region.restricted) {
+    flags.push(`region_restricted${region.note ? `:${region.note}` : ""}`);
+    bump(-0.15);
   }
 
   const replyLikelihood = Math.max(0, Math.min(1, reply));

@@ -9,8 +9,18 @@ export interface JobSearchConfig {
   minLpa: number;
   /** if true, non-remote postings are always flagged `onsite` → Group B */
   remoteOnly: boolean;
-  /** Adzuna country codes to query (in, gb, us, …) */
+  /** Adzuna country codes to query, most important first (us, gb, de, …) */
   adzunaCountries: string[];
+  /** how many of `adzunaCountries` to query per run (default 6; rotate the list
+   *  over the week if you want fuller coverage without the API-call cost) */
+  adzunaMaxCountries?: number;
+  /** Countries/regions you'd actually take a remote role in (human names).
+   *  A posting that names a country outside this set — and isn't
+   *  worldwide/anywhere — is flagged `region_restricted` → Group B. */
+  targetCountries?: string[];
+  /** bias ranking toward companies with a detectable funding signal:
+   *  strong signal → score bump, weak/negative → penalty, unknown → small nudge. */
+  preferFunded?: boolean;
   /** cap results kept per source before merge */
   maxPerSource: number;
   /** how many titles SerpApi's google_jobs search spends a request on (default 3) */
@@ -46,6 +56,8 @@ export interface RawJob {
   publisher: string | null;
   descriptionSnippet: string | null;
   contactEmail: string | null;
+  /** full-time / contract / freelance / … when the source states it */
+  employmentType?: string | null;
 }
 
 export type RemoteKind = "remote" | "onsite_foreign" | "onsite_india" | "unknown";

@@ -199,6 +199,107 @@ export async function hnWhoIsHiring(cfg: JobSearchConfig): Promise<RawJob[]> {
   return out.slice(0, cfg.maxPerSource);
 }
 
+// ── keyless remote-focused JSON boards (Himalayas / WorkingNomads / Jobicy) ──
+
+/** himalayas.app — big remote board, cursor-paginated JSON, no key. */
+export async function himalayas(cfg: JobSearchConfig): Promise<RawJob[]> {
+  type HimResp = { jobs?: Record<string, unknown>[]; nextCursor?: string };
+  const out: RawJob[] = [];
+  let cursor = "";
+  for (let page = 0; page < 3 && out.length < cfg.maxPerSource * 2; page++) {
+    const url: string =
+      `https://himalayas.app/jobs/api?limit=50` + (cursor ? `&cursor=${cursor}` : "");
+    const j: HimResp = await getJson<HimResp>(url);
+    for (const r of j.jobs ?? []) {
+      const title = String(r.title ?? "");
+      if (!titleMatches(title, cfg)) continue;
+      const min = Number(r.minSalary) || 0;
+      const max = Number(r.maxSalary) || 0;
+      out.push({
+        source: "himalayas",
+        company: String(r.companyName ?? ""),
+        role: title,
+        location:
+          (Array.isArray(r.locationRestrictions) && r.locationRestrictions.length
+            ? (r.locationRestrictions as string[]).join(", ")
+            : "Remote"),
+        remote: true,
+        salaryText: min || max ? `$${min}-${max} ${String(r.salaryPeriod ?? "year")}` : null,
+        postedAt: r.pubDate ? new Date(Number(r.pubDate) * 1000).toISOString() : null,
+        url: String(r.applicationLink ?? r.guid ?? ""),
+        applyUrl: (r.applicationLink as string) || null,
+        publisher: null,
+        descriptionSnippet: stripHtml(String(r.description ?? r.excerpt ?? "")).slice(0, 1400),
+        contactEmail: null,
+        employmentType: (r.employmentType as string) || null,
+      });
+    }
+    cursor = j.nextCursor ?? "";
+    if (!cursor) break;
+  }
+  return out.slice(0, cfg.maxPerSource * 2);
+}
+
+/** workingnomads.com — single JSON feed of current remote jobs, no key. */
+export async function workingnomads(cfg: JobSearchConfig): Promise<RawJob[]> {
+  const rows = await getJson<Record<string, unknown>[]>(
+    "https://www.workingnomads.com/api/exposed_jobs/",
+  );
+  return rows
+    .filter((r) => titleMatches(String(r.title ?? ""), cfg))
+    .slice(0, cfg.maxPerSource)
+    .map((r) => ({
+      source: "workingnomads",
+      company: String(r.company_name ?? ""),
+      role: String(r.title ?? ""),
+      location: (r.location as string) || "Remote",
+      remote: true,
+      salaryText: null,
+      postedAt: (r.pub_date as string) || null,
+      url: String(r.url ?? ""),
+      applyUrl: (r.url as string) || null,
+      publisher: null,
+      descriptionSnippet: stripHtml(String(r.description ?? "")).slice(0, 1400),
+      contactEmail: null,
+      employmentType: null,
+    }));
+}
+
+/** jobicy.com — remote-only JSON API, filterable by geo + industry, no key. */
+export async function jobicy(cfg: JobSearchConfig): Promise<RawJob[]> {
+  const j = await getJson<{ jobs?: Record<string, unknown>[] }>(
+    `https://jobicy.com/api/v2/remote-jobs?count=${Math.min(50, cfg.maxPerSource * 2)}` +
+      `&industry=engineering`,
+  );
+  return (j.jobs ?? [])
+    .filter((r) => titleMatches(String(r.jobTitle ?? ""), cfg))
+    .map((r) => {
+      const min = Number(r.salaryMin) || 0;
+      const max = Number(r.salaryMax) || 0;
+      const type = Array.isArray(r.jobType) ? (r.jobType as string[]).join(", ") : null;
+      return {
+        source: "jobicy",
+        company: String(r.companyName ?? ""),
+        role: String(r.jobTitle ?? ""),
+        location: String(r.jobGeo ?? "Remote"),
+        remote: true,
+        salaryText:
+          min || max
+            ? `${min}-${max} ${String(r.salaryCurrency ?? "USD")} /${String(r.salaryPeriod ?? "year")}`
+            : null,
+        postedAt: (r.pubDate as string) || null,
+        url: String(r.url ?? ""),
+        applyUrl: (r.url as string) || null,
+        publisher: null,
+        descriptionSnippet: stripHtml(
+          String(r.jobDescription ?? r.jobExcerpt ?? ""),
+        ).slice(0, 1400),
+        contactEmail: null,
+        employmentType: type,
+      } satisfies RawJob;
+    });
+}
+
 // ── key-gated sources ────────────────────────────────────────────────────
 
 export async function jsearch(cfg: JobSearchConfig): Promise<RawJob[]> {
@@ -239,11 +340,13 @@ export async function adzuna(cfg: JobSearchConfig): Promise<RawJob[]> {
   const key = env.ADZUNA_APP_KEY;
   if (!id || !key) throw new Error("ADZUNA_APP_ID / ADZUNA_APP_KEY not set");
   const out: RawJob[] = [];
-  for (const country of cfg.adzunaCountries.slice(0, 3)) {
+  for (const country of cfg.adzunaCountries.slice(0, cfg.adzunaMaxCountries ?? 6)) {
     for (const term of queryTerms(cfg, 2, 1)) {
       const j = await getJson<{ results?: Record<string, unknown>[] }>(
         `https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${id}&app_key=${key}` +
-          `&what=${encodeURIComponent(term)}&results_per_page=${cfg.maxPerSource}&content-type=application/json`,
+          `&what=${encodeURIComponent(term)}` +
+          `${cfg.remoteOnly ? "&what_and=remote" : ""}` +
+          `&results_per_page=${cfg.maxPerSource}&content-type=application/json`,
       );
       for (const r of j.results ?? []) {
         const co = r.company as { display_name?: string } | undefined;
@@ -311,7 +414,12 @@ export const SOURCES = {
   remotive,
   wwr,
   hn: hnWhoIsHiring,
-  jsearch,
+  himalayas,
+  workingnomads,
+  jobicy,
   adzuna,
   serpapi,
 } as const;
+
+// `jsearch` is defined above but no longer registered — this key's JSearch
+// subscription exposes only /job-details, not a search endpoint.

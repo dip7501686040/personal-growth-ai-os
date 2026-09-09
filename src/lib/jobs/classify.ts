@@ -72,6 +72,64 @@ export function fundingOf(j: RawJob): {
   return m ? { stage: m[0], note: m[0], weak: false } : { stage: null, note: null, weak: false };
 }
 
+// ── region fit ────────────────────────────────────────────────────────────
+
+/** User's hard "never" list plus places remote roles almost never hire from. */
+const EXCLUDED_REGION = /\b(china|\bprc\b|mainland china|pakistan|afghanistan)\b/i;
+const WORLDWIDE =
+  /\b(worldwide|work from anywhere|anywhere in the world|global(?:ly)?|international|any country|any location|no location restriction|location:? *remote)\b/i;
+/** Broad regions that overlap the user's target set — a posting scoped to one
+ *  of these is fine even if it also names a single country outside the list. */
+const OK_REGION =
+  /\b(europe|european|eu\b|emea|eea|schengen|americas?|north america|latam|latin america|apac|asia[- ]?pacific|worldwide)\b/i;
+
+/** Country names we can recognise in a location string. Aliases fold to a key. */
+const COUNTRY_ALIASES: Record<string, string> = {
+  usa: "us", "u.s.": "us", "u.s.a": "us", "united states": "us", america: "us", us: "us",
+  uk: "uk", "u.k.": "uk", "united kingdom": "uk", britain: "uk", england: "uk", "great britain": "uk",
+  uae: "uae", "united arab emirates": "uae", dubai: "uae", "abu dhabi": "uae",
+  "the netherlands": "netherlands", holland: "netherlands",
+  "czech republic": "czechia", czechia: "czechia",
+};
+const KNOWN_COUNTRIES = [
+  "united states", "usa", "canada", "mexico", "united kingdom", "uk", "britain", "england",
+  "ireland", "germany", "france", "spain", "portugal", "italy", "netherlands", "holland",
+  "belgium", "austria", "switzerland", "sweden", "norway", "denmark", "finland", "iceland",
+  "poland", "czech republic", "czechia", "romania", "greece", "estonia", "lithuania", "latvia",
+  "india", "united arab emirates", "uae", "dubai", "singapore", "malaysia", "indonesia",
+  "thailand", "vietnam", "philippines", "japan", "south korea", "taiwan", "hong kong",
+  "china", "pakistan", "afghanistan", "bangladesh", "sri lanka", "nepal",
+  "australia", "new zealand", "brazil", "argentina", "colombia", "chile", "south africa",
+  "nigeria", "kenya", "egypt", "israel", "turkey", "ukraine",
+];
+
+const norm = (s: string) => COUNTRY_ALIASES[s.trim().toLowerCase()] ?? s.trim().toLowerCase();
+
+export function regionOf(
+  j: RawJob,
+  targetCountries: string[] | undefined,
+): { excluded: boolean; restricted: boolean; note: string | null } {
+  const loc = (j.location ?? "").toLowerCase();
+  const text = `${loc} ${(j.descriptionSnippet ?? "").toLowerCase()}`;
+
+  if (EXCLUDED_REGION.test(text)) {
+    return { excluded: true, restricted: false, note: text.match(EXCLUDED_REGION)![0] };
+  }
+  if (!targetCountries?.length || !loc || WORLDWIDE.test(text) || OK_REGION.test(loc)) {
+    return { excluded: false, restricted: false, note: null };
+  }
+
+  const wanted = new Set(targetCountries.map(norm));
+  const namedInLoc = KNOWN_COUNTRIES.filter((c) => new RegExp(`\\b${c}\\b`).test(loc)).map(norm);
+  if (namedInLoc.length === 0) {
+    return { excluded: false, restricted: false, note: null }; // just a city / "Remote"
+  }
+  const anyWanted = namedInLoc.some((c) => wanted.has(c));
+  return anyWanted
+    ? { excluded: false, restricted: false, note: null }
+    : { excluded: false, restricted: true, note: j.location };
+}
+
 const EMAIL = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/;
 
 export function contactOf(j: RawJob): {
