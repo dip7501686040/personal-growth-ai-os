@@ -37,6 +37,10 @@ import { knowledgeDocuments } from "./knowledge";
  * Global reference list of subject-area tags (seeded once; edit/add rows as
  * the corpus grows). Not user-scoped — like `dsa_patterns`. `embedding` is the
  * label+description centroid used to classify a doc by cosine similarity.
+ *
+ * RLS is enabled with no policies: the app only ever reads this via Drizzle
+ * (direct Postgres connection, bypasses RLS), so there is nothing to allow
+ * through PostgREST — enabling RLS just closes the public API surface.
  */
 export const knowledgeTaxonomy = pgTable("knowledge_taxonomy", {
   slug: text("slug").primaryKey(),
@@ -45,7 +49,7 @@ export const knowledgeTaxonomy = pgTable("knowledge_taxonomy", {
   sortOrder: integer("sort_order").notNull().default(0),
   embedding: vector("embedding", { dimensions: 768 }),
   embeddingModel: text("embedding_model"),
-});
+}).enableRLS();
 
 /** Doc ⇒ taxonomy tag (many-to-many, scored). Usually one or two per doc. */
 export const knowledgeDocumentTags = pgTable(

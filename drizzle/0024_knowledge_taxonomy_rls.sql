@@ -1,0 +1,1 @@
+ALTER TABLE "knowledge_taxonomy" ENABLE ROW LEVEL SECURITY;

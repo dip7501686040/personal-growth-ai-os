@@ -169,6 +169,13 @@
       "when": 1788860080556,
       "tag": "0023_purge_output_entities",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788936628567,
+      "tag": "0024_knowledge_taxonomy_rls",
+      "breakpoints": true
     }
   ]
 }
