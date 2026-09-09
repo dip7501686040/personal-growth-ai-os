@@ -20,6 +20,7 @@ import {
   setEvidenceStatus,
   setSkillExcluded,
   setSkillParent,
+  updateEvidence,
   updateSkillCategory,
   updateSkillLabel,
   type MergePreview,
@@ -178,6 +179,41 @@ export async function decideEvidenceAction(
   await bestEffortResync(userId);
   revalidatePath("/skills");
   return { ok: true, message: `Evidence ${parsed.data.decision}.` };
+}
+
+// ── Edit an evidence row's text ────────────────────────────────────────────
+
+const updateEvidenceSchema = z.object({
+  evidenceId: z.uuid(),
+  slug: z.string().min(1),
+  summary: z.string().trim().min(1, "Summary is required.").max(300),
+  detail: z.string().trim().max(2000).optional(),
+});
+
+export async function updateEvidenceAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = updateEvidenceSchema.safeParse({
+    evidenceId: formData.get("evidenceId"),
+    slug: formData.get("slug"),
+    summary: formData.get("summary"),
+    detail: formData.get("detail") || undefined,
+  });
+  if (!parsed.success) return err(parsed.error.issues[0].message);
+
+  try {
+    await updateEvidence(userId, parsed.data.evidenceId, {
+      summary: parsed.data.summary,
+      detail: parsed.data.detail ?? null,
+    });
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Could not update evidence.");
+  }
+  revalidatePath(`/skills/${parsed.data.slug}`);
+  revalidatePath("/skills");
+  return { ok: true, message: "Evidence updated." };
 }
 
 // ── Accept every suggested evidence row (post repo-sync review) ─────────────

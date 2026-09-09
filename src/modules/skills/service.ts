@@ -647,6 +647,26 @@ export async function setEvidenceStatus(
   if (row) await recomputeSkill(userId, row.skillId);
 }
 
+/** Edit an evidence row's prose only (summary / detail). Strength, supported
+ *  level and status are unchanged, so the skill's level is not recomputed. */
+export async function updateEvidence(
+  userId: string,
+  evidenceId: string,
+  input: { summary: string; detail?: string | null },
+): Promise<void> {
+  const [row] = await db
+    .update(skillEvidence)
+    .set({
+      summary: input.summary.trim(),
+      detail: input.detail?.trim() || null,
+    })
+    .where(
+      and(eq(skillEvidence.userId, userId), eq(skillEvidence.id, evidenceId)),
+    )
+    .returning({ id: skillEvidence.id });
+  if (!row) throw new Error("Evidence not found.");
+}
+
 /** Count of not-yet-reviewed evidence across all skills (drives the /skills banner). */
 export async function countSuggestedEvidence(userId: string): Promise<number> {
   const [{ n }] = await db
