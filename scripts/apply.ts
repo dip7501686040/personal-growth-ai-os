@@ -9,10 +9,18 @@
  *   pnpm apply status   <id> <draft|applied|screening|interviewing|offer|rejected|ghosted>
  *   pnpm apply due                     # follow-ups owed (JSON)
  *   pnpm apply open                    # open applications (JSON)
+ *   pnpm apply push  [all|<date>|<date/folder>]   # local applications/ → R2 (default: today)
+ *   pnpm apply pull  [all|<date>|<date/folder>]   # R2 → local applications/ (default: today)
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getOwnerUserId } from "@/lib/owner";
+import {
+  isR2Configured,
+  pullRemote,
+  pushLocal,
+  resolveTarget,
+} from "./apply-sync";
 import {
   listDueFollowups,
   listOpenApplications,
@@ -41,6 +49,22 @@ async function resolveId(userId: string, ref: string): Promise<string> {
 
 async function main() {
   const cmd = argv[0];
+
+  if (cmd === "push" || cmd === "pull") {
+    if (!isR2Configured()) {
+      throw new Error(
+        "R2 is not configured — set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID and " +
+          "R2_SECRET_ACCESS_KEY in .env.local.",
+      );
+    }
+    const { label } = resolveTarget(argv[1]);
+    const keys =
+      cmd === "push" ? await pushLocal(argv[1]) : await pullRemote(argv[1]);
+    const dir = cmd === "push" ? "→ R2" : "← R2";
+    console.log(`${cmd} ${label}: ${keys.length} file(s) ${dir}`);
+    return;
+  }
+
   const userId = await getOwnerUserId();
 
   if (cmd === "record") {
@@ -131,7 +155,9 @@ async function main() {
     return;
   }
 
-  throw new Error("commands: record | submit | touchpoint | status | due | open");
+  throw new Error(
+    "commands: record | submit | touchpoint | status | due | open | push | pull",
+  );
 }
 
 main()

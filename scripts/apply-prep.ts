@@ -22,6 +22,7 @@ import {
   toHtml,
   toMarkdown,
 } from "@/modules/resume/render";
+import { isR2Configured, pushFolder } from "./apply-sync";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -184,6 +185,7 @@ async function main() {
   const userId = await getOwnerUserId();
   const master = loadMaster();
   const cfg = loadJobSearchConfig();
+  const written: string[] = [];
 
   for (const i of idxs) {
     const j = all[i];
@@ -235,7 +237,21 @@ async function main() {
         (pdfOk ? " · resume.pdf ✓" : " · resume.pdf ✗ (no Chrome — print resume.html by hand)") +
         `\n      write next: why-fit.md, cover-letter.md (if the JD asks), pitch-recruiter.md, pitch-referral.md`,
     );
+    written.push(`${date}/${slug(j.company)}__${slug(j.role)}`);
   }
+
+  if (written.length && isR2Configured()) {
+    let files = 0;
+    for (const rel of written) {
+      try {
+        files += await pushFolder(rel);
+      } catch (e) {
+        console.log(`  R2 push failed for ${rel}: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    console.log(`  R2: pushed ${files} file(s) across ${written.length} folder(s)`);
+  }
+
   process.exit(0);
 }
 

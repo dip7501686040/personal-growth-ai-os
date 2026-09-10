@@ -51,6 +51,13 @@ const serverEnvSchema = z.object({
   CRON_SECRET: z.string().min(1).optional(),
   // The single owner's auth.users id — lets cron skip an auth-schema lookup.
   OWNER_USER_ID: z.uuid().optional(),
+  // Cloudflare R2 (S3-compatible) — source of truth for the applications/ tree.
+  // All optional so the app boots before R2 is configured; the R2 store throws
+  // a clear error if used without them.
+  R2_ACCOUNT_ID: z.string().min(1).optional(),
+  R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+  R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+  R2_BUCKET: z.string().min(1).optional(),
 });
 
 const optional = (v: string | undefined) => (v && v.length > 0 ? v : undefined);
@@ -73,6 +80,10 @@ const parsed = serverEnvSchema.safeParse({
   GITHUB_TOKEN: optional(process.env.GITHUB_TOKEN),
   CRON_SECRET: optional(process.env.CRON_SECRET),
   OWNER_USER_ID: optional(process.env.OWNER_USER_ID),
+  R2_ACCOUNT_ID: optional(process.env.R2_ACCOUNT_ID),
+  R2_ACCESS_KEY_ID: optional(process.env.R2_ACCESS_KEY_ID),
+  R2_SECRET_ACCESS_KEY: optional(process.env.R2_SECRET_ACCESS_KEY),
+  R2_BUCKET: optional(process.env.R2_BUCKET),
 });
 
 if (!parsed.success) {
