@@ -26,6 +26,7 @@
     "apply-answers": "node --env-file=.env.local --import tsx scripts/apply-answers.ts",
     "gmail-auth": "node --env-file=.env.local --import tsx scripts/gmail-auth.ts",
     "outreach": "node --env-file=.env.local --import tsx scripts/outreach.ts",
+    "media": "node --env-file=.env.local --import tsx scripts/media.ts",
     "knowledge:smoke": "node --env-file=.env.local --import tsx scripts/knowledge-smoke.ts",
     "ingest:smoke": "node --env-file=.env.local --import tsx scripts/ingest-smoke.ts",
     "sources:smoke": "node --env-file=.env.local --import tsx scripts/sources-smoke.ts",

@@ -58,6 +58,9 @@ const serverEnvSchema = z.object({
   R2_ACCESS_KEY_ID: z.string().min(1).optional(),
   R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
   R2_BUCKET: z.string().min(1).optional(),
+  // Cloudinary — visual proof (demo videos / screenshots / diagrams).
+  // Format: cloudinary://<api_key>:<api_secret>@<cloud_name>
+  CLOUDINARY_URL: z.string().min(1).optional(),
 });
 
 const optional = (v: string | undefined) => (v && v.length > 0 ? v : undefined);
@@ -84,6 +87,7 @@ const parsed = serverEnvSchema.safeParse({
   R2_ACCESS_KEY_ID: optional(process.env.R2_ACCESS_KEY_ID),
   R2_SECRET_ACCESS_KEY: optional(process.env.R2_SECRET_ACCESS_KEY),
   R2_BUCKET: optional(process.env.R2_BUCKET),
+  CLOUDINARY_URL: optional(process.env.CLOUDINARY_URL),
 });
 
 if (!parsed.success) {
