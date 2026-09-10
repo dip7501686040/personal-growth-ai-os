@@ -12,7 +12,7 @@
     "default": "Senior engineer with 6+ years building production backend and full-stack systems — event-driven microservices, RAG/LLM features, and the platform and CI/CD that ship them. Comfortable owning a service end to end: schema, API, messaging, observability, and rollout.",
     "backend": "Backend engineer with 6+ years designing event-driven microservice platforms — NestJS/Node.js services over gRPC and RabbitMQ, per-service Postgres, multi-tenant RBAC, and full OpenTelemetry observability. Recently built an 11-service AI notification platform end to end.",
     "platform": "Full-stack engineer who also owns the platform: reproducible Kubernetes deployments via Helm + ArgoCD GitOps, a Terraform-defined AWS-shaped runtime (EKS/ECR/ELBv2), Jenkins CI, and an OpenTelemetry → Prometheus/Loki/Jaeger/Grafana stack — plus 6+ years of the microservices those pipelines deploy.",
-    "ai-llm": "Engineer building LLM-backed product features on solid distributed-systems foundations: multi-provider AI analysis pipelines, pgvector RAG (duplicate-incident detection, per-JD retrieval), LangGraph agents behind a provider-ladder abstraction, and the event-driven microservices they run inside."
+    "ai-llm": "Engineer building LLM-backed product features on solid distributed-systems foundations: multi-provider AI analysis pipelines, pgvector RAG (duplicate-incident detection, role-to-evidence retrieval), LangGraph agents behind a provider-ladder abstraction, and the event-driven microservices they run inside."
   },
   "skills": [
     {
@@ -207,7 +207,7 @@
       "bullets": [
         "Next.js 16 App Router + Supabase Postgres (Drizzle, RLS); a pgvector RAG knowledge base with cross-source duplicate detection and deterministic entity linking.",
         "Eight structured LLM agents behind a provider-ladder abstraction (Gemini / OpenAI / Anthropic) with automatic fallback; a LangGraph extraction agent.",
-        "Seven nightly Vercel cron jobs for ingestion, mapping, and briefings; a deterministic per-JD proof-of-work retrieval endpoint."
+        "Seven nightly Vercel cron jobs for ingestion, mapping, and briefings; a deterministic retrieval endpoint that maps a role's requirements to proof from shipped work."
       ],
       "tech": [
         "Next.js",

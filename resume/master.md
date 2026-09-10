@@ -64,7 +64,7 @@ Reproducible, auditable Kubernetes delivery for a 13-service platform: every cha
 A private system that distills real engineering work into a proof-of-skills graph feeding career, content, and learning agents.
 - Next.js 16 App Router + Supabase Postgres (Drizzle, RLS); a pgvector RAG knowledge base with cross-source duplicate detection and deterministic entity linking.
 - Eight structured LLM agents behind a provider-ladder abstraction (Gemini / OpenAI / Anthropic) with automatic fallback; a LangGraph extraction agent.
-- Seven nightly Vercel cron jobs for ingestion, mapping, and briefings; a deterministic per-JD proof-of-work retrieval endpoint.
+- Seven nightly Vercel cron jobs for ingestion, mapping, and briefings; a deterministic retrieval endpoint that maps a role's requirements to proof from shipped work.
 *Tech: Next.js, TypeScript, PostgreSQL, pgvector, Drizzle, LangGraph, OpenAI / Anthropic APIs, Vercel*  ·  https://github.com/dip7501686040/personal-growth-ai-os
 
 ### Japshop Admin Panel — Financial Logbook
