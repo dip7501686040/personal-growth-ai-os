@@ -32,20 +32,45 @@ Ask which to prep — the user names indices, or says "prep the top N of Group A
 pnpm apply-prep --jobs /tmp/jobs.json --pick 0,1,4,6
 ```
 
-Writes `applications/<date>/<company>__<role>/` per pick with: `resume.md` / `.html` / `.docx` (archetype auto-picked, tailored to the JD via get_proof_for_jd), `proof-bundle.md`, `outreach-targets.md`, `search-provenance.md` (why this job surfaced — manual vs knowledge-graph layer + score math), `job.json`.
+Writes `applications/<date>/<company>__<role>/` per pick — to the local cache
+and the R2 `applications` bucket (the source of truth) — with: `resume.md` /
+`.html` / `.pdf` (archetype auto-picked, tailored to the JD via
+get_proof_for_jd), `proof-bundle.md`, `outreach-targets.md`,
+`search-provenance.md` (why this job surfaced), `job.json`, and **stub**
+`why-fit.md` / `pitch-recruiter.md` / `pitch-referral.md` for you to fill in
+(re-running the scaffold never overwrites prose you've written).
 
 ## 4. Write the prose files (your judgment — Sonnet)
 
 For each folder, using `job.json` (the JD + match data) and `proof-bundle.md`:
 
-| File | Length | Notes |
+| File | Shape | Notes |
 |---|---|---|
-| `why-fit.md` | ~150 words | the "why are you a fit?" box. Lead with the 2–3 strongest proof points from `proof-bundle.md`. Concrete, first person, no fluff. |
-| `cover-letter.md` | ~250 words | only if the JD/portal asks for one — otherwise skip the file. |
-| `pitch-recruiter.md` | 60–90 words | DM/email to a recruiter. Open with the single best proof link. |
-| `pitch-referral.md` | 60–90 words | asking a current employee for a referral — warmer, shorter, one link. |
+| `why-fit.md` | ~150 words | the "why are you a fit?" box. Lead with the 2–3 strongest proof points from `proof-bundle.md`. Concrete, first person. |
+| `cover-letter.md` | ~250 words | only if the JD/portal asks for one, or the application is by email — otherwise skip the file. |
+| `pitch-recruiter.md` | 3 parts (below) | cold outreach to the gatekeeper — recruiter **or** hiring manager. |
+| `pitch-referral.md` | same 3 parts | asking a current employee for a referral — warmer, shorter. |
 
-Ground every claim in `proof-bundle.md` / `resume.md`. Never invent a metric, project, or link. If a skill has no shipped-feature proof, don't claim it as proven.
+Both pitch files carry every channel in one file (no separate LinkedIn/email files):
+
+```
+# Pitch — <who> · <Company>
+
+Subject: <email subject line>
+
+## Message
+<~80 words (referral ~70). Opens with the single strongest proof link.
+Serves as a cold email or a LinkedIn DM / InMail.>
+
+## LinkedIn connection note (≤300 chars)
+<a tight cold-open that fits the connection-request limit — identity + role + one hook>
+```
+
+`pnpm outreach email` reads the `Subject:` line and the `## Message` section;
+`/apply-drive` and Phase 9 use the `## LinkedIn connection note`.
+
+Ground every claim in `proof-bundle.md` / `resume.md`. Never invent a metric,
+project, or link. If a skill has no shipped-feature proof, don't claim it as proven.
 
 ## 5. Record in the ledger
 

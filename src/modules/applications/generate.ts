@@ -88,6 +88,19 @@ export async function persist(
   }
 }
 
+/** Write a file only if it doesn't already exist (or is blank) — for prose stubs. */
+async function persistIfAbsent(
+  date: string,
+  folder: string,
+  file: string,
+  body: string,
+): Promise<boolean> {
+  const existing = await readFolderFile(date, folder, file);
+  if (existing != null && existing.trim()) return false;
+  await persist(date, folder, file, body);
+  return true;
+}
+
 /** Push an already-written local file (e.g. the Chrome-rendered PDF) to R2. */
 async function persistExistingLocal(
   date: string,
@@ -262,6 +275,41 @@ export function searchProvenanceMd(
   return L.filter((x): x is string => x !== undefined).join("\n");
 }
 
+// ── prose stubs (Claude fills these; scaffold only lays down the structure) ──
+
+export function whyFitStub(): string {
+  return (
+    `<!-- ~150 words — the "why are you a fit?" box. Lead with the 2–3 strongest ` +
+    `proof points from proof-bundle.md. First person, concrete, no fabrication. -->\n`
+  );
+}
+
+/**
+ * The one file per audience, carrying every channel. `pitch-recruiter.md` is the
+ * gatekeeper (recruiter *or* hiring manager); `pitch-referral.md` is a current
+ * employee. Parsed by `pnpm outreach` (Subject: line, ## Message section).
+ */
+export function pitchStub(kind: "recruiter" | "referral", j: ScoredJob): string {
+  const who =
+    kind === "recruiter" ? "recruiter / hiring manager" : "a current employee (referral)";
+  const messageHint =
+    kind === "recruiter"
+      ? `~80 words. Open with the single strongest proof link from proof-bundle.md. First person, concrete, no fluff. Works as a cold email or a LinkedIn DM / InMail.`
+      : `~70 words, warmer and shorter than the recruiter pitch. One proof link. You're asking someone inside ${j.company} to refer you.`;
+  return [
+    `# Pitch — ${who} · ${j.company}`,
+    ``,
+    `Subject: `,
+    ``,
+    `## Message`,
+    `<!-- ${messageHint} -->`,
+    ``,
+    `## LinkedIn connection note (≤300 chars)`,
+    `<!-- A cold open that fits the 300-char connect-request limit: who you are, the role at ${j.company}, one hook. -->`,
+    ``,
+  ].join("\n");
+}
+
 export function outreachMd(j: ScoredJob): string {
   const L: string[] = [`# Outreach — ${j.company} / ${j.role}`, ``];
   if (j.contactName || j.contactEmail) {
@@ -344,6 +392,13 @@ export async function scaffoldJobFolder(input: ScaffoldInput): Promise<ScaffoldR
   };
   await persist(date, folder, "job.json", JSON.stringify(folderJob, null, 2));
   files.push("job.json");
+
+  // Prose skeletons — only if not already written, so re-scaffolding a folder
+  // never clobbers real pitches / why-fit text.
+  await persistIfAbsent(date, folder, "why-fit.md", whyFitStub());
+  await persistIfAbsent(date, folder, "pitch-recruiter.md", pitchStub("recruiter", input.job));
+  await persistIfAbsent(date, folder, "pitch-referral.md", pitchStub("referral", input.job));
+  files.push("why-fit.md", "pitch-recruiter.md", "pitch-referral.md");
 
   return {
     date,
