@@ -5,6 +5,7 @@
  *   pnpm outreach send     <draftId>
  *   pnpm outreach drafts
  *   pnpm outreach linkedin <folder> [--open] [--sent recruiter|referral --note "..."]
+ *   pnpm outreach status   [--json]
  *
  * `email` builds the message from the folder's cover-letter.md (apply) or the
  * Message section of pitch-recruiter.md (cold), attaches resume.pdf, and
@@ -27,6 +28,8 @@ import {
 } from "@/lib/outreach/gmail";
 import { writeFolderFile } from "@/modules/applications/generate";
 import {
+  applicationsOverview,
+  countApplicationsByStatus,
   listOpenApplications,
   recordTouchpoint,
 } from "@/modules/applications/service";
@@ -255,13 +258,74 @@ async function draftsCmd() {
   }
 }
 
+const STATUS_ORDER = [
+  "draft",
+  "applied",
+  "screening",
+  "interviewing",
+  "offer",
+  "rejected",
+  "ghosted",
+];
+
+function fmtDay(iso: string | null): string {
+  return iso ? iso.slice(0, 10) : "—";
+}
+
+async function statusCmd() {
+  const userId = await getOwnerUserId();
+  const [rows, counts] = await Promise.all([
+    applicationsOverview(userId),
+    countApplicationsByStatus(userId),
+  ]);
+
+  if (process.argv.includes("--json")) {
+    console.log(JSON.stringify(rows, null, 2));
+    return;
+  }
+  if (rows.length === 0) {
+    console.log("no applications yet");
+    return;
+  }
+
+  const summary = STATUS_ORDER.filter((s) => counts[s])
+    .map((s) => `${s} ${counts[s]}`)
+    .join(" · ");
+  console.log(`Applications — ${rows.length} total · ${summary}\n`);
+
+  const sorted = [...rows].sort((a, b) => {
+    if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+
+  for (const r of sorted) {
+    const ch = r.channels.length
+      ? r.channels
+          .map((c) => `${c.channel}${c.count > 1 ? `·${c.count}` : ""}`)
+          .join(" ")
+      : "no touchpoints";
+    console.log(
+      `${r.status.padEnd(12)} ${r.company} — ${r.role}\n` +
+        `             channels: ${ch}` +
+        (r.kinds.length ? `   kinds: ${r.kinds.join(", ")}` : "") +
+        `\n             last ${fmtDay(r.lastAt)}` +
+        (r.nextDueAt
+          ? ` · next due ${fmtDay(r.nextDueAt)}${r.overdue ? "  [OVERDUE]" : ""}`
+          : "") +
+        (r.bundleDir ? `\n             ${r.bundleDir}` : "") +
+        "\n",
+    );
+  }
+}
+
 async function main() {
   const cmd = process.argv[2];
   if (cmd === "email") return emailCmd();
   if (cmd === "send") return sendCmd();
   if (cmd === "drafts") return draftsCmd();
   if (cmd === "linkedin") return linkedinCmd();
-  throw new Error("commands: email | send | drafts | linkedin");
+  if (cmd === "status") return statusCmd();
+  throw new Error("commands: email | send | drafts | linkedin | status");
 }
 
 main().catch((e) => {

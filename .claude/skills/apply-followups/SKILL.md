@@ -8,7 +8,8 @@ description: Draft the follow-up messages that are due today for open applicatio
 ## 1. What's owed
 
 ```
-pnpm apply due
+pnpm apply due            # JSON, drives the drafting below
+pnpm outreach status      # human view — channels used per job + [OVERDUE] markers
 ```
 
 JSON list of open applications whose scheduled follow-up date has passed — each has `id`, `company`, `role`, `lastKind` (what was sent last), `dueAt`, `bundleDir`.

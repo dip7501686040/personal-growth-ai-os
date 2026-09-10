@@ -19,14 +19,23 @@ pnpm apply submit "applications/<date>/<company>__<role>" --channel portal
 
 ## Pitch sent
 
-After the user sends `pitch-recruiter.md` / `pitch-referral.md`:
+If the user sent it via `pnpm outreach` those commands already logged the
+touchpoint — nothing to do here. Otherwise, after they send
+`pitch-recruiter.md` / `pitch-referral.md` by hand:
 
 ```
 pnpm apply touchpoint "<folder|id>" --kind recruiter_pitch --channel linkedin
 pnpm apply touchpoint "<folder|id>" --kind referral_pitch  --channel email
 ```
 
-Also schedules a day-5 nudge.
+(`pnpm outreach send <draftId>` and `pnpm outreach linkedin <folder> --sent …`
+write the same touchpoints.) Also schedules a day-5 nudge.
+
+## Where things stand
+
+```
+pnpm outreach status        # per-job: channels used, kinds, next follow-up due
+```
 
 ## Reply / interview / note
 

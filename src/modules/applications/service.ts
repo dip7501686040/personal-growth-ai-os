@@ -364,3 +364,88 @@ export async function countApplicationsByStatus(
   for (const r of rows) out[r.status] = r.n;
   return out;
 }
+
+export interface ApplicationOverviewRow {
+  id: string;
+  company: string;
+  role: string;
+  status: ApplicationStatus;
+  bundleDir: string | null;
+  createdAt: string;
+  /** touchpoints rolled up per channel */
+  channels: { channel: string; count: number; lastAt: string }[];
+  /** distinct touchpoint kinds seen, in first-seen order */
+  kinds: string[];
+  lastAt: string | null;
+  nextDueAt: string | null;
+  overdue: boolean;
+}
+
+/** One compact row per application: which channels have been used and what's due. */
+export async function applicationsOverview(
+  userId: string,
+): Promise<ApplicationOverviewRow[]> {
+  const apps = await db
+    .select()
+    .from(jobApplications)
+    .where(eq(jobApplications.userId, userId))
+    .orderBy(desc(jobApplications.createdAt));
+  if (apps.length === 0) return [];
+
+  const tps = await db
+    .select()
+    .from(applicationTouchpoints)
+    .where(
+      inArray(
+        applicationTouchpoints.applicationId,
+        apps.map((a) => a.id),
+      ),
+    )
+    .orderBy(asc(applicationTouchpoints.sentAt));
+
+  const byApp = new Map<string, ApplicationTouchpoint[]>();
+  for (const t of tps) {
+    const arr = byApp.get(t.applicationId) ?? [];
+    arr.push(t);
+    byApp.set(t.applicationId, arr);
+  }
+
+  const now = Date.now();
+  return apps.map((a) => {
+    const list = byApp.get(a.id) ?? [];
+    const chMap = new Map<string, { count: number; lastAt: Date }>();
+    const kinds: string[] = [];
+    for (const t of list) {
+      const e = chMap.get(t.channel);
+      if (e) {
+        e.count += 1;
+        if (t.sentAt > e.lastAt) e.lastAt = t.sentAt;
+      } else {
+        chMap.set(t.channel, { count: 1, lastAt: t.sentAt });
+      }
+      if (!kinds.includes(t.kind)) kinds.push(t.kind);
+    }
+    const last = list.at(-1) ?? null;
+    const nextDue = last?.nextDueAt ?? null;
+    return {
+      id: a.id,
+      company: a.company,
+      role: a.role,
+      status: a.status as ApplicationStatus,
+      bundleDir: a.bundleDir,
+      createdAt: a.createdAt.toISOString(),
+      channels: [...chMap.entries()].map(([channel, v]) => ({
+        channel,
+        count: v.count,
+        lastAt: v.lastAt.toISOString(),
+      })),
+      kinds,
+      lastAt: last?.sentAt.toISOString() ?? null,
+      nextDueAt: nextDue?.toISOString() ?? null,
+      overdue: nextDue
+        ? nextDue.getTime() < now &&
+          (a.status === "applied" || a.status === "screening")
+        : false,
+    };
+  });
+}
