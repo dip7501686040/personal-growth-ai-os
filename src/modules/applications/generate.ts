@@ -34,6 +34,7 @@ import {
   listKeys,
   putObject,
 } from "./store";
+import { visualProofMd } from "./visual-proof";
 
 const LOCAL_ROOT = join(process.cwd(), "applications");
 const EMPTY_PROOF: JdProof = {
@@ -181,7 +182,10 @@ export function proofBundleMd(j: ScoredJob, proof: JdProof): string {
           p.repoUrl ? `repo ${p.repoUrl}` : "",
           ...p.codeLinks.slice(0, 3).map((c) => `${c.label} ${c.url}`),
         ].filter(Boolean);
-        L.push(`- **${p.featureTitle}** (${p.projectName}) — ${links.join("  ·  ") || "no link"}`);
+        L.push(
+          `- **${p.featureTitle}** (${p.projectName}) — ${links.join("  ·  ") || "no link"}` +
+            visualProofMd(p.projectName, p.featureTitle),
+        );
       }
       if (s.proof.length > 3) L.push(`- _…+${s.proof.length - 3} more features_`);
       L.push(``);
@@ -200,7 +204,10 @@ export function proofBundleMd(j: ScoredJob, proof: JdProof): string {
         f.repoUrl ? `repo ${f.repoUrl}` : "",
         ...f.codeLinks.map((c) => `${c.label} ${c.url}`),
       ].filter(Boolean);
-      L.push(`- **${f.title}** (${f.projectName}) — ${links.join("  ·  ") || "no link"}`);
+      L.push(
+        `- **${f.title}** (${f.projectName}) — ${links.join("  ·  ") || "no link"}` +
+          visualProofMd(f.projectName, f.title),
+      );
     }
     L.push(``);
   }
