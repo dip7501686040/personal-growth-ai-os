@@ -23,6 +23,7 @@
     "apply-prep": "node --env-file=.env.local --import tsx scripts/apply-prep.ts",
     "apply": "node --env-file=.env.local --import tsx scripts/apply.ts",
     "apply-fill": "node --env-file=.env.local --import tsx scripts/apply-fill.ts",
+    "apply-answers": "node --env-file=.env.local --import tsx scripts/apply-answers.ts",
     "knowledge:smoke": "node --env-file=.env.local --import tsx scripts/knowledge-smoke.ts",
     "ingest:smoke": "node --env-file=.env.local --import tsx scripts/ingest-smoke.ts",
     "sources:smoke": "node --env-file=.env.local --import tsx scripts/sources-smoke.ts",
