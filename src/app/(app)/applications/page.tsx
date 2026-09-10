@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUserId } from "@/lib/user";
 import { fmtDateTime } from "@/lib/format";
 import {
@@ -5,6 +6,12 @@ import {
   listApplications,
   listDueFollowups,
 } from "@/modules/applications/service";
+import {
+  folderName,
+  listDates,
+  listJobFolders,
+} from "@/modules/applications/generate";
+import { isR2Configured } from "@/modules/applications/store";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -41,16 +48,24 @@ const STATUS_VARIANT: Record<
 
 export default async function ApplicationsPage() {
   const userId = await requireUserId();
-  const [apps, counts, due] = await Promise.all([
+  const [apps, counts, due, dates] = await Promise.all([
     listApplications(userId),
     countApplicationsByStatus(userId),
     listDueFollowups(userId),
+    listDates(),
   ]);
 
   const grouped = STATUS_ORDER.map((s) => ({
     status: s,
     items: apps.filter((a) => a.status === s),
   })).filter((g) => g.items.length > 0);
+
+  const statusByFolder = new Map(
+    apps.map((a) => [folderName({ company: a.company, role: a.role }), a.status]),
+  );
+  const folderSections = await Promise.all(
+    dates.map(async (d) => ({ date: d, folders: await listJobFolders(d) })),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -177,6 +192,50 @@ export default async function ApplicationsPage() {
           </div>
         </section>
       ))}
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-sm font-semibold">Folders</h3>
+          <p className="text-xs text-muted-foreground">
+            The per-job bundles.{" "}
+            {isR2Configured()
+              ? "Source of truth: the R2 applications bucket."
+              : "R2 not configured — showing the local cache."}
+          </p>
+        </div>
+        {folderSections.length === 0 && (
+          <p className="text-sm text-muted-foreground">No folders yet.</p>
+        )}
+        {folderSections.map(({ date, folders }) => (
+          <div key={date} className="flex flex-col gap-1.5">
+            <h4 className="text-xs font-semibold text-muted-foreground">
+              {date} · {folders.length}
+            </h4>
+            <div className="divide-y rounded-lg border">
+              {folders.map((f) => {
+                const st = statusByFolder.get(f);
+                return (
+                  <Link
+                    key={f}
+                    href={`/applications/${date}/${f}`}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent/50"
+                  >
+                    <span className="truncate">{f}</span>
+                    {st && (
+                      <Badge
+                        variant={STATUS_VARIANT[st] ?? "outline"}
+                        className="ml-auto"
+                      >
+                        {st}
+                      </Badge>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </section>
     </div>
   );
 }
