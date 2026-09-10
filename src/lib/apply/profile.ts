@@ -51,10 +51,11 @@ const profileSchema = z.object({
   authorization: z.record(z.string(), authEntrySchema),
   compensation: z.object({
     currency: z.string(),
-    expectationMin: z.number().nullable(),
-    expectationMax: z.number().nullable(),
+    // number (e.g. 120000) or free text (e.g. "25k USD", "$120k") or null
+    expectationMin: z.union([z.string(), z.number()]).nullable(),
+    expectationMax: z.union([z.string(), z.number()]).nullable(),
     expectationNote: z.string().default(""),
-    currentCtc: z.number().nullable().default(null),
+    currentCtc: z.union([z.string(), z.number()]).nullable().default(null),
   }),
   eeo: z.object({
     gender: z.string(),
@@ -106,10 +107,12 @@ export function profileGaps(p: Profile = loadProfile()): string[] {
   if (!p.identity.pronouns) gaps.push("identity.pronouns");
   if (!p.links.portfolio) gaps.push("links.portfolio");
   if (!p.work.earliestStartDate) gaps.push("work.earliestStartDate");
-  if (p.compensation.expectationMin == null)
-    gaps.push("compensation.expectationMin");
-  if (p.compensation.expectationMax == null)
-    gaps.push("compensation.expectationMax");
+  if (
+    p.compensation.expectationMin == null &&
+    p.compensation.expectationMax == null &&
+    !p.compensation.expectationNote
+  )
+    gaps.push("compensation.expectation");
   return gaps;
 }
 
@@ -134,13 +137,22 @@ export function authFor(region: AuthRegion, p: Profile = loadProfile()) {
   return p.authorization[region] ?? p.authorization.default;
 }
 
+function money(v: string | number, currency: string): string {
+  return typeof v === "number" ? `${currency} ${v.toLocaleString()}` : v;
+}
+
 function compExpectation(p: Profile): string {
   const { expectationMin, expectationMax, currency, expectationNote } =
     p.compensation;
   if (expectationMin != null && expectationMax != null) {
-    return `${currency} ${expectationMin.toLocaleString()}–${expectationMax.toLocaleString()}`;
+    return `${money(expectationMin, currency)}–${money(expectationMax, currency)}`;
   }
-  if (expectationMin != null) return `${currency} ${expectationMin.toLocaleString()}+`;
+  if (expectationMin != null) {
+    return typeof expectationMin === "number"
+      ? `${money(expectationMin, currency)}+`
+      : expectationMin;
+  }
+  if (expectationMax != null) return `up to ${money(expectationMax, currency)}`;
   return expectationNote || "Open — happy to discuss a range.";
 }
 
@@ -246,13 +258,14 @@ export function answerFor(label: string): Answer | null {
 
   // ── compensation ─────────────────────────────────────────────────────────
   if (m(/salary|compensation|expected (ctc|pay|rate|salary)|pay expectation|rate expectation|desired (salary|compensation)/))
-    return A(compExpectation(p), "compensation", p.compensation.expectationMin != null);
+    return A(
+      compExpectation(p),
+      "compensation",
+      p.compensation.expectationMin != null || p.compensation.expectationMax != null,
+    );
   if (m(/current (ctc|salary|compensation)/))
     return p.compensation.currentCtc != null
-      ? A(
-          `${p.compensation.currency} ${p.compensation.currentCtc.toLocaleString()}`,
-          "compensation.currentCtc",
-        )
+      ? A(money(p.compensation.currentCtc, p.compensation.currency), "compensation.currentCtc")
       : A("Prefer not to disclose", "compensation.currentCtc", false);
 
   // ── EEO / voluntary ──────────────────────────────────────────────────────

@@ -22,6 +22,7 @@
     "jobs": "node --env-file=.env.local --import tsx scripts/jobs.ts",
     "apply-prep": "node --env-file=.env.local --import tsx scripts/apply-prep.ts",
     "apply": "node --env-file=.env.local --import tsx scripts/apply.ts",
+    "apply-fill": "node --env-file=.env.local --import tsx scripts/apply-fill.ts",
     "knowledge:smoke": "node --env-file=.env.local --import tsx scripts/knowledge-smoke.ts",
     "ingest:smoke": "node --env-file=.env.local --import tsx scripts/ingest-smoke.ts",
     "sources:smoke": "node --env-file=.env.local --import tsx scripts/sources-smoke.ts",
@@ -63,6 +64,7 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
+    "playwright": "^1.63.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
     "typescript": "^5"
