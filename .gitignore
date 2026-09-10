@@ -48,6 +48,9 @@ next-env.d.ts
 # generated résumé output (source is resume/master.json)
 resume/out/
 
+# standing answer bank for application forms (copy from profile.example.json)
+resume/profile.json
+
 # generated per-job application folders (ledger is in the DB) — root only,
 # not src/**/applications which is real source
 /applications/

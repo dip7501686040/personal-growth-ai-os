@@ -1,0 +1,61 @@
+{
+  "_note": "Standing answers for job-application forms and outreach. Copy to resume/profile.json (gitignored) and fill in. Consumed by src/lib/apply/profile.ts → answerFor().",
+  "identity": {
+    "firstName": "",
+    "lastName": "",
+    "fullName": "",
+    "email": "",
+    "phone": "",
+    "location": { "city": "", "region": "", "country": "" },
+    "timezone": "",
+    "pronouns": ""
+  },
+  "links": {
+    "linkedin": "",
+    "github": "",
+    "portfolio": "",
+    "website": ""
+  },
+  "work": {
+    "yearsExperience": 0,
+    "currentTitle": "",
+    "seniority": "",
+    "noticePeriodDays": 30,
+    "earliestStartDate": "",
+    "remoteOnly": true,
+    "willingToRelocate": false,
+    "employmentTypes": ["permanent", "contract", "freelance"]
+  },
+  "authorization": {
+    "_help": "status: citizen | authorized | not_authorized. needsSponsorship: would you need a visa/work-permit sponsored for this region.",
+    "india": { "status": "not_authorized", "needsSponsorship": true },
+    "us": { "status": "not_authorized", "needsSponsorship": true },
+    "uk": { "status": "not_authorized", "needsSponsorship": true },
+    "eu": { "status": "not_authorized", "needsSponsorship": true },
+    "canada": { "status": "not_authorized", "needsSponsorship": true },
+    "australia": { "status": "not_authorized", "needsSponsorship": true },
+    "default": { "status": "not_authorized", "needsSponsorship": true }
+  },
+  "compensation": {
+    "currency": "USD",
+    "expectationMin": null,
+    "expectationMax": null,
+    "expectationNote": "",
+    "currentCtc": null
+  },
+  "eeo": {
+    "gender": "Decline to self-identify",
+    "race": "Decline to self-identify",
+    "veteranStatus": "Decline to self-identify",
+    "disabilityStatus": "Decline to self-identify",
+    "hispanicLatino": "Decline to self-identify"
+  },
+  "screening": {
+    "criminalRecord": false,
+    "requiresSponsorship": true,
+    "over18": true,
+    "canPassBackgroundCheck": true,
+    "referencesAvailable": true,
+    "howDidYouHear": ""
+  }
+}
