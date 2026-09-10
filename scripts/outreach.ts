@@ -1,24 +1,35 @@
 /**
  * Outreach + email-apply drafts, straight into your Gmail Drafts.
  *
- *   pnpm outreach email <folder> [--kind apply|cold] [--to addr] [--subject "..."] [--date YYYY-MM-DD]
- *   pnpm outreach send  <draftId>
+ *   pnpm outreach email    <folder> [--kind apply|cold] [--to addr] [--subject "..."] [--date YYYY-MM-DD]
+ *   pnpm outreach send     <draftId>
  *   pnpm outreach drafts
+ *   pnpm outreach linkedin <folder> [--open] [--sent recruiter|referral --note "..."]
  *
  * `email` builds the message from the folder's cover-letter.md (apply) or the
  * Message section of pitch-recruiter.md (cold), attaches resume.pdf, and
  * creates a DRAFT only. Review it in Gmail, then `pnpm outreach send <id>`.
+ *
+ * `linkedin` prints the people-search URLs and the connection notes + messages
+ * from the pitch files, and opens LinkedIn in your normal browser. YOU send by
+ * hand — no automation. `--sent` logs the touchpoint afterward.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { getOwnerUserId } from "@/lib/owner";
 import { loadProfile } from "@/lib/apply/profile";
 import {
   createDraft,
   listDrafts,
+  openInBrowser,
   sendDraft,
   tokenExists,
 } from "@/lib/outreach/gmail";
 import { writeFolderFile } from "@/modules/applications/generate";
+import {
+  listOpenApplications,
+  recordTouchpoint,
+} from "@/modules/applications/service";
 import { pullRemote } from "./apply-sync";
 
 function arg(name: string): string | undefined {
@@ -131,6 +142,107 @@ async function sendCmd() {
   console.log(`sent — message ${r.id} (thread ${r.threadId})`);
 }
 
+async function linkedinCmd() {
+  const folderArg = process.argv[3];
+  if (!folderArg || folderArg.startsWith("--")) {
+    throw new Error(
+      "usage: pnpm outreach linkedin <folder> [--open] [--sent recruiter|referral]",
+    );
+  }
+  const { date, folder } = parseFolder(folderArg, arg("--date"));
+  await pullRemote(`${date}/${folder}`).catch(() => {});
+  const dir = join("applications", date, folder);
+  if (!existsSync(join(dir, "job.json"))) {
+    throw new Error(`no local/R2 folder for ${date}/${folder}`);
+  }
+  const job = JSON.parse(readFileSync(join(dir, "job.json"), "utf8")) as {
+    company: string;
+    role: string;
+    contactName?: string | null;
+  };
+
+  const sent = arg("--sent");
+  if (sent) {
+    if (sent !== "recruiter" && sent !== "referral") {
+      throw new Error("--sent must be `recruiter` or `referral`");
+    }
+    const userId = await getOwnerUserId();
+    const hit = (await listOpenApplications(userId)).find(
+      (a) => a.company === job.company && a.role === job.role,
+    );
+    if (!hit) {
+      console.log("no ledger row — run `pnpm apply record` first");
+      return;
+    }
+    await recordTouchpoint(userId, {
+      applicationId: hit.id,
+      kind: sent === "recruiter" ? "recruiter_pitch" : "referral_pitch",
+      channel: "linkedin",
+      note: arg("--note") ?? undefined,
+    });
+    const line = `\n## ${new Date().toISOString()} · linkedin · ${sent} pitch sent${
+      arg("--note") ? ` — ${arg("--note")}` : ""
+    }\n`;
+    await writeFolderFile(
+      date,
+      folder,
+      "outreach-log.md",
+      read(join(dir, "outreach-log.md")) + line,
+    );
+    console.log(`logged: ${sent} pitch on LinkedIn`);
+    return;
+  }
+
+  const enc = encodeURIComponent;
+  const peopleSearch = (q: string) =>
+    `https://www.linkedin.com/search/results/people/?keywords=${enc(q)}`;
+  const searches: [string, string][] = [
+    ["recruiter", peopleSearch(`${job.company} recruiter`)],
+    ["eng manager", peopleSearch(`${job.company} engineering manager`)],
+    ["talent", peopleSearch(`${job.company} talent acquisition`)],
+  ];
+  if (job.contactName)
+    searches.unshift([
+      `named: ${job.contactName}`,
+      peopleSearch(`${job.contactName} ${job.company}`),
+    ]);
+
+  const pitchR = read(join(dir, "pitch-recruiter.md"));
+  const pitchF = read(join(dir, "pitch-referral.md"));
+  const note = (md: string) =>
+    sectionOf(md, "LinkedIn connection note") || "(write the LinkedIn note in the pitch file)";
+  const message = (md: string) =>
+    sectionOf(md, "Message") || "(write the Message section in the pitch file)";
+
+  console.log(
+    [
+      `LinkedIn outreach — ${job.company} / ${job.role}`,
+      ``,
+      `Find a person:`,
+      ...searches.map(([k, u]) => `  ${k.padEnd(16)} ${u}`),
+      ``,
+      `── Recruiter / hiring manager ──`,
+      `Connection note (≤300):`,
+      `  ${note(pitchR).replace(/\n/g, "\n  ")}`,
+      ``,
+      `Message once connected:`,
+      `  ${message(pitchR).replace(/\n/g, "\n  ")}`,
+      ``,
+      `── Current employee (referral) ──`,
+      `Connection note (≤300):`,
+      `  ${note(pitchF).replace(/\n/g, "\n  ")}`,
+      ``,
+      `Message once connected:`,
+      `  ${message(pitchF).replace(/\n/g, "\n  ")}`,
+      ``,
+      `You send these by hand. After you do:`,
+      `  pnpm outreach linkedin ${folderArg} --sent recruiter|referral`,
+    ].join("\n"),
+  );
+
+  if (process.argv.includes("--open")) openInBrowser(searches[0][1]);
+}
+
 async function draftsCmd() {
   if (!tokenExists()) throw new Error("Not authorized — run `pnpm gmail-auth` once.");
   const rows = await listDrafts();
@@ -148,7 +260,8 @@ async function main() {
   if (cmd === "email") return emailCmd();
   if (cmd === "send") return sendCmd();
   if (cmd === "drafts") return draftsCmd();
-  throw new Error("commands: email | send | drafts");
+  if (cmd === "linkedin") return linkedinCmd();
+  throw new Error("commands: email | send | drafts | linkedin");
 }
 
 main().catch((e) => {
