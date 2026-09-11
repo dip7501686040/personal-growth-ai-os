@@ -13,6 +13,7 @@ import {
   type ContentItem,
   type ContentSource,
 } from "@/lib/db/schema";
+import { slugify } from "@/lib/slug";
 
 export type ContentStatus =
   | "idea"
@@ -406,4 +407,130 @@ export async function getContentSnapshot(userId: string) {
   ]);
 
   return { sessions, features, dsa, levelups };
+}
+
+// ── Group A — feature resolution + idempotency check ────────────────────────
+
+export interface ResolvedFeature {
+  id: string;
+  title: string;
+  description: string | null;
+  projectId: string;
+  projectName: string;
+  projectSlug: string;
+  repoUrl: string | null;
+  codePaths: Record<string, string> | null;
+}
+
+/** (projectSlug, featureKey) -> the real feature row, matching by
+ *  slugify(title) the same way the public API derives featureSlug. */
+export async function findFeature(
+  userId: string,
+  projectSlug: string,
+  featureKey: string,
+): Promise<ResolvedFeature | null> {
+  const rows = await db
+    .select({
+      id: projectFeatures.id,
+      title: projectFeatures.title,
+      description: projectFeatures.description,
+      codePaths: projectFeatures.codePaths,
+      projectId: projects.id,
+      projectName: projects.name,
+      projectSlug: projects.slug,
+      repoUrl: projects.repoUrl,
+    })
+    .from(projectFeatures)
+    .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
+    .where(
+      and(
+        eq(projects.userId, userId),
+        eq(projects.slug, projectSlug),
+        isNull(projectFeatures.excludedAt),
+      ),
+    );
+  const match = rows.find((r) => slugify(r.title) === featureKey);
+  return match
+    ? { ...match, codePaths: match.codePaths as Record<string, string> | null }
+    : null;
+}
+
+/** Idempotency check — an existing portfolio card already covering this
+ *  feature, if any. `ensureVisualProof` (scripts/content.ts) never
+ *  regenerates when this returns non-null. */
+export async function findCardForFeature(
+  userId: string,
+  featureId: string,
+): Promise<ContentItem | null> {
+  const [row] = await db
+    .select({ item: contentItems })
+    .from(contentSources)
+    .innerJoin(contentItems, eq(contentItems.id, contentSources.contentItemId))
+    .where(
+      and(
+        eq(contentSources.userId, userId),
+        eq(contentSources.sourceType, "project_feature"),
+        eq(contentSources.sourceId, featureId),
+        eq(contentItems.platform, "portfolio"),
+      ),
+    )
+    .limit(1);
+  return row?.item ?? null;
+}
+
+export interface MissingVisualProof {
+  featureId: string;
+  featureKey: string;
+  title: string;
+  description: string | null;
+  projectSlug: string;
+  projectName: string;
+}
+
+/** Every shipped, public feature that has no portfolio card yet — the
+ *  "what's missing" scan behind `pnpm content missing`. */
+export async function listMissingVisualProof(
+  userId: string,
+  projectSlug?: string,
+): Promise<MissingVisualProof[]> {
+  const rows = await db
+    .select({
+      featureId: projectFeatures.id,
+      title: projectFeatures.title,
+      description: projectFeatures.description,
+      projectSlug: projects.slug,
+      projectName: projects.name,
+    })
+    .from(projectFeatures)
+    .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
+    .where(
+      and(
+        eq(projects.userId, userId),
+        eq(projects.isPublic, true),
+        eq(projectFeatures.status, "done"),
+        isNull(projects.excludedAt),
+        isNull(projectFeatures.excludedAt),
+        projectSlug ? eq(projects.slug, projectSlug) : undefined,
+      ),
+    );
+  if (rows.length === 0) return [];
+
+  const featureIds = rows.map((r) => r.featureId);
+  const covered = await db
+    .select({ featureId: contentSources.sourceId })
+    .from(contentSources)
+    .innerJoin(contentItems, eq(contentItems.id, contentSources.contentItemId))
+    .where(
+      and(
+        eq(contentSources.userId, userId),
+        eq(contentSources.sourceType, "project_feature"),
+        inArray(contentSources.sourceId, featureIds),
+        eq(contentItems.platform, "portfolio"),
+      ),
+    );
+  const coveredIds = new Set(covered.map((c) => c.featureId).filter((x): x is string => !!x));
+
+  return rows
+    .filter((r) => !coveredIds.has(r.featureId))
+    .map((r) => ({ ...r, featureKey: slugify(r.title) }));
 }

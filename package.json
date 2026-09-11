@@ -28,6 +28,7 @@
     "outreach": "node --env-file=.env.local --import tsx scripts/outreach.ts",
     "media": "node --env-file=.env.local --import tsx scripts/media.ts",
     "files": "node --env-file=.env.local --import tsx scripts/files.ts",
+    "content": "node --env-file=.env.local --import tsx scripts/content.ts",
     "knowledge:smoke": "node --env-file=.env.local --import tsx scripts/knowledge-smoke.ts",
     "ingest:smoke": "node --env-file=.env.local --import tsx scripts/ingest-smoke.ts",
     "sources:smoke": "node --env-file=.env.local --import tsx scripts/sources-smoke.ts",

@@ -54,6 +54,9 @@ next-env.d.ts
 # Playwright MCP output (screenshots the apply-drive skill copies into folders)
 .apply-drive/
 
+# scratch output for terminal-card rendering (Group A)
+.scratch/
+
 # generated per-job application folders (ledger is in the DB) — root only,
 # not src/**/applications which is real source
 /applications/

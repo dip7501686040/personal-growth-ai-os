@@ -1,5 +1,5 @@
 import { execSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { findChrome } from "@/lib/chrome";
 import {
   AlignmentType,
   Document,
@@ -211,22 +211,6 @@ export function toHtml(m: ResumeModel): string {
 }
 
 // ── PDF via headless Chrome (ATS-safe: it's just the printed HTML) ────────
-
-const CHROME_CANDIDATES = [
-  process.env.CHROME_PATH,
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-  "/Applications/Chromium.app/Contents/MacOS/Chromium",
-  "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-  "/usr/bin/google-chrome",
-  "/usr/bin/google-chrome-stable",
-  "/usr/bin/chromium",
-  "/usr/bin/chromium-browser",
-].filter((p): p is string => !!p);
-
-function findChrome(): string | null {
-  for (const p of CHROME_CANDIDATES) if (existsSync(p)) return p;
-  return null;
-}
 
 /**
  * Render `htmlPath` to `pdfPath` using an already-installed Chrome/Chromium/Edge.
