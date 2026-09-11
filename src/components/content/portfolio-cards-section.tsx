@@ -69,6 +69,17 @@ export function PortfolioCardsSection({
   const assetByKey = useMemo(() => new Map(assets.map((a) => [assetKey(a), a])), [assets]);
   const selectedAsset = newAssetKey ? assetByKey.get(newAssetKey) : undefined;
 
+  const groupedCards = useMemo(() => {
+    const groups = new Map<string, Card[]>();
+    for (const c of cards) {
+      const key = c.projectName ?? "(no project)";
+      const arr = groups.get(key) ?? [];
+      arr.push(c);
+      groups.set(key, arr);
+    }
+    return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [cards]);
+
   const run = (fn: () => Promise<ActionState>, after?: () => void) =>
     start(async () => {
       const res = await fn();
@@ -171,8 +182,66 @@ export function PortfolioCardsSection({
       {cards.length === 0 ? (
         <p className="text-sm text-muted-foreground">No portfolio cards yet.</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {cards.map((c) => {
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            {groupedCards.map(([project, group]) => (
+              <a
+                key={project}
+                href={`#pc-${project.replace(/[^a-z0-9]+/gi, "-")}`}
+                className="rounded-full border bg-card px-2.5 py-1 text-xs hover:bg-accent/50"
+              >
+                {project} <span className="text-muted-foreground">· {group.length}</span>
+              </a>
+            ))}
+          </div>
+          {groupedCards.map(([project, group]) => (
+            <PortfolioCardGroup
+              key={project}
+              project={project}
+              cards={group}
+              editing={editing}
+              setEditing={setEditing}
+              features={features}
+              pending={pending}
+              run={run}
+              cloudinaryConfigured={cloudinaryConfigured}
+            />
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
+function PortfolioCardGroup({
+  project,
+  cards,
+  editing,
+  setEditing,
+  features,
+  pending,
+  run,
+  cloudinaryConfigured,
+}: {
+  project: string;
+  cards: Card[];
+  editing: string | null;
+  setEditing: (id: string | null) => void;
+  features: Feature[];
+  pending: boolean;
+  run: (fn: () => Promise<ActionState>, after?: () => void) => void;
+  cloudinaryConfigured: boolean;
+}) {
+  return (
+    <div
+      id={`pc-${project.replace(/[^a-z0-9]+/gi, "-")}`}
+      className="flex flex-col gap-2 scroll-mt-4"
+    >
+      <h3 className="text-sm font-semibold text-muted-foreground">
+        {project} · {cards.length}
+      </h3>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {cards.map((c) => {
             const isEditing = editing === c.id;
             return (
               <div key={c.id} className="flex flex-col overflow-hidden rounded-lg border bg-card">
@@ -242,8 +311,7 @@ export function PortfolioCardsSection({
             );
           })}
         </div>
-      )}
-    </div>
+      </div>
   );
 }
 
