@@ -12,10 +12,17 @@
  *                          [--caption "..."] [--force]
  *   pnpm content terminal --command "<cmd>" --project <slug> --feature <key> \
  *                          --title "..." [--caption "..."] [--cwd <path>]
+ *   pnpm content browser  --screenshot <rawPngPath> --url <liveUrl> \
+ *                          --project <slug> --feature <key> --title "..." \
+ *                          [--caption "..."] [--force]
  *   pnpm content record-steps --project <slug> --feature <key> --title "..."
  *
- * Never regenerates: `register`/`terminal` refuse when a card already
- * exists for that (project, feature) unless --force is passed.
+ * Never regenerates: `register`/`terminal` refuse when a *terminal-role* card
+ * already exists for that (project, feature); `browser` refuses when a
+ * *UI-role* card already exists. The two roles are independent — a feature
+ * can (and, when its project has a live UI, should) carry both, forming one
+ * proof "cycle": what a user sees in the product, then the code/terminal
+ * behind it. `--force` overrides either check.
  */
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
@@ -24,10 +31,12 @@ import { resourceTypeFor, uploadMedia } from "@/lib/media/cloudinary";
 import {
   createPortfolioCard,
   findCardForFeature,
+  findCardForFeatureRole,
   findFeature,
   listMissingVisualProof,
   type CardKind,
 } from "@/modules/content/service";
+import { renderBrowserCardPng } from "@/modules/content/browser-card";
 import { runAndRenderTerminalCard } from "@/modules/content/terminal-card";
 
 function arg(name: string): string | undefined {
@@ -95,10 +104,10 @@ async function registerCmd() {
   if (!title) throw new Error("--title is required");
 
   const { userId, feature } = await requireFeature(projectSlug, featureKey);
-  const existing = await findCardForFeature(userId, feature.id);
+  const existing = await findCardForFeatureRole(userId, feature.id, "terminal");
   if (existing && !has("--force")) {
     console.log(
-      `already have a card for ${projectSlug}/${featureKey}: "${existing.title}" — pass --force to add another, or edit it from /content instead.`,
+      `already have a terminal/code card for ${projectSlug}/${featureKey}: "${existing.title}" — pass --force to add another, or edit it from /content instead.`,
     );
     return;
   }
@@ -126,10 +135,10 @@ async function terminalCmd() {
   if (!command || !title) throw new Error("--command and --title are required");
 
   const { userId, feature } = await requireFeature(projectSlug, featureKey);
-  const existing = await findCardForFeature(userId, feature.id);
+  const existing = await findCardForFeatureRole(userId, feature.id, "terminal");
   if (existing && !has("--force")) {
     console.log(
-      `already have a card for ${projectSlug}/${featureKey}: "${existing.title}" — pass --force to add another.`,
+      `already have a terminal/code card for ${projectSlug}/${featureKey}: "${existing.title}" — pass --force to add another.`,
     );
     return;
   }
@@ -161,6 +170,54 @@ async function terminalCmd() {
   console.log(`registered "${card.title}" for ${projectSlug}/${featureKey} — live on the portfolio now.`);
 }
 
+async function browserCmd() {
+  const screenshotPath = arg("--screenshot");
+  const url = arg("--url");
+  const projectSlug = arg("--project");
+  const featureKey = arg("--feature");
+  const title = arg("--title");
+  if (!screenshotPath || !url || !title) {
+    throw new Error(
+      "usage: pnpm content browser --screenshot <rawPngPath> --url <liveUrl> --project <slug> --feature <key> --title \"...\" [--caption \"...\"] [--force]",
+    );
+  }
+  if (!existsSync(screenshotPath)) throw new Error(`no such file: ${screenshotPath}`);
+
+  const { userId, feature } = await requireFeature(projectSlug, featureKey);
+  const existing = await findCardForFeatureRole(userId, feature.id, "ui");
+  if (existing && !has("--force")) {
+    console.log(
+      `already have a UI card for ${projectSlug}/${featureKey}: "${existing.title}" — pass --force to add another.`,
+    );
+    return;
+  }
+
+  const scratchDir = join(process.cwd(), ".scratch");
+  mkdirSync(scratchDir, { recursive: true });
+  const pngPath = join(scratchDir, `browser-${projectSlug}-${featureKey}.png`);
+  const ok = renderBrowserCardPng({ url, screenshotPath }, pngPath);
+  if (!ok) {
+    throw new Error("no local Chrome/Chromium/Edge found to render the card.");
+  }
+
+  const up = await uploadMedia(pngPath, {
+    resourceType: "image",
+    publicId: `${projectSlug}/${featureKey}-ui`,
+    folder: "contents",
+    overwrite: true,
+  });
+  const card = await createPortfolioCard(userId, {
+    title,
+    caption: arg("--caption"),
+    kind: "screenshot",
+    cloudinaryPublicId: up.publicId,
+    cloudinaryResourceType: up.resourceType,
+    cloudinaryFormat: up.format,
+    featureId: feature.id,
+  });
+  console.log(`registered "${card.title}" (UI view) for ${projectSlug}/${featureKey} — live on the portfolio now.`);
+}
+
 async function recordStepsCmd() {
   const projectSlug = arg("--project");
   const featureKey = arg("--feature");
@@ -189,8 +246,9 @@ async function main() {
   if (cmd === "check") return checkCmd();
   if (cmd === "register") return registerCmd();
   if (cmd === "terminal") return terminalCmd();
+  if (cmd === "browser") return browserCmd();
   if (cmd === "record-steps") return recordStepsCmd();
-  throw new Error("commands: missing | check | register | terminal | record-steps");
+  throw new Error("commands: missing | check | register | terminal | browser | record-steps");
 }
 
 main().catch((e) => {

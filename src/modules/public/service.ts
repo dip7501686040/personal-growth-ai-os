@@ -177,6 +177,9 @@ export interface PublicContentCard {
   /** matches PublicFeature.featureSlug */
   featureSlug: string | null;
   code: { repoUrl: string | null; links: { label: string; url: string }[] } | null;
+  /** "ui" (what a user sees) or "terminal" (the code/execution behind it) —
+   *  a feature can have one of each, forming one proof cycle. */
+  role: "ui" | "terminal";
 }
 
 /** Unauthenticated. Only isPublic && published "portfolio" content_items,
@@ -276,8 +279,9 @@ export async function getPublicContentCards(userId: string): Promise<PublicConte
       projectSlug: f?.projectSlug ?? null,
       featureSlug: f ? slugify(f.title) : null,
       code: f ? { repoUrl: f.repoUrl, links } : null,
+      role: (r.cloudinaryPublicId.endsWith("-ui") ? "ui" : "terminal") as "ui" | "terminal",
     };
-  });
+  }).sort((a, b) => (a.role === "ui" ? -1 : 1) - (b.role === "ui" ? -1 : 1));
 }
 
 // ── Group P — dynamic project catalog ───────────────────────────────────────

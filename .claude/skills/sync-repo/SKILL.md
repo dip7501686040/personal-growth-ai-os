@@ -163,11 +163,14 @@ pnpm content missing <project-slug>
 If anything's listed, generate it now — while the repo's fresh in context —
 rather than leaving it for job-search time. Use the Group A tooling directly
 (`pnpm content terminal` / `register` / `record-steps`, same idempotency
-guarantee: never duplicates a feature that already has a card). See
-[[apply-content-queue]] if you want the fuller checklist (that skill is
-written for the `/applications` queue, but the generation steps are the
-same). This keeps every shipped feature's proof-of-work ready *before* it's
-needed for a pitch, instead of blocking `/apply-morning` on it later.
+guarantee: never duplicates a feature that already has a card). **If this
+project has a live, reachable UI, also capture a `pnpm content browser`
+card** for features with a real end-user screen — a UI card + a terminal
+card form one proof cycle. See [[apply-content-queue]] for the fuller
+checklist (written for the `/applications` queue, but the generation steps
+are the same). This keeps every shipped feature's proof-of-work ready
+*before* it's needed for a pitch, instead of blocking `/apply-morning` on it
+later.
 
 ## Rules
 

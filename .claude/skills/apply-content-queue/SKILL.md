@@ -32,13 +32,29 @@ table):
 
 - **CLI/script feature** → `pnpm content terminal --command "<real cmd>" --project <slug> --feature <key> --title "..."`
 - **Have a diagram/screenshot file already** → `pnpm content register <file> --project <slug> --feature <key> --kind diagram|screenshot|video --title "..."`
-- **Needs a live-app screenshot** → use the Playwright MCP tools against the
-  deployed app (one-time login already persisted), save the screenshot, then
-  `pnpm content register`.
 - **Genuinely needs motion** → `pnpm content record-steps --project <slug> --feature <key> --title "..."`, then STOP and wait for the user to drop the recording in and say go.
 
-`register`/`terminal` refuse to duplicate a card that already exists for that
-feature — that's the point, not a bug to work around.
+**If the feature's project has a live, reachable UI** (checked live — logged
+into the local pgai dev server, or the deployed portfolio/pgai URL), *also*
+capture a UI-view card, not just the terminal/code one — the two together
+form one proof "cycle": what a user actually sees, then what's behind it.
+Never force this onto infra-only projects with no end-user screen (Terraform
+modules, Helm charts, CI pipelines) — terminal/config proof alone is the
+honest answer there; use judgment per feature, not a blanket rule.
+
+1. Navigate to the real page with the Playwright MCP tools and take a
+   screenshot: `browser_navigate` → `browser_take_screenshot` (save under
+   `.scratch/`, an absolute path).
+2. Frame + upload + register it:
+   ```
+   pnpm content browser --screenshot <rawPngPath> --url <liveUrl> \
+     --project <slug> --feature <key> --title "..." [--caption "..."]
+   ```
+
+`register`/`terminal` refuse to duplicate a *terminal-role* card for that
+feature; `browser` refuses to duplicate a *ui-role* one — the two are
+independent, so running both for the same feature is expected, not a
+collision. `pnpm content check` shows both if present.
 
 ## 3. Regenerate the bundle, strengthen the pitches (judgment, not a blanket insert)
 

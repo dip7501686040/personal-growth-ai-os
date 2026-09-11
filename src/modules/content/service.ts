@@ -478,6 +478,45 @@ export async function findCardForFeature(
   return row?.item ?? null;
 }
 
+/** Every portfolio card covering this feature — a feature can have more than
+ *  one (a UI-view card + a terminal/code-view card forming one "cycle"). */
+export async function findCardsForFeature(
+  userId: string,
+  featureId: string,
+): Promise<ContentItem[]> {
+  const rows = await db
+    .select({ item: contentItems })
+    .from(contentSources)
+    .innerJoin(contentItems, eq(contentItems.id, contentSources.contentItemId))
+    .where(
+      and(
+        eq(contentSources.userId, userId),
+        eq(contentSources.sourceType, "project_feature"),
+        eq(contentSources.sourceId, featureId),
+        eq(contentItems.platform, "portfolio"),
+      ),
+    );
+  return rows.map((r) => r.item);
+}
+
+export type CardRole = "ui" | "terminal";
+
+/** UI-view cards are tagged by a `-ui` cloudinaryPublicId suffix (see
+ *  scripts/content.ts's `browser` command); everything else (diagram,
+ *  register, the original terminal command) counts as "terminal" — no
+ *  schema migration needed, just a naming convention. Lets a UI card and a
+ *  terminal card coexist per feature without either command re-triggering
+ *  the other. */
+export async function findCardForFeatureRole(
+  userId: string,
+  featureId: string,
+  role: CardRole,
+): Promise<ContentItem | null> {
+  const cards = await findCardsForFeature(userId, featureId);
+  const isUi = (c: ContentItem) => (c.cloudinaryPublicId ?? "").endsWith("-ui");
+  return cards.find((c) => (role === "ui" ? isUi(c) : !isUi(c))) ?? null;
+}
+
 export interface MissingVisualProof {
   featureId: string;
   featureKey: string;
