@@ -9,6 +9,10 @@
  *   pnpm apply status   <id> <draft|applied|screening|interviewing|offer|rejected|ghosted>
  *   pnpm apply due                     # follow-ups owed (JSON)
  *   pnpm apply open                    # open applications (JSON)
+ *   pnpm apply queue                   # content/apply rows queued from the UI (J1-J4)
+ *   pnpm apply mark-content-prepared <id>   # clear the content-queue flag
+ *
+ * `submit` already clears the apply-queue flag (it sets appliedAt).
  *   pnpm apply push  [all|<date>|<date/folder>]   # local applications/ → R2 (default: today)
  *   pnpm apply pull  [all|<date>|<date/folder>]   # R2 → local applications/ (default: today)
  */
@@ -22,8 +26,11 @@ import {
   resolveTarget,
 } from "./apply-sync";
 import {
+  listApplyQueue,
+  listContentQueue,
   listDueFollowups,
   listOpenApplications,
+  markContentPrepared,
   recordApplication,
   recordTouchpoint,
   setApplicationStatus,
@@ -155,8 +162,39 @@ async function main() {
     return;
   }
 
+  if (cmd === "queue") {
+    const [content, apply] = await Promise.all([
+      listContentQueue(userId),
+      listApplyQueue(userId),
+    ]);
+    if (content.length === 0 && apply.length === 0) {
+      console.log("queue empty — nothing requested from /applications.");
+      return;
+    }
+    if (content.length) {
+      console.log(`content queue (${content.length}):`);
+      for (const a of content) {
+        console.log(`  ${a.id}  ${a.company} — ${a.role}  ${a.bundleDir ?? "(no bundleDir)"}`);
+      }
+    }
+    if (apply.length) {
+      console.log(`apply queue (${apply.length}):`);
+      for (const a of apply) {
+        console.log(`  ${a.id}  ${a.company} — ${a.role}  ${a.bundleDir ?? "(no bundleDir)"}`);
+      }
+    }
+    return;
+  }
+
+  if (cmd === "mark-content-prepared") {
+    const id = await resolveId(userId, argv[1]);
+    await markContentPrepared(userId, id);
+    console.log(`ok — ${id} content-prepared`);
+    return;
+  }
+
   throw new Error(
-    "commands: record | submit | touchpoint | status | due | open | push | pull",
+    "commands: record | submit | touchpoint | status | due | open | queue | mark-content-prepared | push | pull",
   );
 }
 

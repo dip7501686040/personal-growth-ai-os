@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNotNull, lte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   applicationTouchpoints,
@@ -448,4 +448,92 @@ export async function applicationsOverview(
         : false,
     };
   });
+}
+
+// ── J1/J4: the /applications page queue — buttons record intent, a Claude
+// Code session (invoked by you, or surfaced via the SessionStart hook)
+// clears it ────────────────────────────────────────────────────────────────
+
+/** "Process content" — mark the checked rows for J2 (visual-proof + prose). */
+export async function requestContentProcessing(
+  userId: string,
+  ids: string[],
+): Promise<number> {
+  if (ids.length === 0) return 0;
+  const rows = await db
+    .update(jobApplications)
+    .set({ contentRequestedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(jobApplications.userId, userId), inArray(jobApplications.id, ids)))
+    .returning({ id: jobApplications.id });
+  return rows.length;
+}
+
+/** A session clears the flag once ensureVisualProof + proof-bundle regen ran. */
+export async function markContentPrepared(
+  userId: string,
+  id: string,
+): Promise<void> {
+  await db
+    .update(jobApplications)
+    .set({ contentPreparedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(jobApplications.userId, userId), eq(jobApplications.id, id)));
+}
+
+/** "Apply" — mark the checked, content-complete rows for J4 (apply-fill/drive). */
+export async function requestApply(userId: string, ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const rows = await db
+    .update(jobApplications)
+    .set({ applyRequestedAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(jobApplications.userId, userId), inArray(jobApplications.id, ids)))
+    .returning({ id: jobApplications.id });
+  return rows.length;
+}
+
+/** Rows a session should run visual-proof/prose prep on — requested since the
+ *  last time (or never) they were prepared. */
+export async function listContentQueue(userId: string): Promise<JobApplication[]> {
+  return db
+    .select()
+    .from(jobApplications)
+    .where(
+      and(
+        eq(jobApplications.userId, userId),
+        isNotNull(jobApplications.contentRequestedAt),
+        or(
+          isNull(jobApplications.contentPreparedAt),
+          sql`${jobApplications.contentPreparedAt} < ${jobApplications.contentRequestedAt}`,
+        ),
+      ),
+    )
+    .orderBy(asc(jobApplications.contentRequestedAt));
+}
+
+/** Rows a session should run apply-fill/apply-drive on. */
+export async function listApplyQueue(userId: string): Promise<JobApplication[]> {
+  return db
+    .select()
+    .from(jobApplications)
+    .where(
+      and(
+        eq(jobApplications.userId, userId),
+        isNotNull(jobApplications.applyRequestedAt),
+        or(
+          isNull(jobApplications.appliedAt),
+          sql`${jobApplications.appliedAt} < ${jobApplications.applyRequestedAt}`,
+        ),
+      ),
+    )
+    .orderBy(asc(jobApplications.applyRequestedAt));
+}
+
+/** Cheap counts for the SessionStart hook (J7) and the page's queue banner. */
+export async function queueCounts(
+  userId: string,
+): Promise<{ content: number; apply: number }> {
+  const [content, apply] = await Promise.all([
+    listContentQueue(userId),
+    listApplyQueue(userId),
+  ]);
+  return { content: content.length, apply: apply.length };
 }

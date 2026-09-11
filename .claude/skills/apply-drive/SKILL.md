@@ -13,6 +13,11 @@ Needs: an interactive session with the **`playwright`** MCP server connected
 (in `.mcp.json`; approve it once), `resume/profile.json` filled, and the folder
 already scaffolded with prose (`/apply-morning`).
 
+No folder named? Check `pnpm apply queue` — its `apply queue` section lists
+jobs the user clicked **Apply** for on `/applications` (J4), each with its
+`bundleDir`. Confirm the job is content-complete first (not still sitting in
+`pnpm apply queue`'s `content queue`) before driving it.
+
 ## Loop
 
 ### 1. Load the folder

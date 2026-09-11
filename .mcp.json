@@ -19,7 +19,7 @@
         "--output-dir",
         ".apply-drive",
         "--user-data-dir",
-        "~/.config/pgai/playwright-profile"
+        "/Users/dipankarsaha/.config/pgai/playwright-profile"
       ]
     }
   }

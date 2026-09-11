@@ -190,6 +190,13 @@
       "when": 1789118037231,
       "tag": "0026_sharp_shocker",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1789120238269,
+      "tag": "0027_elite_fixer",
+      "breakpoints": true
     }
   ]
 }

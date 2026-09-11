@@ -58,6 +58,14 @@ export const jobApplications = pgTable(
     flags: jsonb("flags").notNull().default(sql`'[]'::jsonb`),
     bundleDir: text("bundle_dir"),
     appliedAt: timestamp("applied_at", { withTimezone: true }),
+    /** Set by the "Process content" button on /applications; cleared once a
+     *  session has run ensureVisualProof across the job's proof-bundle
+     *  features and regenerated the bundle. */
+    contentRequestedAt: timestamp("content_requested_at", { withTimezone: true }),
+    contentPreparedAt: timestamp("content_prepared_at", { withTimezone: true }),
+    /** Set by the "Apply" button; cleared (via appliedAt) once a session has
+     *  run apply-fill/apply-drive and you've clicked Submit. */
+    applyRequestedAt: timestamp("apply_requested_at", { withTimezone: true }),
     createdAt,
     updatedAt,
   },
