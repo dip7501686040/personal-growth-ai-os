@@ -151,6 +151,24 @@ Print the script output. Then tell the user:
 - any **stale** features (in the app but no longer detected in the repo) — the user decides keep or archive; the sync never deletes them
 - the `knowledge:` line — docs upserted / embedded / linked / superseded. High-confidence links to skills & features are auto-accepted; the rest wait in the `/knowledge` review queue
 
+### 6. Check for new content gaps
+
+New `done` features rarely arrive with visual proof already attached. Right
+after reporting, run:
+
+```
+pnpm content missing <project-slug>
+```
+
+If anything's listed, generate it now — while the repo's fresh in context —
+rather than leaving it for job-search time. Use the Group A tooling directly
+(`pnpm content terminal` / `register` / `record-steps`, same idempotency
+guarantee: never duplicates a feature that already has a card). See
+[[apply-content-queue]] if you want the fuller checklist (that skill is
+written for the `/applications` queue, but the generation steps are the
+same). This keeps every shipped feature's proof-of-work ready *before* it's
+needed for a pitch, instead of blocking `/apply-morning` on it later.
+
 ## Rules
 
 - Never invent features, skills, or knowledge. Only what the code supports.
