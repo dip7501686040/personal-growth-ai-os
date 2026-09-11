@@ -42,10 +42,14 @@ Never force this onto infra-only projects with no end-user screen (Terraform
 modules, Helm charts, CI pipelines) — terminal/config proof alone is the
 honest answer there; use judgment per feature, not a blanket rule.
 
-1. Navigate to the real page with the Playwright MCP tools and take a
+1. If the page needs auth, check `.env.local` first for that project's login
+   (`PGAI_LOGIN_EMAIL`/`_PASSWORD`, `AI_NOTIFICATION_SYSTEM_EMAIL`/`_PASSWORD`
+   — one pair per project with a `liveUrl`, see `.env.example`) before asking
+   the user to retype credentials that are already there.
+2. Navigate to the real page with the Playwright MCP tools and take a
    screenshot: `browser_navigate` → `browser_take_screenshot` (save under
    `.scratch/`, an absolute path).
-2. Frame + upload + register it:
+3. Frame + upload + register it:
    ```
    pnpm content browser --screenshot <rawPngPath> --url <liveUrl> \
      --project <slug> --feature <key> --title "..." [--caption "..."]
