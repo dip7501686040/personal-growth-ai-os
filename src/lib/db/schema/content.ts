@@ -35,8 +35,15 @@ export const contentItems = pgTable(
     isPublic: boolean("is_public").notNull().default(false),
     /** Where this piece is published, per platform: {"linkedin":"...","blog":"..."}. */
     publishedUrls: jsonb("published_urls"),
-    /** video | image | doc | diagram | post — drives how the portfolio renders it. */
+    /** video | image | doc | diagram | screenshot | post — drives how the
+     *  portfolio renders it. diagram/screenshot/video + platform "portfolio"
+     *  is a Group C visual-proof card. */
     assetType: text("asset_type"),
+    /** Group C — the Cloudinary asset behind a portfolio card. Null for
+     *  ordinary (non-portfolio) content items. */
+    cloudinaryPublicId: text("cloudinary_public_id"),
+    cloudinaryResourceType: text("cloudinary_resource_type"),
+    cloudinaryFormat: text("cloudinary_format"),
     agentRunId: uuid("agent_run_id").references(() => agentRuns.id, {
       onDelete: "set null",
     }),

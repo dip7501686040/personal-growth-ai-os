@@ -8,9 +8,11 @@ import { purgePolymorphicRefs, resyncEntity } from "@/modules/knowledge/resync";
 import { createApproval, listApprovals } from "@/modules/approvals/service";
 import {
   createIdea,
+  createPortfolioCard,
   deleteContentItem,
   getContentItem,
   updateContentItem,
+  updatePortfolioCard,
 } from "@/modules/content/service";
 
 export type ActionState = { ok: boolean; message: string } | null;
@@ -158,4 +160,74 @@ export async function markPublishedAction(
   revalidatePath("/content");
   revalidatePath(`/content/${id.data}`);
   return { ok: true, message: "Marked published." };
+}
+
+// ── Portfolio cards (Group C) ────────────────────────────────────────────────
+
+const cardKindSchema = z.enum(["diagram", "screenshot", "video"]);
+
+const newCardSchema = z.object({
+  title: z.string().trim().min(1, "Title is required.").max(200),
+  caption: z.string().trim().max(400).optional(),
+  kind: cardKindSchema,
+  cloudinaryPublicId: z.string().trim().min(1, "Pick an asset."),
+  cloudinaryResourceType: z.enum(["image", "video"]),
+  cloudinaryFormat: z.string().trim().min(1),
+  featureId: z.uuid().optional(),
+});
+
+export async function createPortfolioCardAction(
+  _p: ActionState,
+  input: {
+    title: string;
+    caption?: string;
+    kind: string;
+    cloudinaryPublicId: string;
+    cloudinaryResourceType: string;
+    cloudinaryFormat: string;
+    featureId?: string;
+  },
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = newCardSchema.safeParse(input);
+  if (!parsed.success) return err(parsed.error.issues[0].message);
+  await createPortfolioCard(userId, {
+    ...parsed.data,
+    featureId: parsed.data.featureId ?? null,
+  });
+  revalidatePath("/content");
+  return { ok: true, message: "Card added — live on the portfolio now." };
+}
+
+export async function updatePortfolioCardAction(
+  _p: ActionState,
+  input: { id: string; title: string; caption: string; isPublic: boolean; featureId: string | null },
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = z
+    .object({
+      id: z.uuid(),
+      title: z.string().trim().min(1).max(200),
+      caption: z.string().trim().max(400),
+      isPublic: z.boolean(),
+      featureId: z.uuid().nullable(),
+    })
+    .safeParse(input);
+  if (!parsed.success) return err(parsed.error.issues[0].message);
+  const { id, ...patch } = parsed.data;
+  await updatePortfolioCard(userId, id, patch);
+  revalidatePath("/content");
+  return { ok: true, message: "Saved." };
+}
+
+export async function deletePortfolioCardAction(
+  _p: ActionState,
+  id: string,
+): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsed = z.uuid().safeParse(id);
+  if (!parsed.success) return err("Bad id.");
+  await deleteContentItem(userId, parsed.data);
+  revalidatePath("/content");
+  return { ok: true, message: "Deleted." };
 }

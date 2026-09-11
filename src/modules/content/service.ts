@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   contentItems,
@@ -150,6 +150,178 @@ export async function deleteContentItem(
   await db
     .delete(contentItems)
     .where(and(eq(contentItems.userId, userId), eq(contentItems.id, id)));
+}
+
+// ── Portfolio cards (Group C) — curated visual-proof, platform "portfolio" ──
+
+export type CardKind = "diagram" | "screenshot" | "video";
+
+export interface PortfolioCardInput {
+  title: string;
+  caption?: string;
+  kind: CardKind;
+  cloudinaryPublicId: string;
+  cloudinaryResourceType: "image" | "video";
+  cloudinaryFormat: string;
+  featureId?: string | null;
+  isPublic?: boolean;
+}
+
+/** A portfolio card is a content_item — no separate table, no idea/draft
+ *  Kanban: picking the asset + feature is itself the curation act. */
+export async function createPortfolioCard(
+  userId: string,
+  input: PortfolioCardInput,
+): Promise<ContentItem> {
+  const [item] = await db
+    .insert(contentItems)
+    .values({
+      userId,
+      platform: "portfolio",
+      status: "published",
+      title: input.title.trim(),
+      body: input.caption?.trim() || null,
+      assetType: input.kind,
+      cloudinaryPublicId: input.cloudinaryPublicId,
+      cloudinaryResourceType: input.cloudinaryResourceType,
+      cloudinaryFormat: input.cloudinaryFormat,
+      isPublic: input.isPublic ?? true,
+    })
+    .returning();
+  if (input.featureId) {
+    await db.insert(contentSources).values({
+      userId,
+      contentItemId: item.id,
+      sourceType: "project_feature",
+      sourceId: input.featureId,
+    });
+  }
+  return item;
+}
+
+export type PortfolioCardListItem = ContentItem & {
+  featureId: string | null;
+  featureTitle: string | null;
+  projectName: string | null;
+  projectSlug: string | null;
+};
+
+export async function listPortfolioCards(
+  userId: string,
+): Promise<PortfolioCardListItem[]> {
+  const rows = await db
+    .select()
+    .from(contentItems)
+    .where(and(eq(contentItems.userId, userId), eq(contentItems.platform, "portfolio")))
+    .orderBy(desc(contentItems.createdAt));
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((r) => r.id);
+  const sources = await db
+    .select({
+      contentItemId: contentSources.contentItemId,
+      featureId: contentSources.sourceId,
+    })
+    .from(contentSources)
+    .where(
+      and(
+        eq(contentSources.userId, userId),
+        eq(contentSources.sourceType, "project_feature"),
+        inArray(contentSources.contentItemId, ids),
+      ),
+    );
+  const featureIds = [...new Set(sources.map((s) => s.featureId).filter((x): x is string => !!x))];
+  const features = featureIds.length
+    ? await db
+        .select({
+          id: projectFeatures.id,
+          title: projectFeatures.title,
+          projectName: projects.name,
+          projectSlug: projects.slug,
+        })
+        .from(projectFeatures)
+        .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
+        .where(inArray(projectFeatures.id, featureIds))
+    : [];
+  const featureById = new Map(features.map((f) => [f.id, f]));
+  const sourceByContentId = new Map(sources.map((s) => [s.contentItemId, s.featureId]));
+
+  return rows.map((r) => {
+    const featureId = sourceByContentId.get(r.id) ?? null;
+    const f = featureId ? featureById.get(featureId) : undefined;
+    return {
+      ...r,
+      featureId,
+      featureTitle: f?.title ?? null,
+      projectName: f?.projectName ?? null,
+      projectSlug: f?.projectSlug ?? null,
+    };
+  });
+}
+
+export async function updatePortfolioCard(
+  userId: string,
+  id: string,
+  patch: Partial<{
+    title: string;
+    caption: string;
+    isPublic: boolean;
+    featureId: string | null;
+  }>,
+): Promise<void> {
+  const set: Record<string, unknown> = { updatedAt: new Date() };
+  if (patch.title !== undefined) set.title = patch.title;
+  if (patch.caption !== undefined) set.body = patch.caption;
+  if (patch.isPublic !== undefined) set.isPublic = patch.isPublic;
+  await db
+    .update(contentItems)
+    .set(set)
+    .where(and(eq(contentItems.userId, userId), eq(contentItems.id, id)));
+
+  if (patch.featureId !== undefined) {
+    await db
+      .delete(contentSources)
+      .where(
+        and(
+          eq(contentSources.userId, userId),
+          eq(contentSources.contentItemId, id),
+          eq(contentSources.sourceType, "project_feature"),
+        ),
+      );
+    if (patch.featureId) {
+      await db.insert(contentSources).values({
+        userId,
+        contentItemId: id,
+        sourceType: "project_feature",
+        sourceId: patch.featureId,
+      });
+    }
+  }
+}
+
+/** Every active feature, for the portfolio-card picker (any project, not just
+ *  already-public ones — isPublic on the card is a separate later choice). */
+export async function listFeaturesForPicker(
+  userId: string,
+): Promise<{ id: string; title: string; projectName: string; projectSlug: string }[]> {
+  const rows = await db
+    .select({
+      id: projectFeatures.id,
+      title: projectFeatures.title,
+      projectName: projects.name,
+      projectSlug: projects.slug,
+    })
+    .from(projectFeatures)
+    .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
+    .where(
+      and(
+        eq(projects.userId, userId),
+        isNull(projects.excludedAt),
+        isNull(projectFeatures.excludedAt),
+      ),
+    )
+    .orderBy(projects.name, projectFeatures.title);
+  return rows;
 }
 
 // ── Context for the Content agent (scan mode) ─────────────────────────────

@@ -185,7 +185,12 @@ export const contentStatusEnum = pgEnum("content_status", [
   "published",
 ]);
 
-export const contentPlatformEnum = pgEnum("content_platform", ["linkedin"]);
+/** "portfolio" = a curated visual-proof card for the portfolio's deep-dive
+ *  grid (Group C), not a build-in-public post. */
+export const contentPlatformEnum = pgEnum("content_platform", [
+  "linkedin",
+  "portfolio",
+]);
 
 export const contentSourceTypeEnum = pgEnum("content_source_type", [
   "learning_session",

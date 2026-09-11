@@ -2,11 +2,13 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   contentItems,
+  contentSources,
   entitySkillLinks,
   projectFeatures,
   projects,
   skills,
 } from "@/lib/db/schema";
+import { isCloudinaryConfigured, mediaUrl, videoPosterUrl } from "@/lib/media/cloudinary";
 import { slugify } from "@/lib/slug";
 
 /**
@@ -159,4 +161,120 @@ export async function getPublicFeatures(userId: string): Promise<PublicFeature[]
     demoVideoUrl: r.demoVideoUrl,
     codePaths: r.codePaths as Record<string, string> | null,
   }));
+}
+
+// ── Group C — curated portfolio content cards ───────────────────────────────
+
+export interface PublicContentCard {
+  id: string;
+  title: string;
+  caption: string | null;
+  kind: string; // diagram | screenshot | video
+  url: string; // display image (poster frame for a video)
+  videoUrl: string | null; // set only when kind === "video"
+  projectSlug: string | null;
+  /** matches PublicFeature.featureSlug */
+  featureSlug: string | null;
+  code: { repoUrl: string | null; links: { label: string; url: string }[] } | null;
+}
+
+/** Unauthenticated. Only isPublic && published "portfolio" content_items,
+ *  each with its linked feature's code links resolved inline (never stored
+ *  redundantly — see content_sources, sourceType "project_feature"). */
+export async function getPublicContentCards(userId: string): Promise<PublicContentCard[]> {
+  if (!isCloudinaryConfigured()) return [];
+  const rows = await db
+    .select({
+      id: contentItems.id,
+      title: contentItems.title,
+      caption: contentItems.body,
+      kind: contentItems.assetType,
+      cloudinaryPublicId: contentItems.cloudinaryPublicId,
+      resourceType: contentItems.cloudinaryResourceType,
+      format: contentItems.cloudinaryFormat,
+    })
+    .from(contentItems)
+    .where(
+      and(
+        eq(contentItems.userId, userId),
+        eq(contentItems.platform, "portfolio"),
+        eq(contentItems.isPublic, true),
+        eq(contentItems.status, "published"),
+      ),
+    )
+    .orderBy(contentItems.createdAt);
+  const complete = rows.filter(
+    (r): r is typeof r & { cloudinaryPublicId: string; resourceType: string; format: string; kind: string } =>
+      Boolean(r.cloudinaryPublicId && r.resourceType && r.format && r.kind),
+  );
+  if (complete.length === 0) return [];
+
+  const ids = complete.map((r) => r.id);
+  const sources = await db
+    .select({
+      contentItemId: contentSources.contentItemId,
+      featureId: contentSources.sourceId,
+    })
+    .from(contentSources)
+    .where(
+      and(
+        eq(contentSources.userId, userId),
+        eq(contentSources.sourceType, "project_feature"),
+        inArray(contentSources.contentItemId, ids),
+      ),
+    );
+  const featureIds = [...new Set(sources.map((s) => s.featureId).filter((x): x is string => !!x))];
+  const features = featureIds.length
+    ? await db
+        .select({
+          id: projectFeatures.id,
+          title: projectFeatures.title,
+          repoUrl: projects.repoUrl,
+          projectSlug: projects.slug,
+          codePaths: projectFeatures.codePaths,
+        })
+        .from(projectFeatures)
+        .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
+        .where(
+          and(
+            inArray(projectFeatures.id, featureIds),
+            eq(projects.isPublic, true),
+            isNull(projects.excludedAt),
+            isNull(projectFeatures.excludedAt),
+          ),
+        )
+    : [];
+  const featureById = new Map(features.map((f) => [f.id, f]));
+  const featureIdByContent = new Map(sources.map((s) => [s.contentItemId, s.featureId]));
+
+  return complete.map((r) => {
+    const featureId = featureIdByContent.get(r.id) ?? null;
+    const f = featureId ? featureById.get(featureId) : undefined;
+    const codePaths = (f?.codePaths as Record<string, string> | null) ?? null;
+    const links = f
+      ? [
+          ...(f.repoUrl ? [{ label: "Repository", url: f.repoUrl }] : []),
+          ...Object.entries(codePaths ?? {}).map(([label, path]) => ({
+            label,
+            url: `${(f.repoUrl ?? "").replace(/\/$/, "")}/tree/main/${String(path).replace(/^\//, "")}`,
+          })),
+        ]
+      : [];
+    const isVideo = r.resourceType === "video";
+    return {
+      id: r.id,
+      title: r.title,
+      caption: r.caption,
+      kind: r.kind,
+      url: isVideo
+        ? videoPosterUrl(r.cloudinaryPublicId)
+        : mediaUrl(r.cloudinaryPublicId, { resourceType: "image", format: r.format }),
+      videoUrl: isVideo
+        ? mediaUrl(r.cloudinaryPublicId, { resourceType: "video", format: r.format })
+        : null,
+      projectSlug: f?.projectSlug ?? null,
+      featureSlug: f ? slugify(f.title) : null,
+      code: f ? { repoUrl: f.repoUrl, links } : null,
+    };
+  });
 }
