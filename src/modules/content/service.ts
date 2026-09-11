@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   contentItems,
@@ -572,4 +572,44 @@ export async function listMissingVisualProof(
   return rows
     .filter((r) => !coveredIds.has(r.featureId))
     .map((r) => ({ ...r, featureKey: slugify(r.title) }));
+}
+
+/** Shipped features whose project has a `liveUrl` set (the deterministic
+ *  "does this project have a real UI to screenshot" signal) but that only
+ *  have a terminal/code card so far — the other half of each proof cycle. */
+export async function listMissingUiProof(
+  userId: string,
+  projectSlug?: string,
+): Promise<MissingVisualProof[]> {
+  const rows = await db
+    .select({
+      featureId: projectFeatures.id,
+      title: projectFeatures.title,
+      description: projectFeatures.description,
+      projectSlug: projects.slug,
+      projectName: projects.name,
+    })
+    .from(projectFeatures)
+    .innerJoin(projects, eq(projects.id, projectFeatures.projectId))
+    .where(
+      and(
+        eq(projects.userId, userId),
+        eq(projects.isPublic, true),
+        eq(projectFeatures.status, "done"),
+        isNotNull(projects.liveUrl),
+        isNull(projects.excludedAt),
+        isNull(projectFeatures.excludedAt),
+        projectSlug ? eq(projects.slug, projectSlug) : undefined,
+      ),
+    );
+  if (rows.length === 0) return [];
+
+  const withUi: MissingVisualProof[] = [];
+  for (const r of rows) {
+    const cards = await findCardsForFeature(userId, r.featureId);
+    if (cards.length === 0) continue; // listMissingVisualProof already covers "no card at all"
+    const hasUi = cards.some((c) => (c.cloudinaryPublicId ?? "").endsWith("-ui"));
+    if (!hasUi) withUi.push({ ...r, featureKey: slugify(r.title) });
+  }
+  return withUi;
 }

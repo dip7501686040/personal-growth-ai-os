@@ -53,6 +53,23 @@ export function ProjectDetailsForm({ project }: { project: Project }) {
       </div>
 
       <div className="flex flex-col gap-2">
+        <Label htmlFor="liveUrl">
+          Live URL{" "}
+          <span className="text-xs text-muted-foreground">
+            — when set, content generation also captures a UI-view card for this project&apos;s features
+          </span>
+        </Label>
+        <Input
+          id="liveUrl"
+          name="liveUrl"
+          type="url"
+          maxLength={500}
+          defaultValue={project.liveUrl ?? ""}
+          placeholder="https://your-deployed-app.vercel.app"
+        />
+      </div>
+
+      <div className="flex flex-col gap-2">
         <Label htmlFor="status">Status</Label>
         <NativeSelect
           id="status"

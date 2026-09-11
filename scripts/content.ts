@@ -33,6 +33,7 @@ import {
   findCardForFeature,
   findCardForFeatureRole,
   findFeature,
+  listMissingUiProof,
   listMissingVisualProof,
   type CardKind,
 } from "@/modules/content/service";
@@ -48,15 +49,27 @@ const has = (name: string) => process.argv.includes(name);
 async function missingCmd() {
   const userId = await getOwnerUserId();
   const projectSlug = process.argv[3] && !process.argv[3].startsWith("--") ? process.argv[3] : undefined;
-  const rows = await listMissingVisualProof(userId, projectSlug);
-  if (rows.length === 0) {
+  const [rows, uiRows] = await Promise.all([
+    listMissingVisualProof(userId, projectSlug),
+    listMissingUiProof(userId, projectSlug),
+  ]);
+  if (rows.length === 0 && uiRows.length === 0) {
     console.log(projectSlug ? `${projectSlug}: nothing missing.` : "Nothing missing — every shipped feature has a card.");
     return;
   }
-  for (const r of rows) {
-    console.log(`${r.projectSlug} / ${r.featureKey}  —  ${r.title}`);
+  if (rows.length) {
+    for (const r of rows) {
+      console.log(`${r.projectSlug} / ${r.featureKey}  —  ${r.title}`);
+    }
+    console.log(`\n${rows.length} feature(s) with no visual-proof card yet.`);
   }
-  console.log(`\n${rows.length} feature(s) with no visual-proof card yet.`);
+  if (uiRows.length) {
+    console.log("\nHave a terminal/code card but no UI companion (project has a liveUrl set):");
+    for (const r of uiRows) {
+      console.log(`${r.projectSlug} / ${r.featureKey}  —  ${r.title}  [pnpm content browser needed]`);
+    }
+    console.log(`\n${uiRows.length} feature(s) missing a UI-view card.`);
+  }
 }
 
 async function checkCmd() {

@@ -221,6 +221,7 @@ export async function updateProject(
     status: ProjectStatus;
     tagline: string;
     highlights: string[];
+    liveUrl: string | null;
   }>,
 ): Promise<void> {
   await db

@@ -68,6 +68,7 @@ const updateProjectSchema = z.object({
   status: z.enum(PROJECT_STATUS).optional(),
   tagline: z.string().trim().max(200).optional(),
   highlights: z.string().trim().max(4000).optional(),
+  liveUrl: z.string().trim().max(500).optional(),
 });
 
 export async function updateProjectAction(
@@ -85,9 +86,10 @@ export async function updateProjectAction(
     status: fd.get("status") || undefined,
     tagline: fd.get("tagline") ?? undefined,
     highlights: fd.get("highlights") ?? undefined,
+    liveUrl: fd.get("liveUrl") ?? undefined,
   });
   if (!parsed.success) return err(parsed.error.issues[0].message);
-  const { projectId, slug, highlights, ...patch } = parsed.data;
+  const { projectId, slug, highlights, liveUrl, ...patch } = parsed.data;
   try {
     await updateProject(userId, projectId, {
       ...patch,
@@ -99,6 +101,7 @@ export async function updateProjectAction(
               .filter(Boolean),
           }
         : {}),
+      ...(liveUrl !== undefined ? { liveUrl: liveUrl || null } : {}),
     });
   } catch (e) {
     return err(e instanceof Error ? e.message : "Could not update project.");
