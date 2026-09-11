@@ -61,15 +61,20 @@ export interface UploadResult {
   bytes: number;
 }
 
-export async function uploadMedia(
-  filePath: string,
-  opts: {
-    resourceType: ResourceType;
-    folder?: string;
-    publicId?: string;
-    caption?: string;
-    overwrite?: boolean;
-  },
+export interface UploadOpts {
+  resourceType: ResourceType;
+  folder?: string;
+  publicId?: string;
+  caption?: string;
+  overwrite?: boolean;
+}
+
+/** The real upload — from in-memory bytes, so the web UI (Group M) and the
+ *  CLI (`pnpm media upload`) share one signing/fetch path. */
+export async function uploadBuffer(
+  buffer: Buffer | Uint8Array,
+  filename: string,
+  opts: UploadOpts,
 ): Promise<UploadResult> {
   const cfg = cloudinaryConfig();
   const timestamp = Math.floor(Date.now() / 1000).toString();
@@ -84,11 +89,7 @@ export async function uploadMedia(
   const signature = sign(signed, cfg.apiSecret);
 
   const form = new FormData();
-  form.append(
-    "file",
-    new Blob([new Uint8Array(readFileSync(filePath))]),
-    basename(filePath),
-  );
+  form.append("file", new Blob([new Uint8Array(buffer)]), filename);
   form.append("api_key", cfg.apiKey);
   form.append("signature", signature);
   for (const [k, v] of Object.entries(signed)) form.append(k, v);
@@ -122,6 +123,31 @@ export async function uploadMedia(
     duration: j.duration ?? null,
     bytes: j.bytes,
   };
+}
+
+/** CLI convenience — reads a local file, then `uploadBuffer`. */
+export async function uploadMedia(filePath: string, opts: UploadOpts): Promise<UploadResult> {
+  return uploadBuffer(readFileSync(filePath), basename(filePath), opts);
+}
+
+/** Admin API delete — removes the asset from Cloudinary entirely. */
+export async function destroyAsset(
+  publicId: string,
+  resourceType: ResourceType,
+): Promise<void> {
+  const cfg = cloudinaryConfig();
+  const auth = Buffer.from(`${cfg.apiKey}:${cfg.apiSecret}`).toString("base64");
+  const url = new URL(
+    `https://api.cloudinary.com/v1_1/${cfg.cloudName}/resources/${resourceType}/upload`,
+  );
+  url.searchParams.append("public_ids[]", publicId);
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: { Authorization: `Basic ${auth}` },
+  });
+  if (!res.ok) {
+    throw new Error(`Cloudinary destroy ${res.status}: ${await res.text()}`);
+  }
 }
 
 /** A delivery URL for a stored asset. `transform` is a raw Cloudinary segment. */

@@ -95,6 +95,44 @@ export function addMediaItem(
   return m;
 }
 
+/** Remove one item by its Cloudinary public ID (Group M — /media delete). */
+export function removeMediaItem(
+  projectSlug: string,
+  featureKey: string,
+  cloudinaryId: string,
+): MediaManifest {
+  const m = loadManifest();
+  const list = m.projects[projectSlug]?.[featureKey];
+  if (list) {
+    m.projects[projectSlug][featureKey] = list.filter(
+      (x) => x.cloudinaryId !== cloudinaryId,
+    );
+    if (m.projects[projectSlug][featureKey].length === 0) {
+      delete m.projects[projectSlug][featureKey];
+    }
+    if (Object.keys(m.projects[projectSlug]).length === 0) {
+      delete m.projects[projectSlug];
+    }
+  }
+  saveManifest(m);
+  return m;
+}
+
+/** Patch one item's editable fields (caption today) without touching the asset. */
+export function updateMediaItem(
+  projectSlug: string,
+  featureKey: string,
+  cloudinaryId: string,
+  patch: Partial<Pick<MediaItem, "caption">>,
+): MediaManifest {
+  const m = loadManifest();
+  const list = m.projects[projectSlug]?.[featureKey];
+  const item = list?.find((x) => x.cloudinaryId === cloudinaryId);
+  if (item) Object.assign(item, patch);
+  saveManifest(m);
+  return m;
+}
+
 export function itemsForFeature(
   projectSlug: string,
   featureKey: string,
