@@ -21,6 +21,7 @@ import {
   addMediaItem,
   allItems,
   itemsForProject,
+  syncManifestToR2,
   type MediaItem,
 } from "@/lib/media/manifest";
 
@@ -79,7 +80,8 @@ async function uploadCmd() {
     duration: up.duration,
     addedAt: new Date().toISOString(),
   };
-  addMediaItem(projectSlug, featureKey, item);
+  const manifest = addMediaItem(projectSlug, featureKey, item);
+  const mirrored = await syncManifestToR2(manifest);
 
   console.log(
     `stored ${kind} → ${projectSlug} / ${featureKey}\n` +
@@ -88,7 +90,10 @@ async function uploadCmd() {
       (up.resourceType === "video"
         ? `  poster: ${videoPosterUrl(up.publicId)}\n`
         : `  thumb: ${mediaUrl(up.publicId, { resourceType: "image", format: "jpg", transform: "c_fill,w_640" })}\n`) +
-      `  → resume/media-manifest.json`,
+      `  → resume/media-manifest.json` +
+      (mirrored
+        ? " + R2 (live on the public API within ~5 min, no push needed)"
+        : " (R2 not configured — commit + push for the public API to see it)"),
   );
 }
 
