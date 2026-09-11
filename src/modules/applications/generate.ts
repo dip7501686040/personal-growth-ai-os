@@ -169,7 +169,11 @@ async function writeResumeFiles(
   return pdfOk;
 }
 
-export async function proofBundleMd(j: ScoredJob, proof: JdProof): Promise<string> {
+export async function proofBundleMd(
+  userId: string,
+  j: ScoredJob,
+  proof: JdProof,
+): Promise<string> {
   const L: string[] = [`# Proof of work — ${j.company} / ${j.role}`, ``];
   const withProof = proof.skills.filter((s) => s.proof.length > 0);
   if (withProof.length) {
@@ -184,7 +188,7 @@ export async function proofBundleMd(j: ScoredJob, proof: JdProof): Promise<strin
         ].filter(Boolean);
         L.push(
           `- **${p.featureTitle}** (${p.projectName}) — ${links.join("  ·  ") || "no link"}` +
-            (await visualProofMd(p.projectName, p.featureTitle)),
+            (await visualProofMd(userId, p.featureId)),
         );
       }
       if (s.proof.length > 3) L.push(`- _…+${s.proof.length - 3} more features_`);
@@ -206,7 +210,7 @@ export async function proofBundleMd(j: ScoredJob, proof: JdProof): Promise<strin
       ].filter(Boolean);
       L.push(
         `- **${f.title}** (${f.projectName}) — ${links.join("  ·  ") || "no link"}` +
-          (await visualProofMd(f.projectName, f.title)),
+          (await visualProofMd(userId, f.featureId)),
       );
     }
     L.push(``);
@@ -380,7 +384,7 @@ export async function scaffoldJobFolder(input: ScaffoldInput): Promise<ScaffoldR
   const pdfOk = await writeResumeFiles(date, folder, jdText, archetype, proof);
   files.push("resume.md", "resume.html", ...(pdfOk ? ["resume.pdf"] : []));
 
-  await persist(date, folder, "proof-bundle.md", await proofBundleMd(input.job, proof));
+  await persist(date, folder, "proof-bundle.md", await proofBundleMd(input.userId, input.job, proof));
   await persist(date, folder, "outreach-targets.md", outreachMd(input.job));
   await persist(
     date,
@@ -463,7 +467,7 @@ export async function regenerateProofBundle(
   if (!job) throw new Error(`no job.json for ${date}/${folder}`);
   const jdText = job.jdText ?? jdTextOf(job);
   const proof = await getProofForJd(userId, jdText);
-  await persist(date, folder, "proof-bundle.md", await proofBundleMd(job, proof));
+  await persist(date, folder, "proof-bundle.md", await proofBundleMd(userId, job, proof));
   return { skills: proof.skills.length, features: proof.features.length };
 }
 
