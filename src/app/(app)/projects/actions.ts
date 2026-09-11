@@ -61,10 +61,13 @@ export async function createProjectAction(
 const updateProjectSchema = z.object({
   projectId: z.uuid(),
   slug: z.string().min(1),
+  name: z.string().trim().min(1).max(120).optional(),
   description: z.string().trim().max(4000).optional(),
   problemSolved: z.string().trim().max(4000).optional(),
   architecture: z.string().trim().max(4000).optional(),
   status: z.enum(PROJECT_STATUS).optional(),
+  tagline: z.string().trim().max(200).optional(),
+  highlights: z.string().trim().max(4000).optional(),
 });
 
 export async function updateProjectAction(
@@ -75,15 +78,28 @@ export async function updateProjectAction(
   const parsed = updateProjectSchema.safeParse({
     projectId: fd.get("projectId"),
     slug: fd.get("slug"),
+    name: fd.get("name") || undefined,
     description: fd.get("description") ?? undefined,
     problemSolved: fd.get("problemSolved") ?? undefined,
     architecture: fd.get("architecture") ?? undefined,
     status: fd.get("status") || undefined,
+    tagline: fd.get("tagline") ?? undefined,
+    highlights: fd.get("highlights") ?? undefined,
   });
   if (!parsed.success) return err(parsed.error.issues[0].message);
-  const { projectId, slug, ...patch } = parsed.data;
+  const { projectId, slug, highlights, ...patch } = parsed.data;
   try {
-    await updateProject(userId, projectId, patch);
+    await updateProject(userId, projectId, {
+      ...patch,
+      ...(highlights !== undefined
+        ? {
+            highlights: highlights
+              .split("\n")
+              .map((h) => h.trim())
+              .filter(Boolean),
+          }
+        : {}),
+    });
   } catch (e) {
     return err(e instanceof Error ? e.message : "Could not update project.");
   }

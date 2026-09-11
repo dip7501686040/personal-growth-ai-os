@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -19,10 +20,37 @@ export function ProjectDetailsForm({ project }: { project: Project }) {
   );
   useActionToast(state);
 
+  const highlights = Array.isArray(project.highlights)
+    ? (project.highlights as string[])
+    : [];
+
   return (
     <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="projectId" value={project.id} />
       <input type="hidden" name="slug" value={project.slug} />
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="name">
+          Name{" "}
+          <span className="text-xs text-muted-foreground">
+            — display title (slug stays {project.slug}, safe to rename)
+          </span>
+        </Label>
+        <Input id="name" name="name" maxLength={120} defaultValue={project.name} />
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="tagline">
+          Tagline <span className="text-xs text-muted-foreground">— short, for the portfolio card</span>
+        </Label>
+        <Input
+          id="tagline"
+          name="tagline"
+          maxLength={200}
+          defaultValue={project.tagline ?? ""}
+          placeholder="Falls back to Description when empty"
+        />
+      </div>
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="status">Status</Label>
@@ -65,6 +93,20 @@ export function ProjectDetailsForm({ project }: { project: Project }) {
           name="architecture"
           rows={3}
           defaultValue={project.architecture ?? ""}
+        />
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="highlights">
+          Highlights{" "}
+          <span className="text-xs text-muted-foreground">
+            — for the portfolio case-study page, one per line
+          </span>
+        </Label>
+        <Textarea
+          id="highlights"
+          name="highlights"
+          rows={4}
+          defaultValue={highlights.join("\n")}
         />
       </div>
 

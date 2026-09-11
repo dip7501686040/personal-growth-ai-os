@@ -29,6 +29,11 @@ export const projects = pgTable(
     description: text("description"),
     problemSolved: text("problem_solved"),
     architecture: text("architecture"),
+    /** Short one-liner for a portfolio card (Group P). Falls back to
+     *  `description` when unset. */
+    tagline: text("tagline"),
+    /** Bullet list for the portfolio case-study page (Group P). */
+    highlights: jsonb("highlights"),
     status: projectStatusEnum("status").notNull().default("idea"),
     /** Absolute repo path, for the Phase 2.5 activity collector to match on. */
     repoPath: text("repo_path"),

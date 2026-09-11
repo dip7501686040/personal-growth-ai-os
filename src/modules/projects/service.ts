@@ -214,10 +214,13 @@ export async function updateProject(
   userId: string,
   projectId: string,
   patch: Partial<{
+    name: string;
     description: string;
     problemSolved: string;
     architecture: string;
     status: ProjectStatus;
+    tagline: string;
+    highlights: string[];
   }>,
 ): Promise<void> {
   await db

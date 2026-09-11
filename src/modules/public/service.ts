@@ -5,6 +5,7 @@ import {
   contentSources,
   entitySkillLinks,
   projectFeatures,
+  projectSkills,
   projects,
   skills,
 } from "@/lib/db/schema";
@@ -277,4 +278,79 @@ export async function getPublicContentCards(userId: string): Promise<PublicConte
       code: f ? { repoUrl: f.repoUrl, links } : null,
     };
   });
+}
+
+// ── Group P — dynamic project catalog ───────────────────────────────────────
+
+export interface PublicProject {
+  slug: string;
+  name: string;
+  tagline: string;
+  description: string | null;
+  problemSolved: string | null;
+  architecture: string | null;
+  highlights: string[];
+  repoUrl: string | null;
+  liveUrl: string | null;
+  tech: string[];
+}
+
+/** Unauthenticated. isPublic, non-excluded projects — tech derived from
+ *  linked skills, tagline falls back to description. This is the
+ *  portfolio's project catalog; nothing is hand-maintained there anymore. */
+export async function getPublicProjects(userId: string): Promise<PublicProject[]> {
+  const rows = await db
+    .select({
+      id: projects.id,
+      slug: projects.slug,
+      name: projects.name,
+      tagline: projects.tagline,
+      description: projects.description,
+      problemSolved: projects.problemSolved,
+      architecture: projects.architecture,
+      highlights: projects.highlights,
+      repoUrl: projects.repoUrl,
+      liveUrl: projects.liveUrl,
+    })
+    .from(projects)
+    .where(
+      and(
+        eq(projects.userId, userId),
+        eq(projects.isPublic, true),
+        isNull(projects.excludedAt),
+      ),
+    );
+  if (rows.length === 0) return [];
+
+  const ids = rows.map((r) => r.id);
+  const skillRows = await db
+    .select({ projectId: projectSkills.projectId, skillName: skills.name })
+    .from(projectSkills)
+    .innerJoin(skills, eq(skills.id, projectSkills.skillId))
+    .where(
+      and(
+        eq(projectSkills.userId, userId),
+        inArray(projectSkills.projectId, ids),
+        isNull(skills.excludedAt),
+      ),
+    );
+  const techByProject = new Map<string, string[]>();
+  for (const r of skillRows) {
+    const arr = techByProject.get(r.projectId) ?? [];
+    if (!arr.includes(r.skillName)) arr.push(r.skillName);
+    techByProject.set(r.projectId, arr);
+  }
+
+  return rows.map((r) => ({
+    slug: r.slug,
+    name: r.name,
+    tagline: r.tagline || r.description || "",
+    description: r.description,
+    problemSolved: r.problemSolved,
+    architecture: r.architecture,
+    highlights: Array.isArray(r.highlights) ? (r.highlights as string[]) : [],
+    repoUrl: r.repoUrl,
+    liveUrl: r.liveUrl,
+    tech: techByProject.get(r.id) ?? [],
+  }));
 }
