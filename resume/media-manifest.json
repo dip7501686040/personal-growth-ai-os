@@ -1,4 +1,0 @@
-{
-  "_note": "Visual proof index. projectSlug → featureKey → media (video | screenshot | diagram) on Cloudinary. Written by `pnpm media upload`; read by the portfolio content cards and the proof-bundle generator. Committed — it's an index, not secrets.",
-  "projects": {}
-}

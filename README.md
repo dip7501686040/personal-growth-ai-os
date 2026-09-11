@@ -65,6 +65,29 @@ pnpm db:studio     # browse data
 
 Phase 1 introduces no application tables — Supabase manages `auth.users`.
 
+## Résumé + applications data (not in git)
+
+`resume/` and `applications/` are gitignored — Cloudflare R2 is the source of
+truth, not the repo (two buckets, `my-files` and `applications`; see
+`R2_*` / `R2_FILES_BUCKET` in `.env.local`). Every loader falls back to a
+local copy under `resume/`/`applications/` when R2 isn't reachable.
+
+| local path | R2 key | role |
+|---|---|---|
+| `resume/master.json` | `resume/master.json` | **Machine source of truth** for the résumé. Every tailored résumé is built from this — edit it, not `master.md`. |
+| `resume/master.md` | `resume/master.md` | Read-only rendered view. Regenerate: `pnpm resume backend --out /tmp/r && cp /tmp/r/resume.md resume/master.md` |
+| `resume/profile.json` | `resume/profile.json` | Standing answers for application forms/outreach (`src/lib/apply/profile.ts`). Copy from `profile.example.json`. |
+| `resume/job-search.json` | `resume/job-search.json` | Morning job-search config (`titles`, `skills`, `targetCountries`, filters). |
+| `resume/media-manifest.json` | `resume/media-manifest.json` | Visual-proof index (`pnpm media upload`). |
+| `resume/Dipankar_Saha_Resume.pdf` | `resume/Dipankar_Saha_Resume.pdf` | Human-authored reference PDF `master.json` mirrors. |
+| `applications/<date>/<folder>/…` | `<date>/<folder>/…` | Per-job application bundles — see `src/modules/applications/generate.ts`. |
+
+Sync commands:
+```bash
+pnpm files push|pull|list [file]     # local resume/  <-> R2 my-files
+pnpm apply  push|pull [target]       # local applications/ <-> R2 applications
+```
+
 ## Scripts
 
 | Script | Purpose |

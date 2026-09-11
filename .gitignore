@@ -45,11 +45,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# generated résumé output (source is resume/master.json)
-resume/out/
-
-# standing answer bank for application forms (copy from profile.example.json)
-resume/profile.json
+# résumé + applications data — R2 is the source of truth (my-files /
+# applications buckets), not git. See README.md "Résumé + applications data".
+# profile.example.json is the one exception, kept as a committed template.
+/resume/*
+!/resume/profile.example.json
 
 # Playwright MCP output (screenshots the apply-drive skill copies into folders)
 .apply-drive/
