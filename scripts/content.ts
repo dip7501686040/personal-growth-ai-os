@@ -104,8 +104,8 @@ async function registerCmd() {
   }
 
   const resourceType = resourceTypeFor(kind);
-  const publicId = `pgai/${projectSlug}/${featureKey}-${kind}`;
-  const up = await uploadMedia(file, { resourceType, publicId, overwrite: true });
+  const publicId = `${projectSlug}/${featureKey}-${kind}`;
+  const up = await uploadMedia(file, { resourceType, publicId, folder: "contents", overwrite: true });
   const card = await createPortfolioCard(userId, {
     title,
     caption: arg("--caption"),
@@ -145,7 +145,8 @@ async function terminalCmd() {
 
   const up = await uploadMedia(pngPath, {
     resourceType: "image",
-    publicId: `pgai/${projectSlug}/${featureKey}-screenshot`,
+    publicId: `${projectSlug}/${featureKey}-screenshot`,
+    folder: "contents",
     overwrite: true,
   });
   const card = await createPortfolioCard(userId, {
