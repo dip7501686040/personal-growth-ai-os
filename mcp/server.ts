@@ -145,7 +145,7 @@ server.registerTool(
     },
   },
   async ({ jd }) => {
-    const master = loadMaster();
+    const master = await loadMaster();
     const suggestedArchetype = jd ? suggestArchetype(master, jd) : null;
     return text(JSON.stringify({ master, suggestedArchetype }, null, 2));
   },

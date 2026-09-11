@@ -140,8 +140,8 @@ async function readFolderJson<T>(
 
 // ── résumé + doc builders ────────────────────────────────────────────────────
 
-function resumeModelFor(jdText: string, archetype: string, proof: JdProof) {
-  const master = loadMaster();
+async function resumeModelFor(jdText: string, archetype: string, proof: JdProof) {
+  const master = await loadMaster();
   return buildResumeModel(master, archetype as Parameters<typeof buildResumeModel>[1], {
     skillNames: proof.skills.map((s) => s.name),
     projectNames: [
@@ -158,7 +158,7 @@ async function writeResumeFiles(
   archetype: string,
   proof: JdProof,
 ): Promise<boolean> {
-  const model = resumeModelFor(jdText, archetype, proof);
+  const model = await resumeModelFor(jdText, archetype, proof);
   await persist(date, folder, "resume.md", toMarkdown(model));
   await persist(date, folder, "resume.html", toHtml(model));
   const pdfOk = htmlToPdf(
@@ -169,7 +169,7 @@ async function writeResumeFiles(
   return pdfOk;
 }
 
-export function proofBundleMd(j: ScoredJob, proof: JdProof): string {
+export async function proofBundleMd(j: ScoredJob, proof: JdProof): Promise<string> {
   const L: string[] = [`# Proof of work — ${j.company} / ${j.role}`, ``];
   const withProof = proof.skills.filter((s) => s.proof.length > 0);
   if (withProof.length) {
@@ -184,7 +184,7 @@ export function proofBundleMd(j: ScoredJob, proof: JdProof): string {
         ].filter(Boolean);
         L.push(
           `- **${p.featureTitle}** (${p.projectName}) — ${links.join("  ·  ") || "no link"}` +
-            visualProofMd(p.projectName, p.featureTitle),
+            (await visualProofMd(p.projectName, p.featureTitle)),
         );
       }
       if (s.proof.length > 3) L.push(`- _…+${s.proof.length - 3} more features_`);
@@ -206,7 +206,7 @@ export function proofBundleMd(j: ScoredJob, proof: JdProof): string {
       ].filter(Boolean);
       L.push(
         `- **${f.title}** (${f.projectName}) — ${links.join("  ·  ") || "no link"}` +
-          visualProofMd(f.projectName, f.title),
+          (await visualProofMd(f.projectName, f.title)),
       );
     }
     L.push(``);
@@ -374,13 +374,13 @@ export async function scaffoldJobFolder(input: ScaffoldInput): Promise<ScaffoldR
   } catch {
     proof = EMPTY_PROOF;
   }
-  const archetype = suggestArchetype(loadMaster(), jdText);
+  const archetype = suggestArchetype(await loadMaster(), jdText);
 
   const files: string[] = [];
   const pdfOk = await writeResumeFiles(date, folder, jdText, archetype, proof);
   files.push("resume.md", "resume.html", ...(pdfOk ? ["resume.pdf"] : []));
 
-  await persist(date, folder, "proof-bundle.md", proofBundleMd(input.job, proof));
+  await persist(date, folder, "proof-bundle.md", await proofBundleMd(input.job, proof));
   await persist(date, folder, "outreach-targets.md", outreachMd(input.job));
   await persist(
     date,
@@ -432,7 +432,7 @@ export async function regenerateResume(
   } catch {
     proof = EMPTY_PROOF;
   }
-  const archetype = job.archetype ?? suggestArchetype(loadMaster(), jdText);
+  const archetype = job.archetype ?? suggestArchetype(await loadMaster(), jdText);
   const pdfOk = await writeResumeFiles(date, folder, jdText, archetype, proof);
   return { pdfOk };
 }
@@ -463,7 +463,7 @@ export async function regenerateProofBundle(
   if (!job) throw new Error(`no job.json for ${date}/${folder}`);
   const jdText = job.jdText ?? jdTextOf(job);
   const proof = await getProofForJd(userId, jdText);
-  await persist(date, folder, "proof-bundle.md", proofBundleMd(job, proof));
+  await persist(date, folder, "proof-bundle.md", await proofBundleMd(job, proof));
   return { skills: proof.skills.length, features: proof.features.length };
 }
 

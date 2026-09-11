@@ -115,7 +115,7 @@ async function main() {
     ? join(process.cwd(), dir, "cover-letter.md")
     : undefined;
 
-  const profile = loadProfile();
+  const profile = await loadProfile();
   const browser = await chromium.launch({ headless: has("--headless") });
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 1400 } });
   const page = await ctx.newPage();

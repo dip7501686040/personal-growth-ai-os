@@ -11,7 +11,7 @@ import {
   mediaUrl,
   videoPosterUrl,
 } from "@/lib/media/cloudinary";
-import { loadManifest, type MediaItem } from "@/lib/media/manifest";
+import { loadManifestFromR2, type MediaItem } from "@/lib/media/manifest";
 
 const PORTFOLIO_FALLBACK = "https://dipankarsaha.vercel.app";
 
@@ -22,9 +22,10 @@ function slugify(s: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-function portfolioBase(): string {
+async function portfolioBase(): Promise<string> {
   try {
-    return (loadProfile().links.portfolio || PORTFOLIO_FALLBACK).replace(/\/$/, "");
+    const p = await loadProfile();
+    return (p.links.portfolio || PORTFOLIO_FALLBACK).replace(/\/$/, "");
   } catch {
     return PORTFOLIO_FALLBACK;
   }
@@ -40,14 +41,14 @@ export interface VisualProof {
 }
 
 /** Manifest media whose (projectSlug, featureKey) matches this proof feature. */
-export function visualProofFor(
+export async function visualProofFor(
   projectName: string,
   featureTitle: string,
-): VisualProof[] {
+): Promise<VisualProof[]> {
   if (!projectName || !featureTitle) return [];
   let manifest;
   try {
-    manifest = loadManifest();
+    manifest = await loadManifestFromR2();
   } catch {
     return [];
   }
@@ -62,7 +63,7 @@ export function visualProofFor(
     keys.find((k) => want.includes(k) || k.includes(want));
   if (!key) return [];
 
-  const base = `${portfolioBase()}/projects/${projSlug}#${key}`;
+  const base = `${await portfolioBase()}/projects/${projSlug}#${key}`;
   return features[key].map((it) => ({
     kind: it.kind,
     caption: it.caption,
@@ -83,8 +84,8 @@ function cdnUrl(v: VisualProof): string {
  * A markdown fragment to append to a proof-bundle feature line — a portfolio
  * deep-link plus (when Cloudinary is configured) each media URL.
  */
-export function visualProofMd(projectName: string, featureTitle: string): string {
-  const links = visualProofFor(projectName, featureTitle);
+export async function visualProofMd(projectName: string, featureTitle: string): Promise<string> {
+  const links = await visualProofFor(projectName, featureTitle);
   if (links.length === 0) return "";
   const parts = [`visual ${links[0].portfolioUrl}`];
   if (isCloudinaryConfigured()) {

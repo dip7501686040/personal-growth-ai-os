@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { getFileText, isR2Configured } from "@/modules/files/store";
 
 const authEntrySchema = z.object({
   status: z.enum(["citizen", "authorized", "not_authorized"]),
@@ -86,15 +87,29 @@ export type AuthRegion =
 
 let cached: Profile | null = null;
 
-export function loadProfile(): Profile {
+/** `my-files` R2 (source of truth) when configured, else the local file. */
+export async function loadProfile(): Promise<Profile> {
   if (cached) return cached;
+  if (isR2Configured()) {
+    try {
+      const text = await getFileText("resume/profile.json");
+      if (text != null) {
+        cached = profileSchema.parse(JSON.parse(text));
+        return cached;
+      }
+    } catch {
+      // bucket not provisioned / not reachable yet — fall through to local
+    }
+  }
   const path = join(process.cwd(), "resume", "profile.json");
   let raw: string;
   try {
     raw = readFileSync(path, "utf8");
   } catch {
     throw new Error(
-      "resume/profile.json not found — run: cp resume/profile.example.json resume/profile.json and fill it in.",
+      "profile.json not found in R2 (my-files bucket) or locally — run: " +
+        "cp resume/profile.example.json resume/profile.json and fill it in " +
+        "(or pnpm files push once R2 is configured).",
     );
   }
   cached = profileSchema.parse(JSON.parse(raw));
@@ -102,7 +117,7 @@ export function loadProfile(): Profile {
 }
 
 /** Which set of TODO / unset fields still need the user's input. */
-export function profileGaps(p: Profile = loadProfile()): string[] {
+export function profileGaps(p: Profile): string[] {
   const gaps: string[] = [];
   if (!p.identity.pronouns) gaps.push("identity.pronouns");
   if (!p.links.portfolio) gaps.push("links.portfolio");
@@ -133,7 +148,7 @@ export function regionFromLabel(label: string): AuthRegion {
   return "default";
 }
 
-export function authFor(region: AuthRegion, p: Profile = loadProfile()) {
+export function authFor(region: AuthRegion, p: Profile) {
   return p.authorization[region] ?? p.authorization.default;
 }
 
@@ -171,8 +186,7 @@ const yesNo = (b: boolean) => (b ? "Yes" : "No");
  * Best answer for a form field given its label / question text.
  * Returns null when nothing in the profile plausibly answers it.
  */
-export function answerFor(label: string): Answer | null {
-  const p = loadProfile();
+export function answerFor(label: string, p: Profile): Answer | null {
   const q = label.toLowerCase().replace(/\s+/g, " ").trim();
   const m = (re: RegExp) => re.test(q);
   const A = (value: string, field: string, confident = true): Answer => ({
@@ -290,6 +304,6 @@ export function answerFor(label: string): Answer | null {
 }
 
 /** Convenience: answers for a batch of field labels, keyed by label. */
-export function answersFor(labels: string[]): Record<string, Answer | null> {
-  return Object.fromEntries(labels.map((l) => [l, answerFor(l)]));
+export function answersFor(labels: string[], p: Profile): Record<string, Answer | null> {
+  return Object.fromEntries(labels.map((l) => [l, answerFor(l, p)]));
 }

@@ -213,6 +213,7 @@ async function fillGeneric(
   root: Root,
   report: FillReport,
   done: Set<string>,
+  profile: Profile,
 ): Promise<void> {
   const controls = await root.$$("input:not([type=hidden]), textarea, select");
   let seen = 0;
@@ -232,7 +233,7 @@ async function fillGeneric(
       if (done.has(label.toLowerCase())) continue;
       done.add(label.toLowerCase());
 
-      const ans = answerFor(label);
+      const ans = answerFor(label, profile);
       if (!ans) {
         report.blank.push(label);
         continue;
@@ -271,6 +272,11 @@ export async function runFill(page: Page, input: FillInput): Promise<FillReport>
   await fillKnown(root, ats, input.profile, report);
   await uploadResume(root, input.resumePath, input.coverLetterPath, report);
   await fillFreeText(root, input.whyFit, input.coverLetter, report);
-  await fillGeneric(root, report, new Set(report.filled.map((f) => f.label.toLowerCase())));
+  await fillGeneric(
+    root,
+    report,
+    new Set(report.filled.map((f) => f.label.toLowerCase())),
+    input.profile,
+  );
   return report;
 }

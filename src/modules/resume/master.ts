@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { getFileText, isR2Configured } from "@/modules/files/store";
 
 export interface MasterExperience {
   role: string;
@@ -54,7 +55,16 @@ export interface MasterResume {
 export const ARCHETYPES = ["backend", "platform", "ai-llm"] as const;
 export type ArchetypeKey = (typeof ARCHETYPES)[number];
 
-export function loadMaster(root = process.cwd()): MasterResume {
+/** `my-files` R2 (source of truth) when configured, else the local file. */
+export async function loadMaster(root = process.cwd()): Promise<MasterResume> {
+  if (isR2Configured()) {
+    try {
+      const text = await getFileText("resume/master.json");
+      if (text != null) return JSON.parse(text) as MasterResume;
+    } catch {
+      // bucket not provisioned / not reachable yet — fall through to local
+    }
+  }
   return JSON.parse(
     readFileSync(join(root, "resume", "master.json"), "utf8"),
   ) as MasterResume;

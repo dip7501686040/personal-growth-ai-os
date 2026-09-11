@@ -61,8 +61,8 @@ function subjectOf(md: string): string {
   return md.match(/^subject:\s*(.+)$/im)?.[1]?.trim() ?? "";
 }
 
-function signature(): string {
-  const p = loadProfile();
+async function signature(): Promise<string> {
+  const p = await loadProfile();
   return ["—", p.identity.fullName, p.links.linkedin, p.links.github]
     .filter(Boolean)
     .join("\n");
@@ -108,7 +108,7 @@ async function emailCmd() {
       ? cover || whyFit
       : sectionOf(pitch, "Message") || pitch.replace(/^subject:.*$/im, "").trim() || whyFit;
   if (!body) throw new Error(`no prose to send — write ${kind === "apply" ? "cover-letter.md / why-fit.md" : "pitch-recruiter.md"} first`);
-  if (!/dipankar saha/i.test(body.slice(-160))) body = `${body}\n\n${signature()}`;
+  if (!/dipankar saha/i.test(body.slice(-160))) body = `${body}\n\n${await signature()}`;
 
   const subject =
     arg("--subject") ||

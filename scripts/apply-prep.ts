@@ -39,7 +39,7 @@ async function main() {
   const idxs = pick.split(",").map((s) => Number(s.trim()));
 
   const userId = await getOwnerUserId();
-  const cfg = loadJobSearchConfig();
+  const cfg = await loadJobSearchConfig();
 
   let folders = 0;
   for (const i of idxs) {

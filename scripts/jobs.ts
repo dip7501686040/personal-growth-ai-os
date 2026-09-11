@@ -32,7 +32,7 @@ async function main() {
   const json = process.argv.includes("--json");
   const showB = process.argv.includes("--b");
   const noGraph = process.argv.includes("--no-graph");
-  const cfg = loadJobSearchConfig();
+  const cfg = await loadJobSearchConfig();
 
   const graphOn = !noGraph && cfg.useGraphMatch !== false;
   let extraTerms: string[] = [];

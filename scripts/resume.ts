@@ -49,7 +49,7 @@ async function main() {
   }
   const jdPath = arg("--jd");
   const outDir = arg("--out") ?? join("resume", "out");
-  const master = loadMaster();
+  const master = await loadMaster();
 
   let jdText = "";
   let jd: JdTailor | undefined;

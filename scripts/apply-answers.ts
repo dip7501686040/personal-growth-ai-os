@@ -9,23 +9,21 @@
  */
 import { answerFor, loadProfile, profileGaps } from "@/lib/apply/profile";
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
+  const profile = await loadProfile();
 
   if (args.includes("--profile") || args.length === 0) {
-    const profile = loadProfile();
     console.log(JSON.stringify({ profile, gaps: profileGaps(profile) }, null, 2));
     return;
   }
 
   const out: Record<string, ReturnType<typeof answerFor>> = {};
-  for (const label of args) out[label] = answerFor(label);
+  for (const label of args) out[label] = answerFor(label, profile);
   console.log(JSON.stringify(out, null, 2));
 }
 
-try {
-  main();
-} catch (e) {
+main().catch((e) => {
   console.error(e instanceof Error ? e.message : e);
   process.exit(1);
-}
+});

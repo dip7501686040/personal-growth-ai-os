@@ -7,15 +7,15 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import { getText, isR2Configured, putObject } from "@/modules/applications/store";
+import { getFileText, isR2Configured, putFile } from "@/modules/files/store";
 
 /**
- * The manifest is mirrored to R2 (same bucket as applications, different key)
- * so the deployed public API can serve a freshly-uploaded item within its
- * revalidate window — no git push / redeploy needed for new media. The local
- * file stays the git-committed backup + the source for local dev without R2.
+ * The manifest is mirrored to the `my-files` R2 bucket (same one as every
+ * other resume-domain file — Group R) so the deployed public API can serve a
+ * freshly-uploaded item within its revalidate window — no git push / redeploy
+ * needed for new media. The local file stays the dev fallback / git backup.
  */
-const R2_KEY = "_meta/media-manifest.json";
+const R2_KEY = "resume/media-manifest.json";
 
 const mediaItemSchema = z.object({
   kind: z.enum(["video", "screenshot", "diagram"]),
@@ -58,15 +58,23 @@ export function saveManifest(m: MediaManifest): void {
 /** Mirror the manifest to R2 so a deployed reader sees new items without a git push. */
 export async function syncManifestToR2(m: MediaManifest = loadManifest()): Promise<boolean> {
   if (!isR2Configured()) return false;
-  await putObject(R2_KEY, JSON.stringify(m, null, 2), "application/json");
-  return true;
+  try {
+    await putFile(R2_KEY, JSON.stringify(m, null, 2), "application/json");
+    return true;
+  } catch {
+    return false; // bucket not provisioned / not reachable yet
+  }
 }
 
 /** R2 (fresh, no deploy needed) when configured, else the local committed file. */
 export async function loadManifestFromR2(): Promise<MediaManifest> {
   if (isR2Configured()) {
-    const text = await getText(R2_KEY);
-    if (text != null) return manifestSchema.parse(JSON.parse(text));
+    try {
+      const text = await getFileText(R2_KEY);
+      if (text != null) return manifestSchema.parse(JSON.parse(text));
+    } catch {
+      // bucket not provisioned / not reachable yet — fall through to local
+    }
   }
   return loadManifest();
 }
