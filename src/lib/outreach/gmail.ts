@@ -122,6 +122,14 @@ function b64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
+/** RFC 2047 encoded-word for a header value with non-ASCII characters
+ *  (e.g. an em dash in a subject line) — a raw UTF-8 byte in a header is
+ *  invalid RFC 2822 and renders as mojibake ("â€”") in strict clients. */
+function encodeHeaderValue(s: string): string {
+  if (/^[\x00-\x7F]*$/.test(s)) return s;
+  return `=?UTF-8?B?${Buffer.from(s, "utf8").toString("base64")}?=`;
+}
+
 function buildRaw(msg: {
   to: string;
   subject: string;
@@ -130,13 +138,17 @@ function buildRaw(msg: {
   attachments?: Attachment[];
 }): string {
   const boundary = `pgai_${Date.now().toString(36)}`;
+  // Note: joined with an explicit "\r\n\r\n" below, not a trailing "" element
+  // here — .filter(Boolean) would silently drop an empty-string list entry,
+  // which previously ate the blank line separating headers from the MIME
+  // body and made every draft's text/plain part vanish (only attachments
+  // survived, since each starts its own well-formed boundary+headers+blank).
   const head = [
     `To: ${msg.to}`,
     msg.cc ? `Cc: ${msg.cc}` : "",
-    `Subject: ${msg.subject}`,
+    `Subject: ${encodeHeaderValue(msg.subject)}`,
     "MIME-Version: 1.0",
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    "",
   ]
     .filter(Boolean)
     .join("\r\n");
@@ -164,7 +176,7 @@ function buildRaw(msg: {
   }
   parts.push(`--${boundary}--`, "");
 
-  return b64url(Buffer.from(`${head}\r\n${parts.join("\r\n")}`, "utf8"));
+  return b64url(Buffer.from(`${head}\r\n\r\n${parts.join("\r\n")}`, "utf8"));
 }
 
 // ── draft operations ────────────────────────────────────────────────────────
@@ -193,6 +205,18 @@ export async function createDraft(
     body: { message: { raw } },
   });
   return { id: d.id, messageId: d.message.id };
+}
+
+/** Gmail returns 204 No Content on delete — gapi()'s res.json() would throw
+ *  on the empty body, so this calls fetch directly instead of going through it. */
+export async function deleteDraft(draftId: string): Promise<void> {
+  const client = await authedClient();
+  const { token } = await client.getAccessToken();
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/drafts/${draftId}`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${token}` } },
+  );
+  if (!res.ok) throw new Error(`Gmail API drafts.delete → ${res.status} ${await res.text()}`);
 }
 
 export async function sendDraft(draftId: string): Promise<{ id: string; threadId: string }> {
