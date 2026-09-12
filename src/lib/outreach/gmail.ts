@@ -17,14 +17,20 @@ export const GMAIL_SCOPES = [
   "email",
 ];
 
+/** Only call this right before writing — Vercel's filesystem is read-only
+ *  outside /tmp, so this throws there. Reading paths/existence never needs it. */
 export function configDir(): string {
   const dir = join(homedir(), ".config", "pgai");
   mkdirSync(dir, { recursive: true });
   return dir;
 }
 
-const CRED_PATH = join(configDir(), "gmail-credentials.json");
-const TOKEN_PATH = join(configDir(), "gmail-token.json");
+// Plain path strings, computed without touching the filesystem — this file
+// is imported by /applications (page + server actions), which must still
+// render on Vercel even though Gmail is a local-only, file-based feature.
+const CONFIG_DIR = join(homedir(), ".config", "pgai");
+const CRED_PATH = join(CONFIG_DIR, "gmail-credentials.json");
+const TOKEN_PATH = join(CONFIG_DIR, "gmail-token.json");
 
 export function credentialsExist(): boolean {
   return existsSync(CRED_PATH);
@@ -58,6 +64,7 @@ export function oauthClient(redirectUri?: string): OAuth2Client {
 }
 
 export function saveToken(tokens: unknown): void {
+  configDir(); // ensure ~/.config/pgai exists — local-only call path, never reached on Vercel
   writeFileSync(TOKEN_PATH, JSON.stringify(tokens, null, 2));
 }
 
