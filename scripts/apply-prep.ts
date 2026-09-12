@@ -1,15 +1,17 @@
 /**
  * Scaffold per-job application folders — the deterministic half of
- * /apply-morning. Writes only job.json per pick; the résumé, proof-bundle,
- * and prose are generated later, when actually needed (proof-bundle by
- * /apply-content-queue, everything else by /apply-drive) — so picking costs
- * nothing beyond recording the job.
+ * /apply-morning. Writes job.json and search-provenance.md per pick (the
+ * latter is cheap string formatting off this run's search context, which
+ * won't exist any later); the résumé, proof-bundle, and prose are generated
+ * later, when actually needed (proof-bundle by /apply-content-queue,
+ * everything else by /apply-drive) — so picking costs nothing beyond
+ * recording the job and why it surfaced.
  *
  *   pnpm apply-prep --jobs <jobs.json> --pick 0,3,7 [--date YYYY-MM-DD]
  *
  * `jobs.json` is the output of `pnpm jobs --json`. Each pick writes
- * applications/<date>/<company>__<role>/job.json — to the local cache and,
- * when R2 is configured, to the `applications` bucket.
+ * applications/<date>/<company>__<role>/{job.json,search-provenance.md} — to
+ * the local cache and, when R2 is configured, to the `applications` bucket.
  *
  * All generation logic lives in src/modules/applications/generate.ts so the
  * /applications page can call the same functions.
@@ -53,7 +55,7 @@ async function main() {
     folders += 1;
     console.log(
       `  [${i}] ${job.company} — ${job.role}\n` +
-        `      applications/${out.date}/${out.folder}/job.json`,
+        `      applications/${out.date}/${out.folder}/{${out.files.join(",")}}`,
     );
   }
 

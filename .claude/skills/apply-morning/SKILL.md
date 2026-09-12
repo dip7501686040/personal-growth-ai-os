@@ -1,16 +1,20 @@
 ---
 name: apply-morning
-description: The morning job run — fetch + score today's matching jobs, let the user pick, and record each pick as a bare job.json in the ledger. Use when the user says "/apply-morning", "run the morning jobs", or "prep applications".
+description: The morning job run — fetch + score today's matching jobs, let the user pick, and record each pick as job.json + search-provenance.md in the ledger. Use when the user says "/apply-morning", "run the morning jobs", or "prep applications".
 ---
 
 # apply-morning
 
-Ties J1–J4 together. Fetch → score → pick → record `job.json` per pick → record
-in the ledger. Nothing else gets generated here — no résumé, no proof-bundle,
-no prose. Those cost real work (LLM calls, DB lookups) and a picked job can
-still get rejected later, so they're deferred: `/apply-content-queue` adds the
-proof-bundle when a job clears content-processing, and `/apply-drive` fills in
-everything else, one file at a time, right when the form on screen needs it.
+Ties J1–J4 together. Fetch → score → pick → record `job.json` +
+`search-provenance.md` per pick → record in the ledger. Nothing else gets
+generated here — no résumé, no proof-bundle, no prose. Those cost real work
+(LLM calls, DB lookups) and a picked job can still get rejected later, so
+they're deferred: `/apply-content-queue` adds the proof-bundle when a job
+clears content-processing, and `/apply-drive` fills in everything else, one
+file at a time, right when the form on screen needs it. Search-provenance is
+the one exception — it's written now because it's cheap (no LLM/DB calls,
+just formatting this run's `cfg`/scoring context) and that context won't
+exist any later than this.
 
 ## 1. Fetch and score
 
@@ -51,17 +55,16 @@ apply-drive means discovering the dead end only after everything else is
 already prepped. If nothing turns up, leave it null and say so in the step 6
 report — don't guess a URL.
 
-## 3. Scaffold each folder (deterministic — job.json only)
+## 3. Scaffold each folder (deterministic — job.json + search-provenance.md)
 
 ```
 pnpm apply-prep --jobs /tmp/jobs.json --pick 0,1,4,6
 ```
 
-Writes `applications/<date>/<company>__<role>/job.json` per pick — to the
-local cache and the R2 `applications` bucket (the source of truth) — nothing
-else. `job.json` carries the JD text and this run's search-provenance
-markdown (rendered now, while `cfg`/`result` are still in hand; materialized
-into `search-provenance.md` later, on demand, by `/apply-drive`).
+Writes `applications/<date>/<company>__<role>/job.json` and
+`search-provenance.md` per pick — to the local cache and the R2
+`applications` bucket (the source of truth). Nothing else: no résumé, no
+proof-bundle, no prose yet.
 
 ## 4. Record in the ledger
 
@@ -86,4 +89,5 @@ first time it's actually needed for that job's form.
 - One `pnpm apply-prep` call can take several `--pick` indices — batch them.
 - Don't submit anything or send any message — the user does that.
 - Don't generate résumé, proof-bundle, or prose here — that's deferred work
-  for later stages. This step only records what got picked and why.
+  for later stages. This step only records what got picked, and why it
+  surfaced.

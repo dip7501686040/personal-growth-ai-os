@@ -14,11 +14,11 @@ doesn't generate those itself.
 
 Needs: an interactive session with the **`playwright`** MCP server connected
 (in `.mcp.json`; approve it once), `resume/profile.json` filled, and the
-folder past content-processing — `job.json` (`/apply-morning`) and
-`proof-bundle.md` (`/apply-content-queue`) should already exist. Nothing else
-does yet: the résumé and every prose file (`why-fit.md`, `cover-letter.md`,
-`pitch-recruiter.md`, `pitch-referral.md`, `outreach-targets.md`,
-`search-provenance.md`) get generated here, one at a time, the first moment
+folder past content-processing — `job.json` + `search-provenance.md`
+(`/apply-morning`) and `proof-bundle.md` (`/apply-content-queue`) should
+already exist. Nothing else does yet: the résumé and every prose file
+(`why-fit.md`, `cover-letter.md`, `pitch-recruiter.md`, `pitch-referral.md`,
+`outreach-targets.md`) get generated here, one at a time, the first moment
 the drive actually needs them — never all up front.
 
 No folder named? Check `pnpm apply queue` — its `apply queue` section lists
@@ -159,27 +159,23 @@ bounced with validation errors, report them and go back to step 5.
 - `pnpm apply push <date>/<folder>` then `pnpm apply submit <date>/<folder>`
   (ledger → applied).
 
-### 10. Outreach and provenance (only if the user wants them)
+### 10. Outreach (only if the user wants it)
 
-Two more files this folder never got, generated only on request — driving the
-form doesn't need either:
+`outreach-targets.md` and the pitch files never got generated earlier —
+driving the form doesn't need them. If the user wants to reach out about this
+job, generate the target list and the one pitch file you'll actually send,
+then write real pitch prose grounded in `proof-bundle.md` (same discipline as
+`why-fit.md` — no filler links):
 
-- **Referral / recruiter outreach** — if the user wants to reach out about
-  this job, generate the target list and the one pitch file you'll actually
-  send, then write real pitch prose grounded in `proof-bundle.md` (same
-  discipline as `why-fit.md` — no filler links):
-  ```ts
-  import { ensureOutreachTargets, ensurePitchStub } from "@/modules/applications/generate";
-  await ensureOutreachTargets("<date>", "<folder>");
-  await ensurePitchStub("<date>", "<folder>", "recruiter"); // or "referral"
-  ```
-- **"Why did this job surface?"** — if the user asks, materialize it from what
-  was captured back at `/apply-morning` time (this is the only point it can
-  come from — the search run's context isn't available any later):
-  ```ts
-  import { ensureSearchProvenance } from "@/modules/applications/generate";
-  await ensureSearchProvenance("<date>", "<folder>");
-  ```
+```ts
+import { ensureOutreachTargets, ensurePitchStub } from "@/modules/applications/generate";
+await ensureOutreachTargets("<date>", "<folder>");
+await ensurePitchStub("<date>", "<folder>", "recruiter"); // or "referral"
+```
+
+(`search-provenance.md` needs nothing here — `/apply-morning` already wrote
+it. If it's somehow missing on an older folder, `ensureSearchProvenance`
+materializes it from what job.json still has cached.)
 
 ### 11. Close
 `browser_close`.

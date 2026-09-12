@@ -335,8 +335,9 @@ export type FolderJob = ScoredJob & {
   preparedAt: string;
   id?: string;
   /** rendered at scaffold time, when `cfg`/`result` (this search run's context)
-   *  are still available — materialized into search-provenance.md later, on
-   *  demand, by `ensureSearchProvenance`. */
+   *  are still available; `scaffoldJobFolder` also writes it straight to
+   *  search-provenance.md, kept here too as a fallback for `ensureSearchProvenance`
+   *  on any folder scaffolded before that file was written up front. */
   searchProvenanceMd?: string;
 };
 
@@ -357,26 +358,30 @@ export interface ScaffoldResult {
 }
 
 /**
- * Scaffold one job — used by `pnpm apply-prep`. Writes only `job.json`; the
- * résumé, proof-bundle, and prose are generated later, when actually needed
+ * Scaffold one job — used by `pnpm apply-prep`. Writes `job.json` and
+ * search-provenance.md (cheap — pure string formatting off `cfg`/`result`,
+ * this run's context, never available again after picking). The résumé,
+ * proof-bundle, and prose are generated later, when actually needed
  * (proof-bundle by /apply-content-queue, everything else by /apply-drive) —
- * so picking a job costs nothing beyond recording it.
+ * so picking a job costs nothing beyond recording it and its provenance.
  */
 export async function scaffoldJobFolder(input: ScaffoldInput): Promise<ScaffoldResult> {
   const date = input.date ?? new Date().toISOString().slice(0, 10);
   const folder = folderName(input.job);
   const jdText = jdTextOf(input.job);
+  const provenance = searchProvenanceMd(input.job, input.cfg, input.result);
 
   const folderJob: FolderJob = {
     ...input.job,
     bundleDir: `applications/${date}/${folder}`,
     jdText,
     preparedAt: new Date().toISOString(),
-    searchProvenanceMd: searchProvenanceMd(input.job, input.cfg, input.result),
+    searchProvenanceMd: provenance,
   };
   await persist(date, folder, "job.json", JSON.stringify(folderJob, null, 2));
+  await persist(date, folder, "search-provenance.md", provenance);
 
-  return { date, folder, files: ["job.json"] };
+  return { date, folder, files: ["job.json", "search-provenance.md"] };
 }
 
 /** Renders resume.md/.html/.pdf from the folder's job.json — first-time
@@ -460,8 +465,10 @@ export async function ensureOutreachTargets(date: string, folder: string): Promi
   return persistIfAbsent(date, folder, "outreach-targets.md", outreachMd(job));
 }
 
-/** Materializes the run-context provenance captured in job.json at scaffold
- *  time (cfg/result aren't available any later than that). */
+/** Fallback for a folder scaffolded before search-provenance.md was written
+ *  up front — materializes the run-context provenance stashed in job.json
+ *  (cfg/result aren't available any later than scaffold time). No-op for any
+ *  folder that already has the file, which is every folder scaffolded now. */
 export async function ensureSearchProvenance(date: string, folder: string): Promise<boolean> {
   const job = await readFolderJson<FolderJob>(date, folder, "job.json");
   if (!job) throw new Error(`no job.json for ${date}/${folder}`);
