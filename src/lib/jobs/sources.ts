@@ -162,6 +162,21 @@ export async function hnWhoIsHiring(cfg: JobSearchConfig): Promise<RawJob[]> {
   for (const c of item.children ?? []) {
     if (!c.text) continue;
     const text = stripHtml(c.text);
+    // HN auto-links a posted URL into an <a href>, which stripHtml discards —
+    // pull it from the raw text first so applyUrl is the poster's own link,
+    // not just the HN comment page (which has nothing to apply to). HN
+    // entity-encodes even the slashes in these hrefs (&#x2F;), so decode
+    // before use.
+    const decodeEntities = (s: string) =>
+      s
+        .replace(/&#x2F;/gi, "/")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">");
+    const applyUrl =
+      [...c.text.matchAll(/href="([^"]+)"/g)]
+        .map((m) => decodeEntities(m[1]))
+        .find((h) => !/^mailto:/i.test(h) && !/news\.ycombinator\.com/i.test(h)) ?? null;
     if (!/remote/i.test(text)) continue;
     const firstLine = text.split(/\.\s|\n| - /)[0].slice(0, 240);
     if (!titleMatches(text, cfg)) continue;
@@ -190,7 +205,7 @@ export async function hnWhoIsHiring(cfg: JobSearchConfig): Promise<RawJob[]> {
       salaryText: text.match(/\$[\d,kK]+[\s-]*(?:to|-)?[\s-]*\$?[\d,kK]*/)?.[0] ?? null,
       postedAt: null,
       url: `https://news.ycombinator.com/item?id=${c.id}`,
-      applyUrl: null,
+      applyUrl,
       publisher: null,
       descriptionSnippet: text.slice(0, 1400),
       contactEmail: text.match(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/)?.[0] ?? null,

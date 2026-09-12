@@ -26,6 +26,26 @@ If `pnpm jobs` reports skipped sources (missing keys), mention it once — cover
 
 Ask which to prep — the user names indices, or says "prep the top N of Group A". Target 8–12/day; it's fine to dip into Group B for a flagged one that looks worth it.
 
+## 2b. Resolve real apply links before scaffolding
+
+Check each pick's `flags` and `applyUrl` in `/tmp/jobs.json`:
+
+- **`verify_apply_link`** (currently: every Himalayas job) — Himalayas' own
+  "Apply now" always routes to *its* signup wall (`/signup/talent`), never
+  the company's real form, regardless of company. Don't scaffold that URL.
+- **`applyUrl` is null/missing and the source isn't a direct board** (e.g. an
+  Adzuna redirect that turns out geo-blocked) — same problem, different
+  shape.
+
+For each one: WebSearch `<company> careers <role title>` and take the
+company's own ATS link (Ashby/Greenhouse/Lever/Workday/direct careers page)
+over any other job-board mirror. Patch that pick's `applyUrl` (and `url`) in
+`/tmp/jobs.json` directly before running `apply-prep` — this is the one
+point where fixing it is cheap (one session, one search); leaving it for
+apply-drive means discovering the dead end only after everything else is
+already prepped. If nothing turns up, leave it null and say so in the step 6
+report — don't guess a URL.
+
 ## 3. Scaffold each folder (deterministic)
 
 ```

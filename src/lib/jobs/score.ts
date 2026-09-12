@@ -23,7 +23,14 @@ const B_FLAGS = new Set([
   "onsite",
   "excluded_region",
   "region_restricted",
+  "verify_apply_link",
 ]);
+
+/** Sources whose own "Apply" always walls into a signup/login page, not the
+ *  real company form — found via real apply-drive attempts (Himalayas
+ *  routes every job to /signup/talent regardless of company). Resolve the
+ *  real link at scaffold time (apply-morning), not discovered later. */
+const WALLED_SOURCES = new Set(["himalayas"]);
 
 function daysAgo(iso: string | null): number | null {
   if (!iso) return null;
@@ -53,6 +60,10 @@ export function scoreJob(
   if (age != null && age <= 7) bump(0.12);
   if (age != null && age > 21) flags.push(`stale:${age}d`);
   if (DIRECT_BOARDS.has(j.source)) bump(0.12);
+  if (WALLED_SOURCES.has(j.source)) {
+    flags.push("verify_apply_link");
+    bump(-0.05);
+  }
   if (j.publisher && AGENCY_PUBLISHER.test(j.publisher)) {
     flags.push("agency_publisher");
     bump(-0.18);
