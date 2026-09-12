@@ -155,7 +155,7 @@ export async function hnWhoIsHiring(cfg: JobSearchConfig): Promise<RawJob[]> {
     search.hits.find((h) => /who is hiring/i.test(h.title));
   if (!story) return [];
   const item = await getJson<{
-    children?: { text?: string; author?: string }[];
+    children?: { id: number; text?: string; author?: string }[];
   }>(`https://hn.algolia.com/api/v1/items/${story.objectID}`);
 
   const out: RawJob[] = [];
@@ -189,7 +189,7 @@ export async function hnWhoIsHiring(cfg: JobSearchConfig): Promise<RawJob[]> {
       remote: true,
       salaryText: text.match(/\$[\d,kK]+[\s-]*(?:to|-)?[\s-]*\$?[\d,kK]*/)?.[0] ?? null,
       postedAt: null,
-      url: `https://news.ycombinator.com/item?id=${story.objectID}`,
+      url: `https://news.ycombinator.com/item?id=${c.id}`,
       applyUrl: null,
       publisher: null,
       descriptionSnippet: text.slice(0, 1400),
