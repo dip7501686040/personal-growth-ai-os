@@ -537,3 +537,18 @@ export async function queueCounts(
   ]);
   return { content: content.length, apply: apply.length };
 }
+
+/** Drop a job you've decided not to pursue — e.g. a stack mismatch found
+ *  while reviewing it. Touchpoints cascade via FK; the caller still needs to
+ *  clean up the R2/local folder separately (see deleteJobFolder), which is
+ *  why bundleDir comes back here. */
+export async function deleteApplication(
+  userId: string,
+  id: string,
+): Promise<{ bundleDir: string | null } | null> {
+  const [row] = await db
+    .delete(jobApplications)
+    .where(and(eq(jobApplications.userId, userId), eq(jobApplications.id, id)))
+    .returning({ bundleDir: jobApplications.bundleDir });
+  return row ?? null;
+}

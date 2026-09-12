@@ -17,6 +17,7 @@ import {
   writeFolderFile,
 } from "@/modules/applications/generate";
 import {
+  deleteApplication,
   recordTouchpoint,
   requestApply,
   requestContentProcessing,
@@ -281,6 +282,25 @@ export async function loadOutreachContentAction(
     message: sectionOf(md ?? "", "Message") || "(not written yet)",
   });
   return { recruiter: pick(pitchR), referral: pick(pitchF) };
+}
+
+/** Drop a job you've decided not to pursue (e.g. a stack mismatch found while
+ *  reviewing it) — removes the ledger row and its R2/local folder together,
+ *  straight from the /applications ledger, no need to open the folder first. */
+export async function deleteApplicationAction(id: string): Promise<ActionState> {
+  const userId = await requireUserId();
+  const parsedId = z.uuid().safeParse(id);
+  if (!parsedId.success) return err("Invalid application id.");
+  try {
+    const row = await deleteApplication(userId, parsedId.data);
+    if (!row) return err("Not found.");
+    const ref = parseBundleDir(row.bundleDir);
+    if (ref) await deleteJobFolder(ref.date, ref.folder);
+    revalidatePath("/applications");
+    return { ok: true, message: "Deleted." };
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Delete failed.");
+  }
 }
 
 export async function deleteFolderAction(

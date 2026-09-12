@@ -6,7 +6,11 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { applyAction, processContentAction } from "@/app/(app)/applications/actions";
+import {
+  applyAction,
+  deleteApplicationAction,
+  processContentAction,
+} from "@/app/(app)/applications/actions";
 
 export interface SelectionRow {
   id: string;
@@ -181,6 +185,17 @@ export function SelectionBoard({ rows }: { rows: SelectionRow[] }) {
                     </Link>
                   )}
                   {queueBadge(r)}
+                  <button
+                    type="button"
+                    className="ml-auto text-destructive underline disabled:opacity-50"
+                    disabled={pending}
+                    onClick={() => {
+                      if (!window.confirm(`Delete ${r.company} — ${r.role}? This removes it and its folder for good.`)) return;
+                      run(() => deleteApplicationAction(r.id));
+                    }}
+                  >
+                    delete
+                  </button>
                 </div>
                 {r.flags.length > 0 && (
                   <div className="flex flex-wrap gap-1">
