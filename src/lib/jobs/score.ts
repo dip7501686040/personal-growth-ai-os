@@ -24,7 +24,17 @@ const B_FLAGS = new Set([
   "excluded_region",
   "region_restricted",
   "verify_apply_link",
+  "visa_blocker",
 ]);
+
+/** Found via a real apply-drive encounter (Product Genius: JD said "REMOTE
+ *  (US)", the actual Ashby form then said "we are not sponsoring visas at
+ *  this time"). The user needs sponsorship for every country but India, so
+ *  either signal makes a role a near-certain dead end regardless of skill
+ *  match — flag it before scaffolding a folder for it. */
+const NO_SPONSORSHIP_PHRASES =
+  /\b(no\s+visa\s+sponsorship|not\s+sponsoring\s+visas?|unable\s+to\s+sponsor|will\s+not\s+sponsor|does\s+not\s+sponsor|without\s+sponsorship|us\s+citizens?\s+only)\b/i;
+const US_ONLY_REMOTE = /\bremote\s*\(\s*us\)/i;
 
 /** Sources whose own "Apply" always walls into a signup/login page, not the
  *  real company form — found via real apply-drive attempts (Himalayas
@@ -119,6 +129,10 @@ export function scoreJob(
   }
 
   const hay = `${j.role} ${j.descriptionSnippet ?? ""}`.toLowerCase();
+  if (NO_SPONSORSHIP_PHRASES.test(hay) || US_ONLY_REMOTE.test(hay)) {
+    flags.push("visa_blocker");
+    bump(-0.2);
+  }
   for (const gap of cfg.hardSkillGaps ?? []) {
     // word-boundary, not substring — "Java" must not match inside "JavaScript"
     const re = new RegExp(`\\b${gap.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
