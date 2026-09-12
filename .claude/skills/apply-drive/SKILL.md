@@ -27,6 +27,18 @@ User names it (`apply-drive quill__fullstack-swe`, or `<date>/<folder>`).
 pnpm apply pull <date>/<folder>
 ```
 
+If `resume/master.json` has changed since this folder was scaffolded (e.g. the
+user just asked for a résumé edit), regenerate this folder's résumé from the
+updated master before driving the form — don't apply with a stale résumé, and
+don't bulk-regenerate every other folder:
+
+```ts
+import { getOwnerUserId } from "@/lib/owner";
+import { regenerateResume } from "@/modules/applications/generate";
+const userId = await getOwnerUserId();
+await regenerateResume(userId, "<date>", "<folder>");
+```
+
 Read `applications/<date>/<folder>/`: `job.json` (`applyUrl` → else `url`),
 `why-fit.md`, `cover-letter.md`. No usable apply URL → ask the user for one.
 
