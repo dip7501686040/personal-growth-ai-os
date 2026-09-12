@@ -1,14 +1,15 @@
 /**
  * Scaffold per-job application folders — the deterministic half of
- * /apply-morning. Claude Code then writes the prose files (why-fit,
- * cover-letter, pitch-recruiter, pitch-referral).
+ * /apply-morning. Writes only job.json per pick; the résumé, proof-bundle,
+ * and prose are generated later, when actually needed (proof-bundle by
+ * /apply-content-queue, everything else by /apply-drive) — so picking costs
+ * nothing beyond recording the job.
  *
  *   pnpm apply-prep --jobs <jobs.json> --pick 0,3,7 [--date YYYY-MM-DD]
  *
  * `jobs.json` is the output of `pnpm jobs --json`. Each pick writes
- * applications/<date>/<company>__<role>/ with job.json, proof-bundle.md,
- * outreach-targets.md, search-provenance.md and resume.md/.html/.pdf — to the
- * local cache and, when R2 is configured, to the `applications` bucket.
+ * applications/<date>/<company>__<role>/job.json — to the local cache and,
+ * when R2 is configured, to the `applications` bucket.
  *
  * All generation logic lives in src/modules/applications/generate.ts so the
  * /applications page can call the same functions.
@@ -52,10 +53,7 @@ async function main() {
     folders += 1;
     console.log(
       `  [${i}] ${job.company} — ${job.role}\n` +
-        `      applications/${out.date}/${out.folder}\n` +
-        `      archetype=${out.archetype} · proof: ${out.proof.skills} skills / ${out.proof.features} features` +
-        (out.pdfOk ? " · resume.pdf ✓" : " · resume.pdf ✗ (no Chrome — print resume.html by hand)") +
-        `\n      write next: why-fit.md, cover-letter.md (if the JD asks), pitch-recruiter.md, pitch-referral.md`,
+        `      applications/${out.date}/${out.folder}/job.json`,
     );
   }
 

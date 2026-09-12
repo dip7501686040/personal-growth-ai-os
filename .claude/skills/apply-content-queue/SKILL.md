@@ -7,8 +7,10 @@ description: Process jobs queued from the /applications page's "Process content"
 
 The `/applications` page's **Process content** button doesn't run anything
 itself — it can only record intent (`contentRequestedAt`). This is the
-session-side half: for every queued job, fill in whatever visual proof its
-`proof-bundle.md` is missing, then strengthen the pitches with the best of it.
+session-side half: for every queued job, generate its proof-bundle.md (this
+is the first time it's ever generated — `/apply-morning` only wrote
+`job.json`), fill in whatever visual proof it's missing, then strengthen the
+pitches with the best of it.
 
 ## 1. See what's queued
 
@@ -18,7 +20,19 @@ pnpm apply queue
 
 Lists `content queue` rows: `<id>  <company> — <role>  <bundleDir>`.
 
-## 2. Per job: find what's missing, fill it in
+## 2. Generate the proof-bundle
+
+```ts
+import { getOwnerUserId } from "@/lib/owner";
+import { regenerateProofBundle } from "@/modules/applications/generate";
+const userId = await getOwnerUserId();
+await regenerateProofBundle(userId, "<date>", "<folder>");
+```
+
+Safe to call even if a bundle already exists (re-running this step just
+refreshes it against the current knowledge graph).
+
+## 4. Per job: find what's missing, fill it in
 
 ```
 cat applications/<date>/<folder>/proof-bundle.md   # or read via R2 — see bundleDir
@@ -60,26 +74,24 @@ feature; `browser` refuses to duplicate a *ui-role* one — the two are
 independent, so running both for the same feature is expected, not a
 collision. `pnpm content check` shows both if present.
 
-## 3. Regenerate the bundle, strengthen the pitches (judgment, not a blanket insert)
+## 5. Regenerate the bundle once every feature has a card
 
-Once every feature the bundle needs has a card:
+Re-run the same `regenerateProofBundle(userId, date, folder)` call from step 2
+— or use the `/applications/<date>/<folder>` page's "Regenerate proof bundle"
+button.
 
-- Regenerate `proof-bundle.md` — via the `/applications/<date>/<folder>` page's
-  "Regenerate proof bundle" button, or `regenerateProofBundle(userId, date, folder)`.
-- Read the fresh bundle. Add the top 2–3 visual links to `pitch-recruiter.md`
-  / `pitch-referral.md` **only where they genuinely strengthen that pitch** —
-  same discipline as writing them the first time, no filler links.
-- Same judgment call for `why-fit.md` / `cover-letter.md` — add a link only
-  when it helps that specific pitch.
+This job's prose (`why-fit.md`, pitch files, cover letter) doesn't exist yet
+— `/apply-morning` only wrote `job.json`, and `/apply-drive` writes those,
+using this bundle as its source. So there's nothing to "strengthen" here;
+just make sure the bundle itself is complete and current.
 
-## 4. Clear the flag
+## 6. Clear the flag
 
 ```
 pnpm apply mark-content-prepared <id>
 ```
 
-## 5. Report back
+## 7. Report back
 
-One line per job: what was generated (or reused), what pitch files got a
-link added, and anything you skipped (e.g. "needs a recording — sent steps,
-waiting on you").
+One line per job: what was generated (or reused) for the bundle, and
+anything you skipped (e.g. "needs a recording — sent steps, waiting on you").

@@ -330,9 +330,14 @@ export function outreachMd(j: ScoredJob): string {
 export type FolderJob = ScoredJob & {
   bundleDir: string;
   jdText: string;
-  archetype: string;
+  /** set once a résumé is generated for this job — absent right after scaffolding. */
+  archetype?: string;
   preparedAt: string;
   id?: string;
+  /** rendered at scaffold time, when `cfg`/`result` (this search run's context)
+   *  are still available — materialized into search-provenance.md later, on
+   *  demand, by `ensureSearchProvenance`. */
+  searchProvenanceMd?: string;
 };
 
 // ── public operations ──────────────────────────────────────────────────────
@@ -348,68 +353,35 @@ export interface ScaffoldInput {
 export interface ScaffoldResult {
   date: string;
   folder: string;
-  archetype: string;
   files: string[];
-  pdfOk: boolean;
-  proof: { skills: number; features: number };
 }
 
-/** Full deterministic scaffold for one job — used by `pnpm apply-prep`. */
+/**
+ * Scaffold one job — used by `pnpm apply-prep`. Writes only `job.json`; the
+ * résumé, proof-bundle, and prose are generated later, when actually needed
+ * (proof-bundle by /apply-content-queue, everything else by /apply-drive) —
+ * so picking a job costs nothing beyond recording it.
+ */
 export async function scaffoldJobFolder(input: ScaffoldInput): Promise<ScaffoldResult> {
   const date = input.date ?? new Date().toISOString().slice(0, 10);
   const folder = folderName(input.job);
   const jdText = jdTextOf(input.job);
 
-  let proof: JdProof;
-  try {
-    proof = await getProofForJd(input.userId, jdText);
-  } catch {
-    proof = EMPTY_PROOF;
-  }
-  const archetype = suggestArchetype(await loadMaster(), jdText);
-
-  const files: string[] = [];
-  const pdfOk = await writeResumeFiles(date, folder, jdText, archetype, proof);
-  files.push("resume.md", "resume.html", ...(pdfOk ? ["resume.pdf"] : []));
-
-  await persist(date, folder, "proof-bundle.md", await proofBundleMd(input.userId, input.job, proof));
-  await persist(date, folder, "outreach-targets.md", outreachMd(input.job));
-  await persist(
-    date,
-    folder,
-    "search-provenance.md",
-    searchProvenanceMd(input.job, input.cfg, input.result),
-  );
-  files.push("proof-bundle.md", "outreach-targets.md", "search-provenance.md");
-
   const folderJob: FolderJob = {
     ...input.job,
     bundleDir: `applications/${date}/${folder}`,
     jdText,
-    archetype,
     preparedAt: new Date().toISOString(),
+    searchProvenanceMd: searchProvenanceMd(input.job, input.cfg, input.result),
   };
   await persist(date, folder, "job.json", JSON.stringify(folderJob, null, 2));
-  files.push("job.json");
 
-  // Prose skeletons — only if not already written, so re-scaffolding a folder
-  // never clobbers real pitches / why-fit text.
-  await persistIfAbsent(date, folder, "why-fit.md", whyFitStub());
-  await persistIfAbsent(date, folder, "pitch-recruiter.md", pitchStub("recruiter", input.job));
-  await persistIfAbsent(date, folder, "pitch-referral.md", pitchStub("referral", input.job));
-  files.push("why-fit.md", "pitch-recruiter.md", "pitch-referral.md");
-
-  return {
-    date,
-    folder,
-    archetype,
-    files,
-    pdfOk,
-    proof: { skills: proof.skills.length, features: proof.features.length },
-  };
+  return { date, folder, files: ["job.json"] };
 }
 
-/** Re-render resume.md/.html/.pdf from the folder's job.json (picks up master.json edits). */
+/** Renders resume.md/.html/.pdf from the folder's job.json — first-time
+ *  generation (job.json has no `archetype` yet) or a re-render that picks up
+ *  master.json edits (archetype already chosen, kept stable). */
 export async function regenerateResume(
   userId: string,
   date: string,
@@ -426,6 +398,9 @@ export async function regenerateResume(
   }
   const archetype = job.archetype ?? suggestArchetype(await loadMaster(), jdText);
   const pdfOk = await writeResumeFiles(date, folder, jdText, archetype, proof);
+  if (!job.archetype) {
+    await persist(date, folder, "job.json", JSON.stringify({ ...job, archetype }, null, 2));
+  }
   return { pdfOk };
 }
 
@@ -446,6 +421,9 @@ export async function regeneratePdf(
 }
 
 /** Re-run get_proof_for_jd from the folder's job.json and rewrite proof-bundle.md. */
+/** Also doubles as first-time creation — /apply-content-queue calls this to
+ *  generate a job's proof-bundle.md the first time, since scaffolding no
+ *  longer writes one up front. */
 export async function regenerateProofBundle(
   userId: string,
   date: string,
@@ -457,6 +435,38 @@ export async function regenerateProofBundle(
   const proof = await getProofForJd(userId, jdText);
   await persist(date, folder, "proof-bundle.md", await proofBundleMd(userId, job, proof));
   return { skills: proof.skills.length, features: proof.features.length };
+}
+
+// ── on-demand files for /apply-drive — each is a no-op if already written,
+// so driving mid-way through a folder (or re-running) never clobbers prose ──
+
+export async function ensureWhyFitStub(date: string, folder: string): Promise<boolean> {
+  return persistIfAbsent(date, folder, "why-fit.md", whyFitStub());
+}
+
+export async function ensurePitchStub(
+  date: string,
+  folder: string,
+  kind: "recruiter" | "referral",
+): Promise<boolean> {
+  const job = await readFolderJson<FolderJob>(date, folder, "job.json");
+  if (!job) throw new Error(`no job.json for ${date}/${folder}`);
+  return persistIfAbsent(date, folder, `pitch-${kind}.md`, pitchStub(kind, job));
+}
+
+export async function ensureOutreachTargets(date: string, folder: string): Promise<boolean> {
+  const job = await readFolderJson<FolderJob>(date, folder, "job.json");
+  if (!job) throw new Error(`no job.json for ${date}/${folder}`);
+  return persistIfAbsent(date, folder, "outreach-targets.md", outreachMd(job));
+}
+
+/** Materializes the run-context provenance captured in job.json at scaffold
+ *  time (cfg/result aren't available any later than that). */
+export async function ensureSearchProvenance(date: string, folder: string): Promise<boolean> {
+  const job = await readFolderJson<FolderJob>(date, folder, "job.json");
+  if (!job) throw new Error(`no job.json for ${date}/${folder}`);
+  const md = job.searchProvenanceMd ?? "_(not captured for this job)_\n";
+  return persistIfAbsent(date, folder, "search-provenance.md", md);
 }
 
 /** Write / overwrite one file in a folder (the /applications inline editor, prose). */

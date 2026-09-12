@@ -7,11 +7,19 @@ description: Claude-driven application form-fill. Walks any portal's form field 
 
 Tier 2 of the apply automation. `pnpm apply-fill` is faster for Greenhouse /
 Lever / Ashby — use this for every other portal, or when apply-fill left too
-many fields for the user.
+many fields for the user. `apply-fill` throws if `resume.pdf` is missing, so
+run step 1's `regenerateResume` call (and, if that portal wants one,
+`ensureWhyFitStub`/write `cover-letter.md`) before invoking it too — it
+doesn't generate those itself.
 
 Needs: an interactive session with the **`playwright`** MCP server connected
-(in `.mcp.json`; approve it once), `resume/profile.json` filled, and the folder
-already scaffolded with prose (`/apply-morning`).
+(in `.mcp.json`; approve it once), `resume/profile.json` filled, and the
+folder past content-processing — `job.json` (`/apply-morning`) and
+`proof-bundle.md` (`/apply-content-queue`) should already exist. Nothing else
+does yet: the résumé and every prose file (`why-fit.md`, `cover-letter.md`,
+`pitch-recruiter.md`, `pitch-referral.md`, `outreach-targets.md`,
+`search-provenance.md`) get generated here, one at a time, the first moment
+the drive actually needs them — never all up front.
 
 No folder named? Check `pnpm apply queue` — its `apply queue` section lists
 jobs the user clicked **Apply** for on `/applications` (J4), each with its
@@ -27,10 +35,16 @@ User names it (`apply-drive quill__fullstack-swe`, or `<date>/<folder>`).
 pnpm apply pull <date>/<folder>
 ```
 
-If `resume/master.json` has changed since this folder was scaffolded (e.g. the
-user just asked for a résumé edit), regenerate this folder's résumé from the
-updated master before driving the form — don't apply with a stale résumé, and
-don't bulk-regenerate every other folder:
+Read `applications/<date>/<folder>/job.json` (`applyUrl` → else `url`) and
+`proof-bundle.md`. No usable apply URL → ask the user for one. No
+proof-bundle.md → this job hasn't cleared `/apply-content-queue` yet; run that
+first, don't generate a bundle here.
+
+Generate the résumé now — almost every portal needs it uploaded up front, and
+this also covers the case where `resume/master.json` changed since this job
+was picked (e.g. the user just asked for a résumé edit): `regenerateResume`
+renders fresh from the current master either way, first-time or re-render,
+and never touches any other folder.
 
 ```ts
 import { getOwnerUserId } from "@/lib/owner";
@@ -39,8 +53,8 @@ const userId = await getOwnerUserId();
 await regenerateResume(userId, "<date>", "<folder>");
 ```
 
-Read `applications/<date>/<folder>/`: `job.json` (`applyUrl` → else `url`),
-`why-fit.md`, `cover-letter.md`. No usable apply URL → ask the user for one.
+Don't generate `why-fit.md`, `cover-letter.md`, or the pitch files yet — wait
+until step 5 shows the form actually asks for one.
 
 ### 2. Load the answers
 
@@ -76,16 +90,31 @@ From the snapshot, for each field:
 | field | value |
 |---|---|
 | name / email / phone / location / links / notice / years | from `pnpm apply-answers "<the field's visible label>"` |
-| résumé upload | `browser_file_upload` → absolute path to `applications/<date>/<folder>/resume.pdf` |
-| cover-letter field or upload | `cover-letter.md` (text or file) |
-| "why do you want to work here" / "anything else" free-text | paste `why-fit.md` verbatim (or `cover-letter.md` if the label literally says cover letter) |
+| résumé upload | `browser_file_upload` → absolute path to `applications/<date>/<folder>/resume.pdf` (already generated in step 1) |
+| "why do you want to work here" / "anything else" free-text | see below — generate `why-fit.md` the first time this shows up, then paste it verbatim |
+| cover-letter field or upload | see below — generate `cover-letter.md` the first time this shows up |
 | work-authorization / sponsorship / "how did you hear" `<select>` | the option matching `apply-answers` `value` |
 | EEO / gender / race / veteran / disability | the "Decline to self-identify" / "I don't wish to answer" option |
 | no stored answer, no folder source | leave blank, add to the report |
 
+**Generating `why-fit.md` / `cover-letter.md` on first need** — this is the
+file's only generation point; nothing wrote it earlier:
+
+```ts
+import { ensureWhyFitStub } from "@/modules/applications/generate";
+await ensureWhyFitStub("<date>", "<folder>");   // no-op if already written
+```
+
+lays down the stub (or does nothing if it's already real prose from an
+earlier pass at this same folder); then write ~150 words into it yourself —
+first person, concrete, leading with the 2–3 strongest points from
+`proof-bundle.md` — via the folder's `writeFolderFile`. `cover-letter.md` has
+no stub (only write one if the form actually asks for it): write it directly,
+~250 words, same grounding rule.
+
 Never type a value you can't trace to `apply-answers`, `profile.json`, or a file
-in the folder. If a field needs prose that isn't in the folder, ask the user —
-don't write it yourself here.
+in the folder. Never invent a metric, project, or link — everything in
+`why-fit.md` / `cover-letter.md` must trace to `proof-bundle.md` or `resume.md`.
 
 ### 6. Screenshot and report
 `browser_take_screenshot` (full page). Show the user:
@@ -130,7 +159,29 @@ bounced with validation errors, report them and go back to step 5.
 - `pnpm apply push <date>/<folder>` then `pnpm apply submit <date>/<folder>`
   (ledger → applied).
 
-### 10. Close
+### 10. Outreach and provenance (only if the user wants them)
+
+Two more files this folder never got, generated only on request — driving the
+form doesn't need either:
+
+- **Referral / recruiter outreach** — if the user wants to reach out about
+  this job, generate the target list and the one pitch file you'll actually
+  send, then write real pitch prose grounded in `proof-bundle.md` (same
+  discipline as `why-fit.md` — no filler links):
+  ```ts
+  import { ensureOutreachTargets, ensurePitchStub } from "@/modules/applications/generate";
+  await ensureOutreachTargets("<date>", "<folder>");
+  await ensurePitchStub("<date>", "<folder>", "recruiter"); // or "referral"
+  ```
+- **"Why did this job surface?"** — if the user asks, materialize it from what
+  was captured back at `/apply-morning` time (this is the only point it can
+  come from — the search run's context isn't available any later):
+  ```ts
+  import { ensureSearchProvenance } from "@/modules/applications/generate";
+  await ensureSearchProvenance("<date>", "<folder>");
+  ```
+
+### 11. Close
 `browser_close`.
 
 ## Rules
