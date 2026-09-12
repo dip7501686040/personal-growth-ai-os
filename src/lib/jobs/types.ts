@@ -32,6 +32,11 @@ export interface JobSearchConfig {
   /** extra source-query terms derived from the graph — set at runtime by
    *  `runJobSearch`, never in `resume/job-search.json`. */
   graphTitles?: string[];
+  /** technologies/specializations you've explicitly rejected a job over
+   *  before (e.g. "NetApp", primary Java/Go) — a JD mentioning one gets
+   *  flagged `hard_skill_gap:<term>` → Group B, instead of ranking clean in
+   *  Group A. Grown from real /apply-drive rejections, not guessed upfront. */
+  hardSkillGaps?: string[];
 }
 
 /** One job's knowledge-graph match — from the same matcher `get_proof_for_jd` uses. */

@@ -107,9 +107,18 @@ export function scoreJob(
     bump(-0.15);
   }
 
+  const hay = `${j.role} ${j.descriptionSnippet ?? ""}`.toLowerCase();
+  for (const gap of cfg.hardSkillGaps ?? []) {
+    // word-boundary, not substring — "Java" must not match inside "JavaScript"
+    const re = new RegExp(`\\b${gap.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+    if (re.test(hay)) {
+      flags.push(`hard_skill_gap:${gap}`);
+      bump(-0.15);
+    }
+  }
+
   const replyLikelihood = Math.max(0, Math.min(1, reply));
 
-  const hay = `${j.role} ${j.descriptionSnippet ?? ""}`.toLowerCase();
   const hits = cfg.skills.filter((s) => hay.includes(s.toLowerCase())).length;
   const substringSkillMatch = cfg.skills.length
     ? Math.min(1, hits / Math.min(cfg.skills.length, 8))
@@ -120,6 +129,7 @@ export function scoreJob(
   const toB =
     flags.some((f) => f.startsWith("stale:")) ||
     flags.some((f) => f.startsWith("low_salary")) ||
+    flags.some((f) => f.startsWith("hard_skill_gap:")) ||
     flags.some((f) => B_FLAGS.has(f.split(":")[0]));
 
   return {
