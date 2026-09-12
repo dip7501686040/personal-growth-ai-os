@@ -15,6 +15,8 @@ export interface MasterProject {
   name: string;
   slug: string;
   repoUrl: string | null;
+  /** second repo, for a project entry that merges two repos (e.g. infra + GitOps). */
+  repoUrl2?: string | null;
   oneLiner: string;
   bullets: string[];
   tech: string[];

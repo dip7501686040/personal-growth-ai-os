@@ -1,10 +1,10 @@
 /**
  * Match a proof-bundle feature to its portfolio card(s) (Group C's
  * `content_items`, platform "portfolio" — the source of truth for visual
- * proof) and render them as a portfolio deep-link + Cloudinary CDN URL(s), to
- * sit next to the GitHub links in proof-bundle.md. A feature can carry two
- * cards — a UI view and a terminal/code view — forming one proof "cycle":
- * what a user sees, then what's behind it.
+ * proof). A feature can carry two cards — a UI view and a terminal/code
+ * view — forming one proof "cycle": what a user sees, then what's behind it.
+ * proof-bundle.md links to the portfolio card itself (visualProofUrl below);
+ * the card page is what shows the visual(s) and the GitHub code links.
  *
  * Server / script only.
  */
@@ -12,11 +12,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { projectFeatures, projects } from "@/lib/db/schema";
 import { loadProfile } from "@/lib/apply/profile";
-import {
-  isCloudinaryConfigured,
-  mediaUrl,
-  videoPosterUrl,
-} from "@/lib/media/cloudinary";
+import { mediaUrl, videoPosterUrl } from "@/lib/media/cloudinary";
 import { slugify } from "@/lib/slug";
 import { findCardsForFeature, type CardRole } from "@/modules/content/service";
 
@@ -84,19 +80,13 @@ export async function visualProofFor(
 }
 
 /**
- * A markdown fragment to append to a proof-bundle feature line — a portfolio
- * deep-link plus (when Cloudinary is configured) each card's CDN URL, UI
- * view before terminal/code view.
+ * The one link a proof-bundle feature line needs: the portfolio card's own
+ * page. The card itself already shows the visual(s) and the "View code"
+ * GitHub links (Group C) — repeating repo/code-path/CDN URLs here just
+ * duplicates what the portfolio already presents better. Returns null when
+ * the feature has no card yet (proofBundleMd falls back to the repo link).
  */
-export async function visualProofMd(userId: string, featureId: string): Promise<string> {
+export async function visualProofUrl(userId: string, featureId: string): Promise<string | null> {
   const cards = await visualProofFor(userId, featureId);
-  if (cards.length === 0) return "";
-  const parts = [`visual ${cards[0].portfolioUrl}`];
-  if (isCloudinaryConfigured()) {
-    for (const c of cards) {
-      const label = c.role === "ui" ? "ui-view" : c.kind;
-      parts.push(`${label} ${c.cdnUrl}`);
-    }
-  }
-  return `  ·  ${parts.join("  ·  ")}`;
+  return cards[0]?.portfolioUrl ?? null;
 }

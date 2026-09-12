@@ -30,6 +30,7 @@ export interface ResumeModel {
     bullets: string[];
     tech: string[];
     repoUrl: string | null;
+    repoUrl2?: string | null;
   }[];
   education: MasterResume["education"];
   archetypeLabel: string;
@@ -37,6 +38,11 @@ export interface ResumeModel {
 }
 
 const has = (set: Set<string>, s: string) => set.has(s.toLowerCase());
+
+/** One or two repo links for a project, joined for a single trailing line. */
+function repoLinks(p: { repoUrl: string | null; repoUrl2?: string | null }): string {
+  return [p.repoUrl, p.repoUrl2].filter((u): u is string => !!u).join("  ·  ");
+}
 
 /** Reorder `items` so JD-matched ones come first, order otherwise preserved. */
 function hoist(items: string[], jd: Set<string>): string[] {
@@ -92,6 +98,7 @@ export function buildResumeModel(
       bullets: p.bullets,
       tech: hoist(p.tech, jdSkills),
       repoUrl: p.repoUrl,
+      repoUrl2: p.repoUrl2,
     }));
 
   const contactLine = [
@@ -131,6 +138,16 @@ export function toMarkdown(m: ResumeModel): string {
   L.push(`## Skills`);
   for (const g of m.skills) L.push(`**${g.label}:** ${g.items.join(", ")}`);
   L.push(``);
+  L.push(`## Projects`);
+  for (const p of m.projects) {
+    L.push(``);
+    L.push(`### ${p.name}`);
+    L.push(p.oneLiner);
+    for (const b of p.bullets) L.push(`- ${b}`);
+    const links = repoLinks(p);
+    L.push(`*Tech: ${p.tech.join(", ")}*${links ? `  ·  ${links}` : ""}`);
+  }
+  L.push(``);
   L.push(`## Experience`);
   for (const e of m.experience) {
     L.push(``);
@@ -138,15 +155,6 @@ export function toMarkdown(m: ResumeModel): string {
     L.push(`${e.location} | ${e.period}`);
     for (const b of e.bullets) L.push(`- ${b}`);
     L.push(`*Tech: ${e.tech.join(", ")}*`);
-  }
-  L.push(``);
-  L.push(`## Projects`);
-  for (const p of m.projects) {
-    L.push(``);
-    L.push(`### ${p.name}`);
-    L.push(p.oneLiner);
-    for (const b of p.bullets) L.push(`- ${b}`);
-    L.push(`*Tech: ${p.tech.join(", ")}*${p.repoUrl ? `  ·  ${p.repoUrl}` : ""}`);
   }
   L.push(``);
   L.push(`## Education`);
@@ -172,21 +180,22 @@ export function toHtml(m: ResumeModel): string {
   parts.push(`<h2>Skills</h2>`);
   for (const g of m.skills)
     parts.push(`<p><strong>${esc(g.label)}:</strong> ${esc(g.items.join(", "))}</p>`);
+  parts.push(`<h2>Projects</h2>`);
+  for (const pr of m.projects) {
+    parts.push(`<h3>${esc(pr.name)}</h3>`);
+    parts.push(`<p>${esc(pr.oneLiner)}</p>`);
+    parts.push(`<ul>${pr.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>`);
+    const links = repoLinks(pr);
+    parts.push(
+      `<p class="tech">Tech: ${esc(pr.tech.join(", "))}${links ? `  ·  ${esc(links)}` : ""}</p>`,
+    );
+  }
   parts.push(`<h2>Experience</h2>`);
   for (const e of m.experience) {
     parts.push(`<h3>${esc(e.role)} — ${esc(e.company)}</h3>`);
     parts.push(`<p class="meta">${esc(e.location)} | ${esc(e.period)}</p>`);
     parts.push(`<ul>${e.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>`);
     parts.push(`<p class="tech">Tech: ${esc(e.tech.join(", "))}</p>`);
-  }
-  parts.push(`<h2>Projects</h2>`);
-  for (const pr of m.projects) {
-    parts.push(`<h3>${esc(pr.name)}</h3>`);
-    parts.push(`<p>${esc(pr.oneLiner)}</p>`);
-    parts.push(`<ul>${pr.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>`);
-    parts.push(
-      `<p class="tech">Tech: ${esc(pr.tech.join(", "))}${pr.repoUrl ? `  ·  ${esc(pr.repoUrl)}` : ""}</p>`,
-    );
   }
   parts.push(`<h2>Education</h2>`);
   for (const ed of m.education)
@@ -273,6 +282,21 @@ export async function toDocxBuffer(m: ResumeModel): Promise<Buffer> {
   }
 
   children.push(
+    new Paragraph({ heading: HeadingLevel.HEADING_2, text: "Projects" }),
+  );
+  for (const pr of m.projects) {
+    children.push(new Paragraph({ heading: HeadingLevel.HEADING_3, text: pr.name }));
+    children.push(p(pr.oneLiner));
+    for (const b of pr.bullets) children.push(bullet(b));
+    const links = repoLinks(pr);
+    children.push(
+      p(`Tech: ${pr.tech.join(", ")}${links ? `  ·  ${links}` : ""}`, {
+        italics: true,
+      }),
+    );
+  }
+
+  children.push(
     new Paragraph({ heading: HeadingLevel.HEADING_2, text: "Experience" }),
   );
   for (const e of m.experience) {
@@ -285,20 +309,6 @@ export async function toDocxBuffer(m: ResumeModel): Promise<Buffer> {
     children.push(p(`${e.location} | ${e.period}`, { italics: true }));
     for (const b of e.bullets) children.push(bullet(b));
     children.push(p(`Tech: ${e.tech.join(", ")}`, { italics: true }));
-  }
-
-  children.push(
-    new Paragraph({ heading: HeadingLevel.HEADING_2, text: "Projects" }),
-  );
-  for (const pr of m.projects) {
-    children.push(new Paragraph({ heading: HeadingLevel.HEADING_3, text: pr.name }));
-    children.push(p(pr.oneLiner));
-    for (const b of pr.bullets) children.push(bullet(b));
-    children.push(
-      p(`Tech: ${pr.tech.join(", ")}${pr.repoUrl ? `  ·  ${pr.repoUrl}` : ""}`, {
-        italics: true,
-      }),
-    );
   }
 
   children.push(

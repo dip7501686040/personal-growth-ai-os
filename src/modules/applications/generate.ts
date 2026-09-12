@@ -34,7 +34,7 @@ import {
   listKeys,
   putObject,
 } from "./store";
-import { visualProofMd } from "./visual-proof";
+import { visualProofUrl } from "./visual-proof";
 
 const LOCAL_ROOT = join(process.cwd(), "applications");
 const EMPTY_PROOF: JdProof = {
@@ -181,14 +181,9 @@ export async function proofBundleMd(
     for (const s of withProof) {
       L.push(`### ${s.name}  _(${s.level})_`);
       for (const p of s.proof.slice(0, 3)) {
-        const links = [
-          p.demoVideoUrl ? `demo ${p.demoVideoUrl}` : "",
-          p.repoUrl ? `repo ${p.repoUrl}` : "",
-          ...p.codeLinks.slice(0, 3).map((c) => `${c.label} ${c.url}`),
-        ].filter(Boolean);
+        const link = (await visualProofUrl(userId, p.featureId)) ?? p.repoUrl;
         L.push(
-          `- **${p.featureTitle}** (${p.projectName}) — ${links.join("  ·  ") || "no link"}` +
-            (await visualProofMd(userId, p.featureId)),
+          `- **${p.featureTitle}** (${p.projectName}) — ${link ?? "no link"}`,
         );
       }
       if (s.proof.length > 3) L.push(`- _…+${s.proof.length - 3} more features_`);
@@ -203,15 +198,8 @@ export async function proofBundleMd(
   if (proof.features.length) {
     L.push(`## Directly-matched project features`, ``);
     for (const f of proof.features) {
-      const links = [
-        f.demoVideoUrl ? `demo ${f.demoVideoUrl}` : "",
-        f.repoUrl ? `repo ${f.repoUrl}` : "",
-        ...f.codeLinks.map((c) => `${c.label} ${c.url}`),
-      ].filter(Boolean);
-      L.push(
-        `- **${f.title}** (${f.projectName}) — ${links.join("  ·  ") || "no link"}` +
-          (await visualProofMd(userId, f.featureId)),
-      );
+      const link = (await visualProofUrl(userId, f.featureId)) ?? f.repoUrl;
+      L.push(`- **${f.title}** (${f.projectName}) — ${link ?? "no link"}`);
     }
     L.push(``);
   }
