@@ -184,6 +184,45 @@ export async function hnWhoIsHiring(cfg: JobSearchConfig): Promise<RawJob[]> {
     const company =
       segs[0]?.replace(/\s*\([^)]*\)\s*/g, " ").slice(0, 60).trim() ||
       `HN (${c.author ?? "?"})`;
+    const location = /remote/i.test(text) ? "Remote" : null;
+    const salaryText = text.match(/\$[\d,kK]+[\s-]*(?:to|-)?[\s-]*\$?[\d,kK]*/)?.[0] ?? null;
+    const contactEmail = text.match(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/)?.[0] ?? null;
+    const base = {
+      source: "hn" as const,
+      company,
+      location,
+      remote: true,
+      salaryText,
+      postedAt: null,
+      publisher: null,
+      descriptionSnippet: text.slice(0, 1400),
+      contactEmail,
+    };
+
+    // Larger companies list several openings in one comment as "<Role>: <a
+    // href=...>" lines (e.g. "Senior DevOps / Infrastructure Engineer:
+    // https://..."). Guessing one title for the whole blob (below) then
+    // fabricates a plausible-but-wrong role — e.g. a blockchain-consensus
+    // company's post got mislabeled "Senior Backend Engineer" purely because
+    // "senior" appears somewhere in a *different* listed role, and the job
+    // carried no real per-role apply link. Extract each listed role/link
+    // directly from the raw (pre-strip) text instead when there are 2+.
+    const roleLinks = [...c.text.matchAll(/<p>([^<]{3,100}?):\s*<a href="([^"]+)"/g)]
+      .map((m) => ({ role: decodeEntities(m[1]).trim(), applyUrl: decodeEntities(m[2]) }))
+      .filter((r) => !/^mailto:/i.test(r.applyUrl) && titleMatches(r.role, cfg));
+
+    if (roleLinks.length >= 2) {
+      for (const rl of roleLinks) {
+        out.push({
+          ...base,
+          role: rl.role,
+          url: `https://news.ycombinator.com/item?id=${c.id}`,
+          applyUrl: rl.applyUrl,
+        });
+      }
+      continue;
+    }
+
     const roleSeg = segs
       .slice(1)
       .find(
@@ -192,23 +231,15 @@ export async function hnWhoIsHiring(cfg: JobSearchConfig): Promise<RawJob[]> {
           /\b(engineer|developer|architect|sre|devops|full[- ]?stack|back[- ]?end|platform|lead|scientist)\b/i.test(s),
       );
     out.push({
-      source: "hn",
-      company,
+      ...base,
       role:
         roleSeg ??
         cfg.titles.find((t) =>
           t.toLowerCase().split(/\s+/).some((w) => w.length > 2 && text.toLowerCase().includes(w)),
         ) ??
         "Engineer (see post)",
-      location: /remote/i.test(text) ? "Remote" : null,
-      remote: true,
-      salaryText: text.match(/\$[\d,kK]+[\s-]*(?:to|-)?[\s-]*\$?[\d,kK]*/)?.[0] ?? null,
-      postedAt: null,
       url: `https://news.ycombinator.com/item?id=${c.id}`,
       applyUrl,
-      publisher: null,
-      descriptionSnippet: text.slice(0, 1400),
-      contactEmail: text.match(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/)?.[0] ?? null,
     });
   }
   return out.slice(0, cfg.maxPerSource);
