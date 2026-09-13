@@ -3,6 +3,7 @@ import { findChrome } from "@/lib/chrome";
 import {
   AlignmentType,
   Document,
+  ExternalHyperlink,
   HeadingLevel,
   Packer,
   Paragraph,
@@ -27,10 +28,11 @@ export interface ResumeModel {
   projects: {
     name: string;
     oneLiner: string;
-    /** each bullet with its resolved portfolio-card URL (null when no real
+    /** each bullet with its resolved portfolio-card link (null when no real
      *  shipped feature backs it) — so the claim right next to it is
-     *  verifiable, not just asserted. */
-    bullets: { text: string; url: string | null }[];
+     *  verifiable, not just asserted. Rendered as a short "(proof)" hyperlink,
+     *  never a spelled-out URL. */
+    bullets: { text: string; link: Link | null }[];
     tech: string[];
     repoUrl: string | null;
     repoUrl2?: string | null;
@@ -42,9 +44,23 @@ export interface ResumeModel {
 
 const has = (set: Set<string>, s: string) => set.has(s.toLowerCase());
 
-/** One or two repo links for a project, joined for a single trailing line. */
-function repoLinks(p: { repoUrl: string | null; repoUrl2?: string | null }): string {
-  return [p.repoUrl, p.repoUrl2].filter((u): u is string => !!u).join("  ·  ");
+/** One short, real hyperlink per bullet/repo instead of a spelled-out URL —
+ *  spelling out a ~80-char URL after every line is both bad taste (no resume
+ *  reads that way) and the single biggest driver of page overflow; a real
+ *  <a>/ExternalHyperlink with a 2-4 word label is the industry-standard way
+ *  to cite a link and is exactly as ATS-safe as plain text. */
+export interface Link {
+  label: string;
+  url: string;
+}
+
+/** One or two repo links for a project, labeled to distinguish them when a
+ *  project entry merges two repos (Platform Infra/GitOps). */
+function repoLinks(p: { repoUrl: string | null; repoUrl2?: string | null }): Link[] {
+  const links: Link[] = [];
+  if (p.repoUrl) links.push({ label: p.repoUrl2 ? "Infra repo" : "GitHub", url: p.repoUrl });
+  if (p.repoUrl2) links.push({ label: "GitOps repo", url: p.repoUrl2 });
+  return links;
 }
 
 /** Reorder `items` so JD-matched ones come first, order otherwise preserved. */
@@ -104,7 +120,7 @@ export function buildResumeModel(
       oneLiner: p.oneLiner,
       bullets: (p.bulletsByArchetype?.[archetype] ?? p.bullets).map((b) => ({
         text: b.text,
-        url: b.link ? `${portfolioBase}/projects/${b.link}` : null,
+        link: b.link ? { label: "proof", url: `${portfolioBase}/projects/${b.link}` } : null,
       })),
       tech: hoist(p.tech, jdSkills),
       repoUrl: p.repoUrl,
@@ -153,9 +169,11 @@ export function toMarkdown(m: ResumeModel): string {
     L.push(``);
     L.push(`### ${p.name}`);
     L.push(p.oneLiner);
-    for (const b of p.bullets) L.push(`- ${b.text}${b.url ? `  — ${b.url}` : ""}`);
+    for (const b of p.bullets)
+      L.push(`- ${b.text}${b.link ? ` [(${b.link.label})](${b.link.url})` : ""}`);
     const links = repoLinks(p);
-    L.push(`*Tech: ${p.tech.join(", ")}*${links ? `  ·  ${links}` : ""}`);
+    const linksMd = links.map((l) => `[${l.label}](${l.url})`).join("  ·  ");
+    L.push(`*Tech: ${p.tech.join(", ")}*${linksMd ? `  ·  ${linksMd}` : ""}`);
   }
   L.push(``);
   L.push(`## Experience`);
@@ -198,13 +216,16 @@ export function toHtml(m: ResumeModel): string {
       `<ul>${pr.bullets
         .map(
           (b) =>
-            `<li>${esc(b.text)}${b.url ? ` — <a href="${esc(b.url)}">${esc(b.url)}</a>` : ""}</li>`,
+            `<li>${esc(b.text)}${b.link ? ` <a href="${esc(b.link.url)}">(${esc(b.link.label)})</a>` : ""}</li>`,
         )
         .join("")}</ul>`,
     );
     const links = repoLinks(pr);
+    const linksHtml = links
+      .map((l) => `<a href="${esc(l.url)}">${esc(l.label)}</a>`)
+      .join("  ·  ");
     parts.push(
-      `<p class="tech">Tech: ${esc(pr.tech.join(", "))}${links ? `  ·  ${esc(links)}` : ""}</p>`,
+      `<p class="tech">Tech: ${esc(pr.tech.join(", "))}${linksHtml ? `  ·  ${linksHtml}` : ""}</p>`,
     );
   }
   parts.push(`<h2>Experience</h2>`);
@@ -232,7 +253,8 @@ export function toHtml(m: ResumeModel): string {
   li,h3+p{break-inside:avoid}
   .title{font-weight:600}
   .contact,.meta,.tech{color:#555;font-size:9.3pt}
-  @media print{body{margin:0;max-width:none;padding:0}}
+  a{color:#1a5fb4;text-decoration:none}
+  @media print{body{margin:0;max-width:none;padding:0}a{color:#1a5fb4}}
 </style></head><body>${parts.join("\n")}</body></html>`;
 }
 
@@ -267,6 +289,32 @@ const bullet = (text: string) =>
     text,
     bullet: { level: 0 },
     spacing: { after: 40 },
+  });
+
+const hyperlink = (label: string, url: string, opts?: { italics?: boolean }) =>
+  new ExternalHyperlink({
+    link: url,
+    children: [new TextRun({ text: label, style: "Hyperlink", italics: opts?.italics })],
+  });
+
+/** A trailing " · label · label" run of real hyperlinks, e.g. the Tech line's
+ *  repo link(s) — same short-label-not-URL treatment as everywhere else. */
+const linkRun = (links: Link[], opts?: { italics?: boolean }) =>
+  links.flatMap((l) => [
+    new TextRun({ text: "  ·  ", italics: opts?.italics }),
+    hyperlink(l.label, l.url, opts),
+  ]);
+
+/** A bullet whose sentence ends with an optional " (proof)" hyperlink —
+ *  parens are part of the clickable text, matching the Markdown/HTML render. */
+const bulletWithLink = (text: string, link: Link | null) =>
+  new Paragraph({
+    bullet: { level: 0 },
+    spacing: { after: 40 },
+    children: [
+      new TextRun({ text }),
+      ...(link ? [new TextRun({ text: " " }), hyperlink(`(${link.label})`, link.url)] : []),
+    ],
   });
 
 export async function toDocxBuffer(m: ResumeModel): Promise<Buffer> {
@@ -304,11 +352,14 @@ export async function toDocxBuffer(m: ResumeModel): Promise<Buffer> {
   for (const pr of m.projects) {
     children.push(new Paragraph({ heading: HeadingLevel.HEADING_3, text: pr.name }));
     children.push(p(pr.oneLiner));
-    for (const b of pr.bullets) children.push(bullet(`${b.text}${b.url ? `  — ${b.url}` : ""}`));
-    const links = repoLinks(pr);
+    for (const b of pr.bullets) children.push(bulletWithLink(b.text, b.link));
     children.push(
-      p(`Tech: ${pr.tech.join(", ")}${links ? `  ·  ${links}` : ""}`, {
-        italics: true,
+      new Paragraph({
+        spacing: { after: 80 },
+        children: [
+          new TextRun({ text: `Tech: ${pr.tech.join(", ")}`, italics: true }),
+          ...linkRun(repoLinks(pr), { italics: true }),
+        ],
       }),
     );
   }
