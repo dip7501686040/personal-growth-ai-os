@@ -51,6 +51,12 @@ const serverEnvSchema = z.object({
   CRON_SECRET: z.string().min(1).optional(),
   // The single owner's auth.users id — lets cron skip an auth-schema lookup.
   OWNER_USER_ID: z.uuid().optional(),
+  // Public read-write demo account — a real, isolated auth.users row with its
+  // own seeded dummy data (see scripts/seed-demo.ts). Optional: the "Try the
+  // demo" login button and the daily reset cron both no-op without it.
+  DEMO_EMAIL: z.email().optional(),
+  DEMO_PASSWORD: z.string().min(8).optional(),
+  DEMO_USER_ID: z.uuid().optional(),
   // Cloudflare R2 (S3-compatible) — source of truth for the applications/ tree.
   // All optional so the app boots before R2 is configured; the R2 store throws
   // a clear error if used without them.
@@ -86,6 +92,9 @@ const parsed = serverEnvSchema.safeParse({
   GITHUB_TOKEN: optional(process.env.GITHUB_TOKEN),
   CRON_SECRET: optional(process.env.CRON_SECRET),
   OWNER_USER_ID: optional(process.env.OWNER_USER_ID),
+  DEMO_EMAIL: optional(process.env.DEMO_EMAIL),
+  DEMO_PASSWORD: optional(process.env.DEMO_PASSWORD),
+  DEMO_USER_ID: optional(process.env.DEMO_USER_ID),
   R2_ACCOUNT_ID: optional(process.env.R2_ACCOUNT_ID),
   R2_ACCESS_KEY_ID: optional(process.env.R2_ACCESS_KEY_ID),
   R2_SECRET_ACCESS_KEY: optional(process.env.R2_SECRET_ACCESS_KEY),
@@ -114,5 +123,6 @@ export const allowedEmails: ReadonlySet<string> = new Set(
 );
 
 export function isAllowedEmail(email: string): boolean {
-  return allowedEmails.has(email.trim().toLowerCase());
+  const e = email.trim().toLowerCase();
+  return allowedEmails.has(e) || (!!env.DEMO_EMAIL && e === env.DEMO_EMAIL.toLowerCase());
 }

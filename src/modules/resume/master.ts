@@ -35,6 +35,9 @@ export interface MasterProject {
    *  project that can't get one. Labeled `docLabel`, default "Case study". */
   docUrl?: string | null;
   docLabel?: string;
+  /** a real, live, interactive deployment of the project — distinct from
+   *  `docUrl` (a static write-up). Labeled "Live". */
+  liveUrl?: string | null;
   oneLiner: string;
   bullets: MasterBullet[];
   /** archetype-flavored bullet set — same underlying facts, different emphasis/order.

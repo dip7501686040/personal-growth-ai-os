@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { loadJobSearchConfig, runJobSearch, type RunJobSearchOpts } from "@/lib/jobs/search";
 import type { JobSearchResult } from "@/lib/jobs/types";
@@ -27,6 +28,18 @@ export type ActionState = { ok: boolean; message: string } | null;
 
 const err = (message: string): ActionState => ({ ok: false, message });
 
+/** The `applications/` tree (résumés, proof bundles, job.json) lives in one
+ *  shared R2/local filesystem prefix with no per-user partitioning — unlike
+ *  every other table in this app, it predates there being a second real
+ *  account. Until it's properly namespaced per user, the demo account must
+ *  not touch it at all: a write here could corrupt the real owner's actual
+ *  résumé/proof-bundle files, and a read would leak real company/role names
+ *  that have nothing to do with demo data. */
+const NOT_IN_DEMO = "Not available in the demo — this touches shared file storage, not demo-only data.";
+async function blockedForDemo(userId: string): Promise<boolean> {
+  return isDemoUserId(userId);
+}
+
 const folderRef = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   folder: z.string().min(1).max(120).regex(/^[a-z0-9][a-z0-9_-]*$/i),
@@ -50,7 +63,8 @@ export async function saveFileAction(
   _prev: ActionState,
   input: { date: string; folder: string; file: string; content: string },
 ): Promise<ActionState> {
-  await requireUserId();
+  const userId = await requireUserId();
+  if (await blockedForDemo(userId)) return err(NOT_IN_DEMO);
   const parsed = saveSchema.safeParse(input);
   if (!parsed.success) return err(parsed.error.issues[0].message);
   const { date, folder, file, content } = parsed.data;
@@ -76,6 +90,7 @@ export async function regenResumeAction(
   input: { date: string; folder: string },
 ): Promise<ActionState> {
   const userId = await requireUserId();
+  if (await blockedForDemo(userId)) return err(NOT_IN_DEMO);
   const parsed = folderRef.safeParse(input);
   if (!parsed.success) return err(parsed.error.issues[0].message);
   try {
@@ -101,6 +116,7 @@ export async function regenProofAction(
   input: { date: string; folder: string },
 ): Promise<ActionState> {
   const userId = await requireUserId();
+  if (await blockedForDemo(userId)) return err(NOT_IN_DEMO);
   const parsed = folderRef.safeParse(input);
   if (!parsed.success) return err(parsed.error.issues[0].message);
   try {
@@ -123,7 +139,8 @@ export async function regenPdfAction(
   _prev: ActionState,
   input: { date: string; folder: string },
 ): Promise<ActionState> {
-  await requireUserId();
+  const userId = await requireUserId();
+  if (await blockedForDemo(userId)) return err(NOT_IN_DEMO);
   const parsed = folderRef.safeParse(input);
   if (!parsed.success) return err(parsed.error.issues[0].message);
   try {
@@ -173,6 +190,9 @@ export type SearchJobsState =
 
 export async function searchJobsAction(): Promise<SearchJobsState> {
   const userId = await requireUserId();
+  if (await blockedForDemo(userId)) {
+    return { ok: false, message: "Not available in the demo — this uses real, rate-limited API quota." };
+  }
   try {
     const cfg = await loadJobSearchConfig();
     const graphOn = cfg.useGraphMatch !== false;
@@ -270,7 +290,8 @@ export interface OutreachContent {
 export async function loadOutreachContentAction(
   bundleDir: string | null,
 ): Promise<OutreachContent | null> {
-  await requireUserId();
+  const userId = await requireUserId();
+  if (await blockedForDemo(userId)) return null;
   const ref = parseBundleDir(bundleDir);
   if (!ref) return null;
   const [pitchR, pitchF] = await Promise.all([
@@ -294,7 +315,9 @@ export async function deleteApplicationAction(id: string): Promise<ActionState> 
   try {
     const row = await deleteApplication(userId, parsedId.data);
     if (!row) return err("Not found.");
-    const ref = parseBundleDir(row.bundleDir);
+    // Demo rows never carry a real bundleDir, but skip the shared-storage
+    // delete outright for the demo account regardless — see blockedForDemo.
+    const ref = (await blockedForDemo(userId)) ? null : parseBundleDir(row.bundleDir);
     if (ref) await deleteJobFolder(ref.date, ref.folder);
     revalidatePath("/applications");
     return { ok: true, message: "Deleted." };
@@ -307,7 +330,8 @@ export async function deleteFolderAction(
   _prev: ActionState,
   input: { date: string; folder: string },
 ): Promise<ActionState> {
-  await requireUserId();
+  const userId = await requireUserId();
+  if (await blockedForDemo(userId)) return err(NOT_IN_DEMO);
   const parsed = folderRef.safeParse(input);
   if (!parsed.success) return err(parsed.error.issues[0].message);
   try {

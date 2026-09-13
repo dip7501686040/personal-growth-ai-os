@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { listDrafts, tokenExists } from "@/lib/outreach/gmail";
 import {
@@ -79,22 +80,26 @@ function draftsFor(
 
 export default async function ApplicationsPage() {
   const userId = await requireUserId();
+  const isDemo = await isDemoUserId(userId);
   const [apps, counts, overview, dates, queued, allDrafts] = await Promise.all([
     listApplications(userId),
     countApplicationsByStatus(userId),
     applicationsOverview(userId),
     listDates(),
     queueCounts(userId),
-    loadDraftsSafely(),
+    isDemo ? Promise.resolve([]) : loadDraftsSafely(),
   ]);
-  const gmailReady = tokenExists();
+  const gmailReady = !isDemo && tokenExists();
 
   const statusByFolder = new Map(
     apps.map((a) => [folderName({ company: a.company, role: a.role }), a.status]),
   );
-  const folderSections = await Promise.all(
-    dates.map(async (d) => ({ date: d, folders: await listJobFolders(d) })),
-  );
+  // The applications/ tree (résumés, proof bundles) is one shared R2/local
+  // prefix with no per-user partitioning — real company/role names, not
+  // demo data, so the demo account never lists or opens it.
+  const folderSections = isDemo
+    ? []
+    : await Promise.all(dates.map(async (d) => ({ date: d, folders: await listJobFolders(d) })));
 
   const selectionRows: SelectionRow[] = apps.map((a) => {
     const parts = a.bundleDir?.replace(/^applications[/\\]/, "").split("/") ?? [];
@@ -171,7 +176,7 @@ export default async function ApplicationsPage() {
         )}
       </div>
 
-      <SearchJobsPanel />
+      {!isDemo && <SearchJobsPanel />}
 
       <section className="flex flex-col gap-3">
         <h3 className="text-sm font-semibold">Select → content → apply</h3>
@@ -188,7 +193,7 @@ export default async function ApplicationsPage() {
             manual either way.
           </p>
         </div>
-        <OutreachBoard rows={outreachRows} gmailReady={gmailReady} />
+        <OutreachBoard rows={outreachRows} gmailReady={gmailReady} demoMode={isDemo} />
       </section>
 
       <section className="flex flex-col gap-3">
@@ -201,7 +206,13 @@ export default async function ApplicationsPage() {
               : "R2 not configured — showing the local cache."}
           </p>
         </div>
-        {folderSections.length === 0 && (
+        {isDemo && (
+          <p className="text-sm text-muted-foreground">
+            Not available in the demo — this is shared file storage, not
+            demo-only data.
+          </p>
+        )}
+        {!isDemo && folderSections.length === 0 && (
           <p className="text-sm text-muted-foreground">No folders yet.</p>
         )}
         {folderSections.map(({ date, folders }) => (

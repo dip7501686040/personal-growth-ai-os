@@ -242,6 +242,7 @@ export async function proofBundleMd(
     }
     if (p.repoUrl2) resumeLinks.push({ title: `${p.name} — GitOps repo`, url: p.repoUrl2 });
     if (p.docUrl) resumeLinks.push({ title: `${p.name} — ${p.docLabel ?? "Case study"}`, url: p.docUrl });
+    if (p.liveUrl) resumeLinks.push({ title: `${p.name} — Live`, url: p.liveUrl });
   }
   if (resumeLinks.length) {
     for (const l of resumeLinks) L.push(linkLine(l.title, l.url));

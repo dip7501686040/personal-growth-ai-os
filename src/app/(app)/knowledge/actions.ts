@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { knowledgeDocumentTags, knowledgeLinks } from "@/lib/db/schema";
+import { isDemoUserId } from "@/lib/demo";
 import type { Page } from "@/lib/paginate";
 import { requireUserId } from "@/lib/user";
 import {
@@ -49,11 +50,14 @@ const REPO = z
   .trim()
   .regex(/^[\w.-]+\/[\w.-]+$/, "Use the owner/repo form.");
 
+const NOT_IN_DEMO = "Not available in the demo — this uses real, rate-limited GitHub API quota.";
+
 export async function addRepoAction(
   _p: ActionState,
   fd: FormData,
 ): Promise<ActionState> {
   const userId = await requireUserId();
+  if (await isDemoUserId(userId)) return { ok: false, message: NOT_IN_DEMO };
   const parsed = REPO.safeParse(fd.get("repo"));
   if (!parsed.success) {
     return { ok: false, message: parsed.error.issues[0]?.message ?? "Bad repo" };
@@ -79,6 +83,7 @@ export async function syncSourceAction(
   fd: FormData,
 ): Promise<ActionState> {
   const userId = await requireUserId();
+  if (await isDemoUserId(userId)) return { ok: false, message: NOT_IN_DEMO };
   const id = z.string().uuid().parse(fd.get("id"));
   const r = await runSourceSync(userId, id);
   revalidatePath("/knowledge");
@@ -116,6 +121,7 @@ export async function resyncSourceAction(
   fd: FormData,
 ): Promise<ActionState> {
   const userId = await requireUserId();
+  if (await isDemoUserId(userId)) return { ok: false, message: NOT_IN_DEMO };
   const id = z.string().uuid().parse(fd.get("id"));
   await resetSourceCursor(userId, id);
   const r = await runSourceSync(userId, id);

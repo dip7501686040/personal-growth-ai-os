@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import {
   listContentItems,
@@ -25,13 +26,17 @@ const COLUMNS: { status: string; label: string }[] = [
 
 export default async function ContentPage() {
   const userId = await requireUserId();
+  const isDemo = await isDemoUserId(userId);
   const [allContent, run, contentConsole, cards, features, manifest] = await Promise.all([
     listContentItems(userId),
     getLatestRun(userId, "content"),
     getAgentConsole(userId, "content"),
     listPortfolioCards(userId),
     listFeaturesForPicker(userId),
-    loadManifestFromR2(),
+    // The Cloudinary manifest is one shared, unpartitioned resource (real
+    // project/feature asset names) — the demo account never sees it, so its
+    // "pick an uploaded asset" list is just empty rather than leaking it.
+    isDemo ? Promise.resolve({ projects: {} }) : loadManifestFromR2(),
   ]);
   const items = allContent.filter((i) => i.platform !== "portfolio");
 

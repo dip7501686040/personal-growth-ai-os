@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { warmupDb } from "@/lib/db";
 import { recordCronFinish, recordCronStart } from "@/lib/cron-runs";
+import { getDemoUserId } from "@/lib/demo";
 import { env } from "@/lib/env";
 import { listDocumentsForMapping } from "@/lib/knowledge";
 import { getOwnerUserId } from "@/lib/owner";
@@ -9,13 +10,15 @@ import { learningAgent } from "@/modules/agents/learning-agent";
 import { backfillEntityEmbeddings, getEntityWatermark } from "@/modules/knowledge/entities";
 import { mapDocument } from "@/modules/knowledge/mapping";
 import { drainContextEvents } from "@/modules/ingestion/refresh";
+import { resetDemoData } from "@/modules/demo/reset";
 
 export const maxDuration = 60;
 
 /**
  * job name → handler.
  *
- * Scheduled (see vercel.json): `daily-learning`, `morning-briefing`.
+ * Scheduled (see vercel.json): `daily-learning`, `morning-briefing`,
+ * `demo-reset`.
  *
  * `knowledge-refresh` / `knowledge-map` are kept here but **no longer
  * scheduled** — Phase 1 of the skill-graph-manager plan retired every
@@ -42,6 +45,15 @@ const JOBS: Record<string, (userId: string) => Promise<{ id: string; status: str
         force: true,
       });
       return { id: run.id, status: run.status };
+    },
+    // Ignores the owner id the route always passes — the demo account is a
+    // separate real user, resolved here from DEMO_EMAIL. No-ops (reports
+    // "skipped") if no demo account is configured yet.
+    "demo-reset": async () => {
+      const demoUserId = await getDemoUserId();
+      if (!demoUserId) return { id: "-", status: "skipped — no demo user configured" };
+      await resetDemoData(demoUserId);
+      return { id: demoUserId, status: "reset" };
     },
     // ── unscheduled: manual knowledge stop-gap until Phase 6's resyncKnowledge ──
     "knowledge-refresh": async (userId) => {

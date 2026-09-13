@@ -1,3 +1,4 @@
+import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { isCloudinaryConfigured, mediaUrl, videoPosterUrl } from "@/lib/media/cloudinary";
 import { allItems, loadManifestFromR2 } from "@/lib/media/manifest";
@@ -8,7 +9,23 @@ import { FilesList } from "@/components/media/files-list";
 export const metadata = { title: "Media" };
 
 export default async function MediaPage() {
-  await requireUserId();
+  const userId = await requireUserId();
+
+  // Both buckets here (Cloudinary manifest + the "my-files" R2 bucket, which
+  // holds the real résumé/profile/job-search config) are one shared,
+  // unpartitioned resource — not per-user data. The demo account never sees
+  // or touches it.
+  if (await isDemoUserId(userId)) {
+    return (
+      <div className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold">Media</h2>
+        <p className="text-sm text-muted-foreground">
+          Not available in the demo — this manages shared file storage
+          (Cloudinary assets and résumé-domain files), not demo-only data.
+        </p>
+      </div>
+    );
+  }
 
   const [manifest, fileKeys] = await Promise.all([
     loadManifestFromR2(),

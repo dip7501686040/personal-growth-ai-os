@@ -83,3 +83,24 @@ export async function signInWithPassword(
 
   redirect("/dashboard");
 }
+
+/** One-click entry to the read-write demo account — credentials never touch
+ *  the client, read server-side from env. No-ops with a clear message if no
+ *  demo account is configured (DEMO_EMAIL/DEMO_PASSWORD unset). */
+export async function tryDemoAction(
+  _prev: LoginState,
+  _formData: FormData,
+): Promise<LoginState> {
+  if (!env.DEMO_EMAIL || !env.DEMO_PASSWORD) {
+    return { ok: false, message: "The demo account isn't configured yet." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({
+    email: env.DEMO_EMAIL,
+    password: env.DEMO_PASSWORD,
+  });
+  if (error) return { ok: false, message: "Demo sign-in failed — try again shortly." };
+
+  redirect("/dashboard");
+}

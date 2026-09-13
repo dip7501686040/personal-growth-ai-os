@@ -43,6 +43,7 @@ export interface ResumeModel {
     repoUrl2?: string | null;
     docUrl?: string | null;
     docLabel?: string;
+    liveUrl?: string | null;
   }[];
   education: MasterResume["education"];
   archetypeLabel: string;
@@ -61,20 +62,24 @@ export interface Link {
   url: string;
 }
 
-/** The Tech-line's link set for a project: one or two repo links (labeled to
- *  distinguish them when a project entry merges two repos, e.g. Platform
- *  Infra/GitOps), plus an external write-up for a project with no synced
- *  portfolio page to link bullets into (e.g. a Notion case study). */
+/** The Tech-line's link set for a project — case study, then a live
+ *  deployment, then code, in that order: what it does, then let a recruiter
+ *  actually use it, then how it's built. One or two repo links are labeled
+ *  to distinguish them when a project entry merges two repos (e.g. Platform
+ *  Infra/GitOps); `docUrl` is an external write-up for a project with no
+ *  synced portfolio page to link bullets into (e.g. a Notion case study). */
 function repoLinks(p: {
   repoUrl: string | null;
   repoUrl2?: string | null;
   docUrl?: string | null;
   docLabel?: string;
+  liveUrl?: string | null;
 }): Link[] {
   const links: Link[] = [];
+  if (p.docUrl) links.push({ label: p.docLabel ?? "Case study", url: p.docUrl });
+  if (p.liveUrl) links.push({ label: "Live", url: p.liveUrl });
   if (p.repoUrl) links.push({ label: p.repoUrl2 ? "Infra repo" : "GitHub", url: p.repoUrl });
   if (p.repoUrl2) links.push({ label: "GitOps repo", url: p.repoUrl2 });
-  if (p.docUrl) links.push({ label: p.docLabel ?? "Case study", url: p.docUrl });
   return links;
 }
 
@@ -232,6 +237,7 @@ export function buildResumeModel(
       repoUrl2: p.repoUrl2,
       docUrl: p.docUrl,
       docLabel: p.docLabel,
+      liveUrl: p.liveUrl,
     };
   });
 

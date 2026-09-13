@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
+import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { contentTypeFor, getFile } from "@/modules/files/store";
 
-/** Auth-gated stream of one object from the `my-files` R2 bucket. */
+/** Auth-gated stream of one object from the `my-files` R2 bucket — a single
+ *  shared, unpartitioned bucket (real résumé/profile/job-search config), so
+ *  blocked entirely for the demo account. */
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ key: string[] }> },
 ) {
-  await requireUserId();
+  const userId = await requireUserId();
+  if (await isDemoUserId(userId)) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const { key: parts } = await params;
   const key = parts.join("/");
   if (!key || key.includes("..")) {

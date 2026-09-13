@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { destroyAsset, uploadBuffer, type ResourceType } from "@/lib/media/cloudinary";
 import {
@@ -15,6 +16,15 @@ import { deleteFile, getFile, putFile } from "@/modules/files/store";
 export type ActionState = { ok: boolean; message: string } | null;
 
 const err = (message: string): ActionState => ({ ok: false, message });
+
+// Every mutation in this file touches one shared, unpartitioned resource
+// (the Cloudinary manifest, or the "my-files" R2 bucket — real résumé/
+// profile/job-search config) — never demo-only data. Block all of it.
+const NOT_IN_DEMO = "Not available in the demo — this touches shared file storage, not demo-only data.";
+async function blockedForDemo(): Promise<boolean> {
+  const userId = await requireUserId();
+  return isDemoUserId(userId);
+}
 
 function revalidate() {
   revalidatePath("/media");
@@ -39,7 +49,7 @@ export async function updateCaptionAction(
   _prev: ActionState,
   input: { projectSlug: string; featureKey: string; cloudinaryId: string; caption: string },
 ): Promise<ActionState> {
-  await requireUserId();
+  if (await blockedForDemo()) return err(NOT_IN_DEMO);
   const parsed = assetRefSchema
     .omit({ resourceType: true })
     .extend({ caption: z.string().max(300) })
@@ -53,7 +63,7 @@ export async function updateCaptionAction(
 }
 
 export async function reuploadAssetAction(formData: FormData): Promise<ActionState> {
-  await requireUserId();
+  if (await blockedForDemo()) return err(NOT_IN_DEMO);
   const parsed = assetRefSchema.safeParse({
     projectSlug: formData.get("projectSlug"),
     featureKey: formData.get("featureKey"),
@@ -99,7 +109,7 @@ export async function deleteAssetAction(
     resourceType: ResourceType;
   },
 ): Promise<ActionState> {
-  await requireUserId();
+  if (await blockedForDemo()) return err(NOT_IN_DEMO);
   const parsed = assetRefSchema.safeParse(input);
   if (!parsed.success) return err(parsed.error.issues[0].message);
   const { projectSlug, featureKey, cloudinaryId, resourceType } = parsed.data;
@@ -123,7 +133,7 @@ export async function deleteAssetAction(
 const keySchema = z.string().min(1).max(300).regex(/^[^/][\S]*$/, "no leading slash");
 
 export async function uploadFileAction(formData: FormData): Promise<ActionState> {
-  await requireUserId();
+  if (await blockedForDemo()) return err(NOT_IN_DEMO);
   const keyParsed = keySchema.safeParse(formData.get("key"));
   if (!keyParsed.success) return err(keyParsed.error.issues[0].message);
   const buffer = await fileFromForm(formData);
@@ -137,7 +147,7 @@ export async function renameFileAction(
   _prev: ActionState,
   input: { oldKey: string; newKey: string },
 ): Promise<ActionState> {
-  await requireUserId();
+  if (await blockedForDemo()) return err(NOT_IN_DEMO);
   const parsed = z.object({ oldKey: keySchema, newKey: keySchema }).safeParse(input);
   if (!parsed.success) return err(parsed.error.issues[0].message);
   const { oldKey, newKey } = parsed.data;
@@ -154,7 +164,7 @@ export async function deleteFileAction(
   _prev: ActionState,
   key: string,
 ): Promise<ActionState> {
-  await requireUserId();
+  if (await blockedForDemo()) return err(NOT_IN_DEMO);
   const parsed = keySchema.safeParse(key);
   if (!parsed.success) return err(parsed.error.issues[0].message);
   await deleteFile(parsed.data);

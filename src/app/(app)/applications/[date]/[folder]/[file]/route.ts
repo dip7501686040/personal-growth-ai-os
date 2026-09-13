@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { contentTypeFor, getObject, keyFor } from "@/modules/applications/store";
 
@@ -6,12 +7,17 @@ const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const FOLDER = /^[a-z0-9][a-z0-9_-]*$/i;
 const FILE = /^[a-z0-9][a-z0-9._-]*$/i;
 
-/** Stream one application-folder file straight from R2 (auth-gated). */
+/** Stream one application-folder file straight from R2 (auth-gated). Blocked
+ *  entirely for the demo account — this shared R2 prefix isn't per-user, so
+ *  it's real résumé/proof-bundle content, never demo data. */
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ date: string; folder: string; file: string }> },
 ) {
-  await requireUserId();
+  const userId = await requireUserId();
+  if (await isDemoUserId(userId)) {
+    return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
   const { date, folder, file } = await params;
   if (!DATE.test(date) || !FOLDER.test(folder) || !FILE.test(file)) {
     return NextResponse.json({ error: "bad path" }, { status: 400 });

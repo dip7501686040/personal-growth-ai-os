@@ -138,9 +138,11 @@ function SourceHistory({ sourceId }: { sourceId: string }) {
 export function KnowledgePanel({
   sources,
   githubTokenSet,
+  isDemo = false,
 }: {
   sources: SourceRow[];
   githubTokenSet: boolean;
+  isDemo?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -154,13 +156,20 @@ export function KnowledgePanel({
               placeholder="owner/repo"
               className="max-w-xs font-mono text-sm"
               required
+              disabled={isDemo}
             />
-            <Button type="submit" size="sm">
+            <Button type="submit" size="sm" disabled={isDemo}>
               Add repo
             </Button>
           </div>
         </InlineForm>
-        {!githubTokenSet && (
+        {isDemo && (
+          <p className="text-xs text-muted-foreground">
+            Not available in the demo — this uses real, rate-limited GitHub
+            API quota.
+          </p>
+        )}
+        {!isDemo && !githubTokenSet && (
           <p className="text-xs text-muted-foreground">
             No <code>GITHUB_TOKEN</code> set — public repos only, 60 requests/hour.
           </p>

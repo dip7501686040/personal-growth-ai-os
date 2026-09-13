@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { listApplications } from "@/modules/applications/service";
 import {
@@ -27,6 +28,9 @@ export default async function ApplicationFolderPage({
 }) {
   const { date, folder } = await params;
   const userId = await requireUserId();
+  // The applications/ tree is one shared R2/local prefix, not per-user — the
+  // demo account must never see or edit real résumé/proof-bundle content.
+  if (await isDemoUserId(userId)) notFound();
 
   const names = await listFolderFiles(date, folder);
   if (names.length === 0) notFound();

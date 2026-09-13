@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { getLastCronRuns } from "@/lib/cron-runs";
 import { env } from "@/lib/env";
@@ -44,6 +45,7 @@ export default async function KnowledgePage({
   searchParams: Promise<{ q?: string; skill?: string; type?: string }>;
 }) {
   const userId = await requireUserId();
+  const isDemo = await isDemoUserId(userId);
   const sp = await searchParams;
   const q = sp.q?.trim() || undefined;
   const skillIds = sp.skill?.split(",").filter(Boolean) ?? [];
@@ -187,6 +189,7 @@ export default async function KnowledgePage({
               lastSyncedAt: s.lastSyncedAt?.toISOString() ?? null,
             }))}
             githubTokenSet={!!env.GITHUB_TOKEN}
+            isDemo={isDemo}
           />
         </CardContent>
       </Card>

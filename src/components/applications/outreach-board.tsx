@@ -65,7 +65,15 @@ async function copy(text: string) {
   }
 }
 
-function OutreachCard({ row, gmailReady }: { row: OutreachRow; gmailReady: boolean }) {
+function OutreachCard({
+  row,
+  gmailReady,
+  demoMode,
+}: {
+  row: OutreachRow;
+  gmailReady: boolean;
+  demoMode: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [linkedin, setLinkedin] = useState<OutreachContent | "idle" | "loading" | "empty">(
@@ -108,6 +116,12 @@ function OutreachCard({ row, gmailReady }: { row: OutreachRow; gmailReady: boole
           {row.nextDueAt && ` · next due ${fmtDateTime(row.nextDueAt)}`}
         </span>
       </div>
+
+      {demoMode && (
+        <p className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">
+          Gmail drafts — not available in the demo.
+        </p>
+      )}
 
       {gmailReady && row.drafts.length > 0 && (
         <div className="flex flex-col gap-1.5 rounded-md border border-dashed p-2">
@@ -254,9 +268,11 @@ function OutreachCard({ row, gmailReady }: { row: OutreachRow; gmailReady: boole
 export function OutreachBoard({
   rows,
   gmailReady,
+  demoMode = false,
 }: {
   rows: OutreachRow[];
   gmailReady: boolean;
+  demoMode?: boolean;
 }) {
   if (rows.length === 0) {
     return (
@@ -272,7 +288,7 @@ export function OutreachBoard({
   return (
     <div className="flex flex-col gap-2">
       {sorted.map((r) => (
-        <OutreachCard key={r.applicationId} row={r} gmailReady={gmailReady} />
+        <OutreachCard key={r.applicationId} row={r} gmailReady={gmailReady} demoMode={demoMode} />
       ))}
     </div>
   );

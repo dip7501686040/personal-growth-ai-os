@@ -14,6 +14,7 @@ import {
 import {
   requestMagicLink,
   signInWithPassword,
+  tryDemoAction,
   type LoginState,
 } from "./actions";
 
@@ -26,9 +27,13 @@ export default function LoginPage() {
     LoginState,
     FormData
   >(requestMagicLink, null);
+  const [demoState, demoAction, demoPending] = useActionState<
+    LoginState,
+    FormData
+  >(tryDemoAction, null);
 
-  const state = pwState ?? linkState;
-  const pending = pwPending || linkPending;
+  const state = pwState ?? linkState ?? demoState;
+  const pending = pwPending || linkPending || demoPending;
 
   return (
     <div className="flex min-h-svh items-center justify-center bg-background p-4">
@@ -72,6 +77,15 @@ export default function LoginPage() {
               disabled={pending}
             >
               {linkPending ? "Sending…" : "Email me a magic link instead"}
+            </Button>
+            <Button
+              type="submit"
+              variant="outline"
+              formAction={demoAction}
+              formNoValidate
+              disabled={pending}
+            >
+              {demoPending ? "Entering demo…" : "Try the demo (read/write, resets daily)"}
             </Button>
 
             {state && (
