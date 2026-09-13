@@ -11,6 +11,7 @@ import {
   createPortfolioCard,
   deleteContentItem,
   getContentItem,
+  reuploadPortfolioCardAsset,
   updateContentItem,
   updatePortfolioCard,
 } from "@/modules/content/service";
@@ -230,4 +231,20 @@ export async function deletePortfolioCardAction(
   await deleteContentItem(userId, parsed.data);
   revalidatePath("/content");
   return { ok: true, message: "Deleted." };
+}
+
+export async function reuploadPortfolioCardAssetAction(formData: FormData): Promise<ActionState> {
+  const userId = await requireUserId();
+  const id = z.uuid().safeParse(formData.get("id"));
+  if (!id.success) return err("Bad id.");
+  const f = formData.get("file");
+  if (!(f instanceof File) || f.size === 0) return err("No file selected.");
+  const buffer = Buffer.from(await f.arrayBuffer());
+  try {
+    await reuploadPortfolioCardAsset(userId, id.data, { buffer, filename: f.name });
+    revalidatePath("/content");
+    return { ok: true, message: "Asset replaced." };
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Re-upload failed.");
+  }
 }

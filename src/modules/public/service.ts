@@ -9,6 +9,7 @@ import {
   projects,
   skills,
 } from "@/lib/db/schema";
+import { cardRoleOf } from "@/lib/media/card-role";
 import { isCloudinaryConfigured, mediaUrl, videoPosterUrl } from "@/lib/media/cloudinary";
 import { slugify } from "@/lib/slug";
 
@@ -279,7 +280,7 @@ export async function getPublicContentCards(userId: string): Promise<PublicConte
       projectSlug: f?.projectSlug ?? null,
       featureSlug: f ? slugify(f.title) : null,
       code: f ? { repoUrl: f.repoUrl, links } : null,
-      role: (r.cloudinaryPublicId.endsWith("-ui") ? "ui" : "terminal") as "ui" | "terminal",
+      role: cardRoleOf(r.cloudinaryPublicId),
     };
   }).sort((a, b) => (a.role === "ui" ? -1 : 1) - (b.role === "ui" ? -1 : 1));
 }

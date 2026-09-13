@@ -14,6 +14,8 @@ import {
   type ContentSource,
 } from "@/lib/db/schema";
 import { slugify } from "@/lib/slug";
+import { cardRoleOf, type CardRole } from "@/lib/media/card-role";
+import { uploadBuffer, type ResourceType } from "@/lib/media/cloudinary";
 
 export type ContentStatus =
   | "idea"
@@ -205,6 +207,9 @@ export type PortfolioCardListItem = ContentItem & {
   featureTitle: string | null;
   projectName: string | null;
   projectSlug: string | null;
+  /** "ui" vs "terminal", derived from the cloudinaryPublicId convention —
+   *  the pairing key the UI groups a feature's two cards by. */
+  role: CardRole;
 };
 
 export async function listPortfolioCards(
@@ -256,6 +261,7 @@ export async function listPortfolioCards(
       featureTitle: f?.title ?? null,
       projectName: f?.projectName ?? null,
       projectSlug: f?.projectSlug ?? null,
+      role: cardRoleOf(r.cloudinaryPublicId),
     };
   });
 }
@@ -298,6 +304,43 @@ export async function updatePortfolioCard(
       });
     }
   }
+}
+
+/** Replace a portfolio card's underlying image/video in place — uploaded to
+ *  the *same* Cloudinary public ID (`overwrite: true`), so the -ui/terminal
+ *  role convention and any portfolio/résumé link already pointing at that
+ *  URL stay valid. The resource type (image vs video) is fixed to whatever
+ *  the card already is — this replaces the asset, not the card's kind. */
+export async function reuploadPortfolioCardAsset(
+  userId: string,
+  id: string,
+  file: { buffer: Buffer; filename: string },
+): Promise<{ format: string }> {
+  const [card] = await db
+    .select()
+    .from(contentItems)
+    .where(
+      and(
+        eq(contentItems.userId, userId),
+        eq(contentItems.id, id),
+        eq(contentItems.platform, "portfolio"),
+      ),
+    )
+    .limit(1);
+  if (!card) throw new Error("Card not found.");
+  if (!card.cloudinaryPublicId || !card.cloudinaryResourceType) {
+    throw new Error("This card has no existing asset to replace.");
+  }
+  const up = await uploadBuffer(file.buffer, file.filename, {
+    resourceType: card.cloudinaryResourceType as ResourceType,
+    publicId: card.cloudinaryPublicId,
+    overwrite: true,
+  });
+  await db
+    .update(contentItems)
+    .set({ cloudinaryFormat: up.format, updatedAt: new Date() })
+    .where(and(eq(contentItems.userId, userId), eq(contentItems.id, id)));
+  return { format: up.format };
 }
 
 /** Every active feature, for the portfolio-card picker (any project, not just
@@ -499,22 +542,15 @@ export async function findCardsForFeature(
   return rows.map((r) => r.item);
 }
 
-export type CardRole = "ui" | "terminal";
+export type { CardRole };
 
-/** UI-view cards are tagged by a `-ui` cloudinaryPublicId suffix (see
- *  scripts/content.ts's `browser` command); everything else (diagram,
- *  register, the original terminal command) counts as "terminal" — no
- *  schema migration needed, just a naming convention. Lets a UI card and a
- *  terminal card coexist per feature without either command re-triggering
- *  the other. */
 export async function findCardForFeatureRole(
   userId: string,
   featureId: string,
   role: CardRole,
 ): Promise<ContentItem | null> {
   const cards = await findCardsForFeature(userId, featureId);
-  const isUi = (c: ContentItem) => (c.cloudinaryPublicId ?? "").endsWith("-ui");
-  return cards.find((c) => (role === "ui" ? isUi(c) : !isUi(c))) ?? null;
+  return cards.find((c) => cardRoleOf(c.cloudinaryPublicId) === role) ?? null;
 }
 
 export interface MissingVisualProof {
@@ -608,7 +644,7 @@ export async function listMissingUiProof(
   for (const r of rows) {
     const cards = await findCardsForFeature(userId, r.featureId);
     if (cards.length === 0) continue; // listMissingVisualProof already covers "no card at all"
-    const hasUi = cards.some((c) => (c.cloudinaryPublicId ?? "").endsWith("-ui"));
+    const hasUi = cards.some((c) => cardRoleOf(c.cloudinaryPublicId) === "ui");
     if (!hasUi) withUi.push({ ...r, featureKey: slugify(r.title) });
   }
   return withUi;

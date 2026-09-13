@@ -12,9 +12,10 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { projectFeatures, projects } from "@/lib/db/schema";
 import { loadProfile } from "@/lib/apply/profile";
+import { cardRoleOf, type CardRole } from "@/lib/media/card-role";
 import { mediaUrl, videoPosterUrl } from "@/lib/media/cloudinary";
 import { slugify } from "@/lib/slug";
-import { findCardsForFeature, type CardRole } from "@/modules/content/service";
+import { findCardsForFeature } from "@/modules/content/service";
 
 const PORTFOLIO_FALLBACK = "https://dipankarsaha.vercel.app";
 
@@ -63,7 +64,7 @@ export async function visualProofFor(
   const portfolioUrl = `${base}/projects/${row.projectSlug}#${slugify(row.featureTitle)}`;
 
   const out = withMedia.map((card) => {
-    const role: CardRole = (card.cloudinaryPublicId ?? "").endsWith("-ui") ? "ui" : "terminal";
+    const role: CardRole = cardRoleOf(card.cloudinaryPublicId);
     return {
       role,
       kind: card.assetType as "diagram" | "screenshot" | "video",

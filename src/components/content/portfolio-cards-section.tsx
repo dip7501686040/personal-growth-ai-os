@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import {
   createPortfolioCardAction,
   deletePortfolioCardAction,
+  reuploadPortfolioCardAssetAction,
   updatePortfolioCardAction,
   type ActionState,
 } from "@/app/(app)/content/actions";
@@ -42,6 +44,8 @@ interface Card {
   featureTitle: string | null;
   projectName: string | null;
   previewUrl: string | null;
+  role: "ui" | "terminal";
+  cloudinaryResourceType: string | null;
 }
 
 const assetKey = (a: Asset) => `${a.projectSlug}::${a.featureKey}::${a.cloudinaryId}`;
@@ -213,6 +217,40 @@ export function PortfolioCardsSection({
   );
 }
 
+interface FeatureGroup {
+  key: string;
+  featureTitle: string | null;
+  cards: Card[];
+}
+
+/** Sub-group a project's cards by feature — a feature's UI-view card and
+ *  terminal/code-view card land in the same block, UI first, matching how
+ *  the portfolio itself pairs them (the same "-ui" suffix convention, see
+ *  card-role.ts). Cards with no linked feature each get their own block. */
+function groupByFeature(cards: Card[]): FeatureGroup[] {
+  const withFeature = new Map<string, Card[]>();
+  const unlinked: Card[] = [];
+  for (const c of cards) {
+    if (c.featureId) {
+      const arr = withFeature.get(c.featureId) ?? [];
+      arr.push(c);
+      withFeature.set(c.featureId, arr);
+    } else {
+      unlinked.push(c);
+    }
+  }
+  const roleRank = (c: Card) => (c.role === "ui" ? 0 : 1);
+  const groups: FeatureGroup[] = [...withFeature.entries()]
+    .map(([featureId, group]) => ({
+      key: featureId,
+      featureTitle: group[0].featureTitle,
+      cards: [...group].sort((a, b) => roleRank(a) - roleRank(b)),
+    }))
+    .sort((a, b) => (a.featureTitle ?? "").localeCompare(b.featureTitle ?? ""));
+  for (const c of unlinked) groups.push({ key: `unlinked:${c.id}`, featureTitle: null, cards: [c] });
+  return groups;
+}
+
 function PortfolioCardGroup({
   project,
   cards,
@@ -232,6 +270,7 @@ function PortfolioCardGroup({
   run: (fn: () => Promise<ActionState>, after?: () => void) => void;
   cloudinaryConfigured: boolean;
 }) {
+  const featureGroups = useMemo(() => groupByFeature(cards), [cards]);
   return (
     <div
       id={`pc-${project.replace(/[^a-z0-9]+/gi, "-")}`}
@@ -240,78 +279,118 @@ function PortfolioCardGroup({
       <h3 className="text-sm font-semibold text-muted-foreground">
         {project} · {cards.length}
       </h3>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {cards.map((c) => {
-            const isEditing = editing === c.id;
-            return (
-              <div key={c.id} className="flex flex-col overflow-hidden rounded-lg border bg-card">
-                <div className="relative aspect-video bg-muted">
-                  {c.previewUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={c.previewUrl} alt={c.title} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                      {cloudinaryConfigured ? "no preview" : "Cloudinary not configured"}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-1 flex-col gap-2 p-3">
-                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                    {c.projectName && <Badge variant="outline">{c.projectName}</Badge>}
-                    {c.assetType && <Badge>{c.assetType}</Badge>}
-                    <Badge variant={c.isPublic ? "default" : "outline"}>
-                      {c.isPublic ? "public" : "hidden"}
-                    </Badge>
-                  </div>
-
-                  {isEditing ? (
-                    <EditCardForm
-                      card={c}
-                      features={features}
-                      pending={pending}
-                      onCancel={() => setEditing(null)}
-                      onSave={(patch) =>
-                        run(
-                          () => updatePortfolioCardAction(null, { id: c.id, ...patch }),
-                          () => setEditing(null),
-                        )
-                      }
-                    />
-                  ) : (
-                    <>
-                      <p className="text-sm font-medium">{c.title}</p>
-                      {c.featureTitle && (
-                        <p className="text-xs text-muted-foreground">{c.featureTitle}</p>
-                      )}
-                      <div className="mt-auto flex items-center gap-3 pt-1">
-                        <button
-                          type="button"
-                          className="text-xs underline"
-                          disabled={pending}
-                          onClick={() => setEditing(c.id)}
-                        >
-                          edit
-                        </button>
-                        <button
-                          type="button"
-                          className="text-xs text-destructive underline"
-                          disabled={pending}
-                          onClick={() => {
-                            if (!window.confirm(`Delete the card "${c.title}"?`)) return;
-                            run(() => deletePortfolioCardAction(null, c.id));
-                          }}
-                        >
-                          delete
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {featureGroups.map((fg) => (
+          <div key={fg.key} className="flex flex-col gap-2 rounded-lg border bg-muted/20 p-2">
+            {fg.featureTitle && (
+              <p className="px-1 text-xs font-medium text-muted-foreground">{fg.featureTitle}</p>
+            )}
+            <div className={cn("grid gap-2", fg.cards.length > 1 && "sm:grid-cols-2")}>
+              {fg.cards.map((c) => (
+                <CardTile
+                  key={c.id}
+                  card={c}
+                  isEditing={editing === c.id}
+                  setEditing={setEditing}
+                  features={features}
+                  pending={pending}
+                  run={run}
+                  cloudinaryConfigured={cloudinaryConfigured}
+                />
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
+    </div>
+  );
+}
+
+function CardTile({
+  card: c,
+  isEditing,
+  setEditing,
+  features,
+  pending,
+  run,
+  cloudinaryConfigured,
+}: {
+  card: Card;
+  isEditing: boolean;
+  setEditing: (id: string | null) => void;
+  features: Feature[];
+  pending: boolean;
+  run: (fn: () => Promise<ActionState>, after?: () => void) => void;
+  cloudinaryConfigured: boolean;
+}) {
+  return (
+    <div className="flex flex-col overflow-hidden rounded-lg border bg-card">
+      <div className="relative aspect-video bg-muted">
+        {c.previewUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={c.previewUrl} alt={c.title} className="h-full w-full object-cover" />
+        ) : (
+          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+            {cloudinaryConfigured ? "no preview" : "Cloudinary not configured"}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <Badge variant={c.role === "ui" ? "default" : "outline"}>
+            {c.role === "ui" ? "UI view" : "Terminal / code"}
+          </Badge>
+          {c.assetType && <Badge variant="outline">{c.assetType}</Badge>}
+          <Badge variant={c.isPublic ? "default" : "outline"}>
+            {c.isPublic ? "public" : "hidden"}
+          </Badge>
+        </div>
+
+        {isEditing ? (
+          <EditCardForm
+            card={c}
+            features={features}
+            pending={pending}
+            onCancel={() => setEditing(null)}
+            onSave={(patch) =>
+              run(
+                () => updatePortfolioCardAction(null, { id: c.id, ...patch }),
+                () => setEditing(null),
+              )
+            }
+            onReupload={(fd) => run(() => reuploadPortfolioCardAssetAction(fd))}
+          />
+        ) : (
+          <>
+            <p className="text-sm font-medium">{c.title}</p>
+            {c.featureTitle && (
+              <p className="text-xs text-muted-foreground">{c.featureTitle}</p>
+            )}
+            <div className="mt-auto flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                className="text-xs underline"
+                disabled={pending}
+                onClick={() => setEditing(c.id)}
+              >
+                edit
+              </button>
+              <button
+                type="button"
+                className="text-xs text-destructive underline"
+                disabled={pending}
+                onClick={() => {
+                  if (!window.confirm(`Delete the card "${c.title}"?`)) return;
+                  run(() => deletePortfolioCardAction(null, c.id));
+                }}
+              >
+                delete
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -321,6 +400,7 @@ function EditCardForm({
   pending,
   onCancel,
   onSave,
+  onReupload,
 }: {
   card: Card;
   features: Feature[];
@@ -332,11 +412,13 @@ function EditCardForm({
     isPublic: boolean;
     featureId: string | null;
   }) => void;
+  onReupload: (fd: FormData) => void;
 }) {
   const [title, setTitle] = useState(card.title);
   const [caption, setCaption] = useState(card.body ?? "");
   const [isPublic, setIsPublic] = useState(card.isPublic);
   const [featureId, setFeatureId] = useState(card.featureId ?? "");
+  const fileInput = useRef<HTMLInputElement | null>(null);
 
   return (
     <div className="flex flex-col gap-2">
@@ -359,6 +441,31 @@ function EditCardForm({
         />
         Public on the portfolio
       </label>
+
+      <input
+        ref={fileInput}
+        type="file"
+        accept={card.cloudinaryResourceType === "video" ? "video/*" : "image/*"}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const fd = new FormData();
+          fd.set("id", card.id);
+          fd.set("file", file);
+          onReupload(fd);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        className="self-start text-xs font-medium text-accent-foreground underline"
+        disabled={pending || !card.cloudinaryResourceType}
+        onClick={() => fileInput.current?.click()}
+      >
+        Replace image/video
+      </button>
+
       <div className="flex gap-2">
         <Button
           size="sm"
