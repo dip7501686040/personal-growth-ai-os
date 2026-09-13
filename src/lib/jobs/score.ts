@@ -49,6 +49,25 @@ const US_ONLY_REMOTE = /\bremote\s*\(\s*us\)|\b(us|usa)\s+only\b/i;
  *  real link at scaffold time (apply-morning), not discovered later. */
 const WALLED_SOURCES = new Set(["himalayas", "jobicy"]);
 
+/** A short/abruptly-cut `descriptionSnippet` silently starves everything
+ *  downstream that tailors off it — archetype pick, skill/project hoisting,
+ *  proof matching — of whatever requirement language got cut (found the
+ *  hard way: Vercel's snippet was truncated mid-sentence, before the
+ *  paragraph naming SCIM/RBAC/SAML/OAuth2, and the résumé silently
+ *  tailored around their absence until the real JD was re-fetched by hand).
+ *  A real posting almost always ends on real punctuation; a snippet cut off
+ *  by a length limit usually doesn't — and a snippet under ~400 chars is
+ *  rarely the whole posting regardless of how it ends. */
+function looksTruncated(snippet: string | null): boolean {
+  if (!snippet) return false;
+  const lines = snippet.trim().split("\n").filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return false;
+  let last = lines[lines.length - 1].trim();
+  if (/^https?:\/\//.test(last) && lines.length > 1) last = lines[lines.length - 2].trim();
+  if (snippet.trim().length < 400) return true;
+  return !/[.!?"')\]:]$/.test(last);
+}
+
 function daysAgo(iso: string | null): number | null {
   if (!iso) return null;
   const d = Date.parse(iso);
@@ -134,6 +153,8 @@ export function scoreJob(
     flags.push(`region_restricted${region.note ? `:${region.note}` : ""}`);
     bump(-0.15);
   }
+
+  if (looksTruncated(j.descriptionSnippet)) flags.push("truncated_jd_text");
 
   const hay = `${j.role} ${j.descriptionSnippet ?? ""}`.toLowerCase();
   if (NO_SPONSORSHIP_PHRASES.test(hay) || US_ONLY_REMOTE.test(hay)) {

@@ -16,6 +16,11 @@ export interface JdTailor {
   skillNames: string[];
   /** project names whose features the JD matched */
   projectNames: string[];
+  /** the JD's own text — used to score/order projects and bullets by real
+   *  content overlap, not just the knowledge-graph's synced-feature index
+   *  (which only "sees" projects that got a portfolio card; a project with
+   *  no card can still be the JD's best match on its actual bullet text). */
+  jdText?: string;
 }
 
 export interface ResumeModel {
@@ -82,6 +87,59 @@ function hoist(items: string[], jd: Set<string>): string[] {
   return [...lead, ...rest];
 }
 
+const STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "for", "with", "that", "this", "from",
+  "into", "per", "are", "was", "were", "been", "has", "have", "will",
+  "using", "use", "via", "our", "your", "you", "we", "to", "of", "in", "on",
+  "at", "by", "as", "is", "it", "its", "be", "not", "also", "who", "what",
+  "how", "when", "where", "which", "their", "them", "all", "any", "can",
+  "new", "one", "two", "more", "most", "other", "such", "than", "then",
+  "these", "those", "about", "if", "you're",
+]);
+
+/** Whole-word significant terms in `text`, lowercased — the same overlap
+ *  vocabulary used to score both sides of a JD/project comparison, so a
+ *  collision like "rag" inside "leveraging" can't happen (word-bounded,
+ *  not substring). */
+function significantWords(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .split(" ")
+      .filter((w) => w.length >= 3 && !STOPWORDS.has(w)),
+  );
+}
+
+function overlapScore(words: Set<string>, jdWords: Set<string>): number {
+  let n = 0;
+  for (const w of words) if (jdWords.has(w)) n++;
+  return n;
+}
+
+/** Identity/access-control/compliance vocabulary — rare and highly diagnostic
+ *  wherever it appears (very few JDs ask for SCIM or ReBAC), unlike commodity
+ *  infra nouns (Terraform, Kubernetes, AWS) that show up in most backend/
+ *  platform postings regardless of what's actually distinctive about the
+ *  role. A project's `matchTerms` hit in this list counts for more than one
+ *  that isn't, so a project whose real work is specifically about
+ *  auth/permissions can outrank one that just shares a common tech stack. */
+const HIGH_SIGNAL_TERMS = new Set([
+  "rbac", "abac", "rebac", "scim", "saml", "sso", "oauth2", "oauth", "ldap",
+  "openid", "mfa", "idp", "access control", "identity management",
+  "identity synchronization", "membership management", "single sign-on",
+]);
+
+function termWeight(term: string): number {
+  return HIGH_SIGNAL_TERMS.has(term.toLowerCase()) ? 3 : 1;
+}
+
+/** Whole-phrase, case-insensitive match — `phrase` can be one word or several. */
+function hasPhrase(text: string, phrase: string): boolean {
+  const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b`, "i").test(text);
+}
+
 export function buildResumeModel(
   master: MasterResume,
   archetype: ArchetypeKey,
@@ -90,6 +148,7 @@ export function buildResumeModel(
   const a = master.archetypes[archetype];
   const jdSkills = new Set((jd?.skillNames ?? []).map((s) => s.toLowerCase()));
   const jdProjects = new Set((jd?.projectNames ?? []).map((s) => s.toLowerCase()));
+  const jdWords = jd?.jdText ? significantWords(jd.jdText) : new Set<string>();
 
   // skills — group order from the archetype, JD matches hoisted within each group
   const byLabel = new Map(master.skills.map((g) => [g.label, g]));
@@ -98,37 +157,66 @@ export function buildResumeModel(
     .filter((g): g is (typeof master.skills)[number] => !!g)
     .map((g) => ({ label: g.label, items: hoist(g.items, jdSkills) }));
 
-  // experience — bullets with a JD term first, tech hoisted
+  // experience — bullets whose actual content overlaps the JD's own words
+  // lead (word-bounded, not the raw substring check this used to be — that
+  // let a short jdSkill collide inside an unrelated word), tech hoisted
   const experience = master.experience.map((e) => ({
     ...e,
     tech: hoist(e.tech, jdSkills),
-    bullets: jdSkills.size
-      ? [...e.bullets].sort((x, y) => {
-          const hx = [...jdSkills].some((k) => x.toLowerCase().includes(k)) ? 0 : 1;
-          const hy = [...jdSkills].some((k) => y.toLowerCase().includes(k)) ? 0 : 1;
-          return hx - hy;
-        })
+    bullets: jdWords.size
+      ? [...e.bullets].sort(
+          (x, y) =>
+            overlapScore(significantWords(y), jdWords) -
+            overlapScore(significantWords(x), jdWords),
+        )
       : e.bullets,
   }));
 
-  // projects — archetype order, JD-matched projects hoisted
+  // projects — scored by each project's own curated `matchTerms` found in the
+  // JD's real text, not just the knowledge-graph's synced-feature index
+  // (`jdProjects`, from get_proof_for_jd): that index only "sees" projects
+  // with a portfolio card, so a project with no card (e.g. a client project
+  // written up as a Notion case study instead) could never be recognized as
+  // the JD's best match no matter how well its real work fit. A graph match
+  // is still a trustworthy signal (backed by a verified shipped feature), so
+  // it's kept as a modest boost — but it no longer dominates outright, so a
+  // project with no card can still out-rank one that merely shares a common
+  // tech stack with the JD.
+  const jdTextLower = (jd?.jdText ?? "").toLowerCase();
   const bySlug = new Map(master.projects.map((p) => [p.slug, p]));
   const ordered = a.projectOrder
     .map((slug) => bySlug.get(slug))
     .filter((p): p is (typeof master.projects)[number] => !!p);
-  const matched = ordered.filter((p) => has(jdProjects, p.name));
+  const projectScore = (p: (typeof ordered)[number]) => {
+    const graphBoost = has(jdProjects, p.name) ? 1 : 0;
+    const termScore = (p.matchTerms ?? [])
+      .filter((t) => hasPhrase(jdTextLower, t))
+      .reduce((sum, t) => sum + termWeight(t), 0);
+    return graphBoost + termScore;
+  };
+  const scored = ordered
+    .map((p) => ({ p, score: projectScore(p) }))
+    .sort((x, y) => y.score - x.score); // stable — ties keep the archetype's default order
   // flex the count with match strength: nothing matched (no JD, or a JD that
   // matched none of these projects) → keep it lean at 3 rather than padding
   // with irrelevant work; a JD that strongly matches most of the catalog →
   // show 5 instead of dropping a genuinely relevant one to a fixed cap.
-  const count = matched.length === 0 ? 3 : matched.length >= 4 ? 5 : 4;
+  const matchedCount = scored.filter((s) => s.score > 0).length;
+  const count = matchedCount === 0 ? 3 : matchedCount >= 4 ? 5 : 4;
   const portfolioBase = master.portfolioUrl.replace(/\/$/, "");
-  const projects = [...matched, ...ordered.filter((p) => !has(jdProjects, p.name))]
-    .slice(0, count)
-    .map((p) => ({
+  const projects = scored.slice(0, count).map(({ p }) => {
+    const rawBullets = p.bulletsByArchetype?.[archetype] ?? p.bullets;
+    const bullets = jdWords.size
+      ? [...rawBullets].sort(
+          (x, y) =>
+            overlapScore(significantWords(y.text), jdWords) -
+            overlapScore(significantWords(x.text), jdWords),
+        )
+      : rawBullets;
+    return {
       name: p.name,
       oneLiner: p.oneLiner,
-      bullets: (p.bulletsByArchetype?.[archetype] ?? p.bullets).map((b) => ({
+      bullets: bullets.map((b) => ({
         text: b.text,
         link: b.link
           ? {
@@ -144,7 +232,8 @@ export function buildResumeModel(
       repoUrl2: p.repoUrl2,
       docUrl: p.docUrl,
       docLabel: p.docLabel,
-    }));
+    };
+  });
 
   const contactLine = [
     master.location,

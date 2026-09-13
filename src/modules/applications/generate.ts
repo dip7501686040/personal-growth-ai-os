@@ -24,7 +24,14 @@ import type {
 } from "@/lib/jobs/types";
 import { getProofForJd, type JdProof } from "@/modules/knowledge/jd-proof";
 import { loadMaster, suggestArchetype } from "@/modules/resume/master";
-import { buildResumeModel, htmlToPdf, toHtml, toMarkdown } from "@/modules/resume/render";
+import {
+  buildResumeModel,
+  htmlToPdf,
+  toHtml,
+  toMarkdown,
+  type JdTailor,
+  type ResumeModel,
+} from "@/modules/resume/render";
 import {
   deletePrefix,
   getText,
@@ -140,15 +147,38 @@ async function readFolderJson<T>(
 
 // ── résumé + doc builders ────────────────────────────────────────────────────
 
-async function resumeModelFor(jdText: string, archetype: string, proof: JdProof) {
-  const master = await loadMaster();
-  return buildResumeModel(master, archetype as Parameters<typeof buildResumeModel>[1], {
+/** Shared by the résumé and the proof-bundle so they always agree on what
+ *  "matches this JD" means — one proof-selection pass, two renderers. */
+function jdTailorFor(jdText: string, proof: JdProof): JdTailor {
+  return {
     skillNames: proof.skills.map((s) => s.name),
     projectNames: [
       ...proof.features.map((f) => f.projectName),
       ...proof.skills.flatMap((s) => s.proof.map((p) => p.projectName)),
     ],
-  });
+    jdText,
+  };
+}
+
+/** The archetype a folder's résumé is (or will be) rendered under — already
+ *  chosen and cached on job.json, or picked fresh from the current JD text.
+ *  Callers that pick fresh should persist it back (see `regenerateResume`/
+ *  `regenerateProofBundle`) so later calls — either generator — agree. */
+async function pickArchetype(job: { archetype?: string }, jdText: string): Promise<string> {
+  return job.archetype ?? suggestArchetype(await loadMaster(), jdText);
+}
+
+async function resumeModelFor(
+  jdText: string,
+  archetype: string,
+  proof: JdProof,
+): Promise<ResumeModel> {
+  const master = await loadMaster();
+  return buildResumeModel(
+    master,
+    archetype as Parameters<typeof buildResumeModel>[1],
+    jdTailorFor(jdText, proof),
+  );
 }
 
 /** The name a résumé should show up as once it's uploaded to a portal or
@@ -180,22 +210,64 @@ async function writeResumeFiles(
   return pdfOk;
 }
 
+/** One clickable+copyable line per link — the UI's proof-bundle Links panel
+ *  parses this exact `- **title**: url` shape, so keep it consistent. */
+const linkLine = (title: string, url: string) => `- **${title}**: ${url}`;
+
 export async function proofBundleMd(
   userId: string,
-  j: ScoredJob,
+  j: Pick<ScoredJob, "company" | "role">,
   proof: JdProof,
+  model: ResumeModel,
 ): Promise<string> {
   const L: string[] = [`# Proof of work — ${j.company} / ${j.role}`, ``];
+
+  // ── Links in this résumé — exactly what's cited in the generated résumé,
+  // 1:1 with the PDF the recruiter actually receives, so nothing here is a
+  // link that isn't backing a real claim on the page (and nothing on the
+  // page is missing from here). ──
+  L.push(
+    `## Links in this résumé`,
+    ``,
+    `Every link that's actually in the résumé for this job — click or copy any of them.`,
+    ``,
+  );
+  const resumeLinks: { title: string; url: string }[] = [];
+  for (const p of model.projects) {
+    for (const b of p.bullets) {
+      if (b.link) resumeLinks.push({ title: `${p.name} — ${b.text}`, url: b.link.url });
+    }
+    if (p.repoUrl) {
+      resumeLinks.push({ title: `${p.name} — ${p.repoUrl2 ? "Infra repo" : "GitHub"}`, url: p.repoUrl });
+    }
+    if (p.repoUrl2) resumeLinks.push({ title: `${p.name} — GitOps repo`, url: p.repoUrl2 });
+    if (p.docUrl) resumeLinks.push({ title: `${p.name} — ${p.docLabel ?? "Case study"}`, url: p.docUrl });
+  }
+  if (resumeLinks.length) {
+    for (const l of resumeLinks) L.push(linkLine(l.title, l.url));
+  } else {
+    L.push(`_No linked proof in this résumé's project bullets yet._`);
+  }
+  L.push(``);
+
+  // ── Additional matched context — the broader knowledge-graph match, not
+  // necessarily cited in the résumé itself (a portal without a cover-letter
+  // or why-fit field never shows this) — raw material for writing
+  // why-fit.md / cover-letter.md / pitch prose, not "the résumé's links". ──
+  L.push(
+    `## Additional matched context`,
+    ``,
+    `Broader knowledge-graph matches for this JD — not necessarily in the résumé above. Source material for why-fit.md / cover-letter.md / pitch prose.`,
+    ``,
+  );
   const withProof = proof.skills.filter((s) => s.proof.length > 0);
   if (withProof.length) {
-    L.push(`## Matched skills → shipped work`, ``);
+    L.push(`### Matched skills → shipped work`, ``);
     for (const s of withProof) {
-      L.push(`### ${s.name}  _(${s.level})_`);
+      L.push(`#### ${s.name}  _(${s.level})_`);
       for (const p of s.proof.slice(0, 3)) {
         const link = (await visualProofUrl(userId, p.featureId)) ?? p.repoUrl;
-        L.push(
-          `- **${p.featureTitle}** (${p.projectName}) — ${link ?? "no link"}`,
-        );
+        L.push(link ? linkLine(`${p.featureTitle} (${p.projectName})`, link) : `- **${p.featureTitle}** (${p.projectName}): no link`);
       }
       if (s.proof.length > 3) L.push(`- _…+${s.proof.length - 3} more features_`);
       L.push(``);
@@ -203,27 +275,27 @@ export async function proofBundleMd(
   }
   const noProof = proof.skills.filter((s) => s.proof.length === 0).map((s) => s.name);
   if (noProof.length) {
-    L.push(`## Matched, no shipped-feature proof yet`);
+    L.push(`### Matched, no shipped-feature proof yet`);
     L.push(noProof.join(", "), ``);
   }
   if (proof.features.length) {
-    L.push(`## Directly-matched project features`, ``);
+    L.push(`### Directly-matched project features`, ``);
     for (const f of proof.features) {
       const link = (await visualProofUrl(userId, f.featureId)) ?? f.repoUrl;
-      L.push(`- **${f.title}** (${f.projectName}) — ${link ?? "no link"}`);
+      L.push(link ? linkLine(`${f.title} (${f.projectName})`, link) : `- **${f.title}** (${f.projectName}): no link`);
     }
     L.push(``);
   }
   if (proof.relatedContent.length) {
-    L.push(`## Related published content`);
+    L.push(`### Related published content`);
     for (const c of proof.relatedContent) {
       const url = c.publishedUrls ? Object.values(c.publishedUrls)[0] : null;
-      L.push(`- ${c.title}${url ? ` — ${url}` : ` _(no public URL yet)_`}`);
+      L.push(url ? linkLine(c.title, url) : `- ${c.title} _(no public URL yet)_`);
     }
     L.push(``);
   }
   if (proof.relatedLearning.length) {
-    L.push(`## Related learning`);
+    L.push(`### Related learning`);
     for (const l of proof.relatedLearning) L.push(`- ${l.topic} (${l.category})`);
     L.push(``);
   }
@@ -395,6 +467,82 @@ export async function scaffoldJobFolder(input: ScaffoldInput): Promise<ScaffoldR
   return { date, folder, files: ["job.json", "search-provenance.md"] };
 }
 
+export interface ManualScaffoldInput {
+  company: string;
+  role: string;
+  /** the full JD text as the user found it — pasted directly, so (unlike
+   *  the automated path's `jdTextOf`) it's never at risk of aggregator
+   *  truncation. */
+  jdText: string;
+  applyUrl?: string | null;
+  location?: string | null;
+  salaryText?: string | null;
+  date?: string;
+}
+
+/** Scaffold one job the user found and pasted themselves — `/apply-single`'s
+ *  entry point. Parallel to `scaffoldJobFolder`, but for a job that was
+ *  never scored by the automated search: skips every field that only makes
+ *  sense for an algorithmic pick (skillMatch, score, graph matches, the
+ *  `cfg`/`result` search-run context) rather than faking them, and writes
+ *  an honest provenance note instead of `searchProvenanceMd()` — that
+ *  formatter would otherwise print "Titles searched: ...", "Sources: ..."
+ *  for a job that was never searched at all. */
+export async function scaffoldManualJobFolder(
+  input: ManualScaffoldInput,
+): Promise<ScaffoldResult> {
+  const date = input.date ?? new Date().toISOString().slice(0, 10);
+  const job: ScoredJob = {
+    source: "manual",
+    company: input.company,
+    role: input.role,
+    location: input.location ?? null,
+    remote: null,
+    salaryText: input.salaryText ?? null,
+    postedAt: null,
+    url: input.applyUrl ?? "",
+    applyUrl: input.applyUrl ?? null,
+    publisher: null,
+    descriptionSnippet: null,
+    contactEmail: null,
+    roleKey: input.role.toLowerCase(),
+    seenIn: ["manual"],
+    salaryLpa: null,
+    remoteKind: "unknown",
+    companyType: "unknown",
+    funding: { stage: null, note: null },
+    contactName: null,
+    flags: ["manual_entry"],
+    replyLikelihood: 0,
+    skillMatch: 0,
+    substringSkillMatch: 0,
+    graphMatch: null,
+    graphSkills: [],
+    graphFeatures: [],
+    score: 0,
+    group: "A",
+  };
+  const folder = folderName(job);
+  const provenance = [
+    `# How this job surfaced — ${job.company} / ${job.role}`,
+    ``,
+    `Added manually by the user on ${date} — not sourced via the automated`,
+    `search, so no score / reply-likelihood / skill-match math applies here.`,
+  ].join("\n");
+
+  const folderJob: FolderJob = {
+    ...job,
+    bundleDir: `applications/${date}/${folder}`,
+    jdText: input.jdText,
+    preparedAt: new Date().toISOString(),
+    searchProvenanceMd: provenance,
+  };
+  await persist(date, folder, "job.json", JSON.stringify(folderJob, null, 2));
+  await persist(date, folder, "search-provenance.md", provenance);
+
+  return { date, folder, files: ["job.json", "search-provenance.md"] };
+}
+
 /** Renders resume.md/.html/.pdf from the folder's job.json — first-time
  *  generation (job.json has no `archetype` yet) or a re-render that picks up
  *  master.json edits (archetype already chosen, kept stable). */
@@ -412,7 +560,7 @@ export async function regenerateResume(
   } catch {
     proof = EMPTY_PROOF;
   }
-  const archetype = job.archetype ?? suggestArchetype(await loadMaster(), jdText);
+  const archetype = await pickArchetype(job, jdText);
   const pdfOk = await writeResumeFiles(date, folder, job.company, jdText, archetype, proof);
   if (!job.archetype) {
     await persist(date, folder, "job.json", JSON.stringify({ ...job, archetype }, null, 2));
@@ -452,7 +600,12 @@ export async function regenerateProofBundle(
   if (!job) throw new Error(`no job.json for ${date}/${folder}`);
   const jdText = job.jdText ?? jdTextOf(job);
   const proof = await getProofForJd(userId, jdText);
-  await persist(date, folder, "proof-bundle.md", await proofBundleMd(userId, job, proof));
+  const archetype = await pickArchetype(job, jdText);
+  const model = await resumeModelFor(jdText, archetype, proof);
+  await persist(date, folder, "proof-bundle.md", await proofBundleMd(userId, job, proof, model));
+  if (!job.archetype) {
+    await persist(date, folder, "job.json", JSON.stringify({ ...job, archetype }, null, 2));
+  }
   return { skills: proof.skills.length, features: proof.features.length };
 }
 

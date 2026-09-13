@@ -41,6 +41,16 @@ export interface MasterProject {
    *  Falls back to `bullets` for any archetype not covered here. */
   bulletsByArchetype?: Partial<Record<ArchetypeKey, MasterBullet[]>>;
   tech: string[];
+  /** short, honest list of the real domain/skill phrases this project's own
+   *  work demonstrates — used to rank/select which projects lead a tailored
+   *  résumé for a given JD (see `render.ts`'s project scoring). Deliberately
+   *  hand-curated rather than derived from `tech`/bullet text: a bag-of-words
+   *  match against a JD's raw text is dominated by generic tech nouns
+   *  (Kubernetes, TypeScript, AWS...) shared by most projects, and by
+   *  coincidental hits (this candidate's own company/product name overlapping
+   *  a JD's employer name). A term here should be something this project's
+   *  bullets can actually back up — never add one just to chase a JD. */
+  matchTerms?: string[];
 }
 
 export interface MasterEducation {
@@ -99,6 +109,15 @@ export async function loadMaster(root = process.cwd()): Promise<MasterResume> {
   ) as MasterResume;
 }
 
+/** Whole-word match so a keyword can't hijack the pick via a substring
+ *  collision inside an unrelated word ("rag" inside "leveraging") or a
+ *  loose stem match against marketing boilerplate ("agent" inside "agents",
+ *  "agentic") rather than an actual job requirement. */
+function hasKeyword(lower: string, keyword: string): boolean {
+  const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`\\b${escaped}\\b`, "i").test(lower);
+}
+
 /** Pick the archetype whose lead keywords best cover the JD text. */
 export function suggestArchetype(
   master: MasterResume,
@@ -109,7 +128,7 @@ export function suggestArchetype(
   let bestScore = -1;
   for (const key of ARCHETYPES) {
     const a = master.archetypes[key];
-    const score = a.leadKeywords.filter((k) => lower.includes(k)).length;
+    const score = a.leadKeywords.filter((k) => hasKeyword(lower, k)).length;
     if (score > bestScore) {
       bestScore = score;
       best = key;

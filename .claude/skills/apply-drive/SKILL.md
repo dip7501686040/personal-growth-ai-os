@@ -40,6 +40,17 @@ Read `applications/<date>/<folder>/job.json` (`applyUrl` → else `url`) and
 proof-bundle.md → this job hasn't cleared `/apply-content-queue` yet; run that
 first, don't generate a bundle here.
 
+If `job.json`'s `flags` includes `truncated_jd_text` (or `jdText` just looks
+short/cut-off on read — apply-morning doesn't always catch it), fetch the
+real posting before generating anything: open `applyUrl`/`url` (or WebSearch
+`<company> careers <role>` if that's a walled aggregator link) and pull the
+full page text. Patch `job.json`'s `jdText` with it and push before the next
+step — a truncated JD silently starves archetype pick, skill/project
+hoisting, and proof matching of whatever requirement language got cut, so
+this needs to happen before the résumé (or proof-bundle) is generated, not
+after. This is exactly the fix that surfaced logbook-management as Vercel's
+best-matching project instead of missing it entirely.
+
 Generate the résumé now — almost every portal needs it uploaded up front, and
 this also covers the case where `resume/master.json` changed since this job
 was picked (e.g. the user just asked for a résumé edit): `regenerateResume`

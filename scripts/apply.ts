@@ -86,7 +86,15 @@ async function main() {
       source: (j.source as string) ?? undefined,
       contactName: (j.contactName as string) ?? undefined,
       contactChannel: j.contactEmail ? "email" : undefined,
-      remoteKind: (j.remoteKind as "remote" | "onsite_foreign" | "onsite_india") ?? undefined,
+      // the "remote_kind" DB enum has no "unknown" value (unlike the
+      // TypeScript RemoteKind type, which legitimately returns it for a job
+      // with no location and no explicit remote flag) — forwarding it
+      // crashes the insert, so leave the column null instead.
+      remoteKind: (["remote", "onsite_foreign", "onsite_india"] as const).includes(
+        j.remoteKind as never,
+      )
+        ? (j.remoteKind as "remote" | "onsite_foreign" | "onsite_india")
+        : undefined,
       salaryLpa: typeof j.salaryLpa === "number" ? j.salaryLpa : undefined,
       companyType: (j.companyType as
         | "product"

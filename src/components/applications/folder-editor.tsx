@@ -19,6 +19,106 @@ import {
 type FileEntry = { name: string; text: string | null };
 
 const EDITABLE = /\.(md|txt|json|html)$/i;
+const HAS_LINKS = /proof-bundle/i;
+
+type LinkRow = { title: string; url: string };
+type LinkGroup = { heading: string; links: LinkRow[] };
+
+/** Parses "- **title**: url" (and tolerates the older "**title** (x) — url"
+ *  shape) out of a markdown file, grouped under each `##`/`###` heading it
+ *  falls under — so "Links in this résumé" and "Additional matched context"
+ *  stay clearly separated instead of one flat list. */
+function parseLinkGroups(text: string): LinkGroup[] {
+  const groups: LinkGroup[] = [];
+  let current: LinkGroup = { heading: "Links", links: [] };
+  for (const line of text.split("\n")) {
+    const heading = line.match(/^##\s+(.+)$/);
+    if (heading) {
+      if (current.links.length) groups.push(current);
+      current = { heading: heading[1].trim(), links: [] };
+      continue;
+    }
+    const urlMatch = line.match(/(https?:\/\/[^\s)]+)/);
+    if (!urlMatch) continue;
+    const boldMatch = line.match(/\*\*(.+?)\*\*/);
+    const title =
+      boldMatch?.[1] ??
+      line.replace(urlMatch[0], "").replace(/^[-*\s]+|[-—:\s]+$/g, "").trim() ??
+      urlMatch[0];
+    current.links.push({ title, url: urlMatch[1] });
+  }
+  if (current.links.length) groups.push(current);
+  return groups;
+}
+
+function CopyButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="shrink-0 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(url);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        } catch {
+          // clipboard unavailable — link is still usable via the <a>
+        }
+      }}
+    >
+      {copied ? "Copied" : "Copy"}
+    </button>
+  );
+}
+
+function LinkGroupList({ links }: { links: LinkRow[] }) {
+  return (
+    <ul className="flex flex-col divide-y">
+      {links.map((l, i) => (
+        <li key={i} className="flex items-center gap-2 py-1.5 text-xs">
+          <a
+            href={l.url}
+            target="_blank"
+            rel="noreferrer"
+            title={l.url}
+            className="min-w-0 flex-1 truncate text-blue-600 underline underline-offset-2 hover:text-blue-700"
+          >
+            {l.title}
+          </a>
+          <CopyButton url={l.url} />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** The proof-bundle Links panel: each `##` section (e.g. "Links in this
+ *  résumé" vs "Additional matched context") renders as its own clearly
+ *  labeled, collapsible group instead of one undifferentiated list — the
+ *  résumé's own links are what a recruiter actually sees, so that group
+ *  opens expanded; the broader graph-context group (usually much longer)
+ *  starts collapsed. */
+function ProofLinks({ text }: { text: string }) {
+  const groups = useMemo(() => parseLinkGroups(text), [text]);
+  const totalLinks = groups.reduce((n, g) => n + g.links.length, 0);
+  if (totalLinks === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border p-2">
+      {groups.map((g, i) => (
+        <details key={i} open={i === 0}>
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+            {g.heading} ({g.links.length})
+          </summary>
+          <div className="mt-1">
+            <LinkGroupList links={g.links} />
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
 
 export function FolderEditor({
   date,
@@ -148,6 +248,7 @@ export function FolderEditor({
             <p className="text-sm text-muted-foreground">No files.</p>
           ) : isEditable ? (
             <div className="flex flex-col gap-2">
+              {HAS_LINKS.test(active) && <ProofLinks text={draft} />}
               <Textarea
                 value={draft}
                 onChange={(e) =>

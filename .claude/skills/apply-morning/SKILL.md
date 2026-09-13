@@ -57,6 +57,20 @@ apply-drive means discovering the dead end only after everything else is
 already prepped. If nothing turns up, leave it null and say so in the step 6
 report — don't guess a URL.
 
+- **`truncated_jd_text`** — the aggregator's `descriptionSnippet` looks cut
+  off (too short, or doesn't end on real punctuation). Everything downstream
+  tailors off this text — archetype pick, skill/project hoisting, proof
+  matching — so a truncated snippet silently starves all of it of whatever
+  requirement language got cut (this happened for real: a snippet cut off
+  right before the paragraph naming SCIM/RBAC/SAML/OAuth2 produced a résumé
+  quietly tailored around their absence). If you're already resolving this
+  pick's real apply link (above) or it's easy to open the real posting,
+  capture the *full* page text and set it as `descriptionSnippet` in
+  `/tmp/jobs.json` before scaffolding — same reasoning as the apply-link
+  fix, cheapest to do now. If not, scaffold anyway and just flag it in the
+  step 6 report so `/apply-drive` knows to fetch the real page before
+  generating that job's résumé.
+
 ## 3. Scaffold each folder (deterministic — job.json + search-provenance.md)
 
 ```
