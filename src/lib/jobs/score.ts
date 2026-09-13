@@ -41,9 +41,13 @@ const US_ONLY_REMOTE = /\bremote\s*\(\s*us\)|\b(us|usa)\s+only\b/i;
 
 /** Sources whose own "Apply" always walls into a signup/login page, not the
  *  real company form — found via real apply-drive attempts (Himalayas
- *  routes every job to /signup/talent regardless of company). Resolve the
+ *  routes every job to /signup/talent regardless of company; Jobicy's own
+ *  "Apply Now" fires a `RegistrationGateOpened` tracking event and opens a
+ *  registration modal instead of the employer's form — confirmed twice,
+ *  ClickUp and Grafana Labs, both times the real posting was findable on
+ *  the employer's own Greenhouse/Ashby board via a web search). Resolve the
  *  real link at scaffold time (apply-morning), not discovered later. */
-const WALLED_SOURCES = new Set(["himalayas"]);
+const WALLED_SOURCES = new Set(["himalayas", "jobicy"]);
 
 function daysAgo(iso: string | null): number | null {
   if (!iso) return null;

@@ -39,9 +39,11 @@ Ask which to prep — the user names indices, or says "prep the top N of Group A
 
 Check each pick's `flags` and `applyUrl` in `/tmp/jobs.json`:
 
-- **`verify_apply_link`** (currently: every Himalayas job) — Himalayas' own
-  "Apply now" always routes to *its* signup wall (`/signup/talent`), never
-  the company's real form, regardless of company. Don't scaffold that URL.
+- **`verify_apply_link`** (currently: every Himalayas or Jobicy job) —
+  Himalayas' own "Apply now" always routes to *its* signup wall
+  (`/signup/talent`); Jobicy's "Apply Now" fires a `RegistrationGateOpened`
+  tracking event and opens Jobicy's own registration modal. Neither ever
+  reaches the company's real form. Don't scaffold that URL.
 - **`applyUrl` is null/missing and the source isn't a direct board** (e.g. an
   Adzuna redirect that turns out geo-blocked) — same problem, different
   shape.
