@@ -151,9 +151,18 @@ async function resumeModelFor(jdText: string, archetype: string, proof: JdProof)
   });
 }
 
+/** The name a résumé should show up as once it's uploaded to a portal or
+ *  attached to an email — that's what the recruiter/ATS file list shows, not
+ *  the internal "resume.pdf" convention every tool in this codebase keys off. */
+export function friendlyResumeFilename(company: string): string {
+  const clean = company.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  return `Dipankar_Saha_${clean}.pdf`;
+}
+
 async function writeResumeFiles(
   date: string,
   folder: string,
+  company: string,
   jdText: string,
   archetype: string,
   proof: JdProof,
@@ -165,7 +174,15 @@ async function writeResumeFiles(
     resolve(localPath(date, folder, "resume.html")),
     resolve(localPath(date, folder, "resume.pdf")),
   );
-  if (pdfOk) await persistExistingLocal(date, folder, "resume.pdf");
+  if (pdfOk) {
+    await persistExistingLocal(date, folder, "resume.pdf");
+    const friendly = friendlyResumeFilename(company);
+    writeFileSync(
+      localPath(date, folder, friendly),
+      readFileSync(localPath(date, folder, "resume.pdf")),
+    );
+    await persistExistingLocal(date, folder, friendly);
+  }
   return pdfOk;
 }
 
@@ -402,7 +419,7 @@ export async function regenerateResume(
     proof = EMPTY_PROOF;
   }
   const archetype = job.archetype ?? suggestArchetype(await loadMaster(), jdText);
-  const pdfOk = await writeResumeFiles(date, folder, jdText, archetype, proof);
+  const pdfOk = await writeResumeFiles(date, folder, job.company, jdText, archetype, proof);
   if (!job.archetype) {
     await persist(date, folder, "job.json", JSON.stringify({ ...job, archetype }, null, 2));
   }

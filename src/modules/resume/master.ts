@@ -19,6 +19,9 @@ export interface MasterProject {
   repoUrl2?: string | null;
   oneLiner: string;
   bullets: string[];
+  /** archetype-flavored bullet set — same underlying facts, different emphasis/order.
+   *  Falls back to `bullets` for any archetype not covered here. */
+  bulletsByArchetype?: Partial<Record<ArchetypeKey, string[]>>;
   tech: string[];
 }
 
@@ -39,7 +42,8 @@ export interface MasterArchetype {
 
 export interface MasterResume {
   name: string;
-  title: string;
+  /** per-archetype title line, keyed like `summary` (plus "default"). */
+  title: Record<string, string>;
   location: string;
   email: string;
   phone: string;

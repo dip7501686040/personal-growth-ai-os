@@ -53,6 +53,11 @@ const userId = await getOwnerUserId();
 await regenerateResume(userId, "<date>", "<folder>");
 ```
 
+This also writes a friendly-named copy — `Dipankar_Saha_<Company>.pdf` in the
+same folder — for uploading instead of the internal `resume.pdf` (see step 5):
+recruiters and ATS file lists show whatever name the uploaded file actually
+had, and "resume.pdf" reads as generic/unlabeled next to other candidates'.
+
 Don't generate `why-fit.md`, `cover-letter.md`, or the pitch files yet — wait
 until step 5 shows the form actually asks for one.
 
@@ -90,7 +95,7 @@ From the snapshot, for each field:
 | field | value |
 |---|---|
 | name / email / phone / location / links / notice / years | from `pnpm apply-answers "<the field's visible label>"` |
-| résumé upload | `browser_file_upload` → absolute path to `applications/<date>/<folder>/resume.pdf` (already generated in step 1) |
+| résumé upload | `browser_file_upload` → absolute path to `applications/<date>/<folder>/Dipankar_Saha_<Company>.pdf` (already generated in step 1) |
 | "why do you want to work here" / "anything else" free-text | see below — generate `why-fit.md` the first time this shows up, then paste it verbatim |
 | cover-letter field or upload | see below — generate `cover-letter.md` the first time this shows up |
 | work-authorization / sponsorship / "how did you hear" `<select>` | the option matching `apply-answers` `value` |
@@ -146,7 +151,7 @@ bounced with validation errors, report them and go back to step 5.
   - submitted: <ISO>
   - portal: <final URL>
   - via: apply-drive
-  - resume: resume.pdf
+  - resume: Dipankar_Saha_<Company>.pdf
   - screenshots: apply-<ts>.png, apply-confirm-<ts>.png
 
   ## Auto-filled

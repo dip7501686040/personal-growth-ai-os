@@ -26,7 +26,7 @@ import {
   sendDraft,
   tokenExists,
 } from "@/lib/outreach/gmail";
-import { writeFolderFile } from "@/modules/applications/generate";
+import { friendlyResumeFilename, writeFolderFile } from "@/modules/applications/generate";
 import {
   applicationsOverview,
   countApplicationsByStatus,
@@ -117,8 +117,12 @@ async function emailCmd() {
       ? `Application — ${job.role}`
       : `${job.role} at ${job.company} — quick note`);
 
-  const attachments = existsSync(join(dir, "resume.pdf"))
-    ? [{ path: join(process.cwd(), dir, "resume.pdf"), contentType: "application/pdf" }]
+  // Prefer the friendly-named copy (what the recruiter sees in their file
+  // list) — falls back to resume.pdf for a folder scaffolded before it existed.
+  const friendlyResume = friendlyResumeFilename(job.company);
+  const resumeFile = existsSync(join(dir, friendlyResume)) ? friendlyResume : "resume.pdf";
+  const attachments = existsSync(join(dir, resumeFile))
+    ? [{ path: join(process.cwd(), dir, resumeFile), contentType: "application/pdf" }]
     : [];
 
   const { id } = await createDraft({ to, subject, body, attachments });

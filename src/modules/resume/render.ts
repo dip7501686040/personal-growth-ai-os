@@ -82,20 +82,23 @@ export function buildResumeModel(
       : e.bullets,
   }));
 
-  // projects — archetype order, JD-matched projects hoisted, top 4
+  // projects — archetype order, JD-matched projects hoisted
   const bySlug = new Map(master.projects.map((p) => [p.slug, p]));
   const ordered = a.projectOrder
     .map((slug) => bySlug.get(slug))
     .filter((p): p is (typeof master.projects)[number] => !!p);
-  const projects = [
-    ...ordered.filter((p) => has(jdProjects, p.name)),
-    ...ordered.filter((p) => !has(jdProjects, p.name)),
-  ]
-    .slice(0, 4)
+  const matched = ordered.filter((p) => has(jdProjects, p.name));
+  // flex the count with match strength: nothing matched (no JD, or a JD that
+  // matched none of these projects) → keep it lean at 3 rather than padding
+  // with irrelevant work; a JD that strongly matches most of the catalog →
+  // show 5 instead of dropping a genuinely relevant one to a fixed cap.
+  const count = matched.length === 0 ? 3 : matched.length >= 4 ? 5 : 4;
+  const projects = [...matched, ...ordered.filter((p) => !has(jdProjects, p.name))]
+    .slice(0, count)
     .map((p) => ({
       name: p.name,
       oneLiner: p.oneLiner,
-      bullets: p.bullets,
+      bullets: p.bulletsByArchetype?.[archetype] ?? p.bullets,
       tech: hoist(p.tech, jdSkills),
       repoUrl: p.repoUrl,
       repoUrl2: p.repoUrl2,
@@ -111,7 +114,7 @@ export function buildResumeModel(
 
   return {
     name: master.name,
-    title: master.title,
+    title: master.title[a.summaryKey] ?? master.title.default,
     contactLine,
     summary: master.summary[a.summaryKey] ?? master.summary.default,
     skills,
