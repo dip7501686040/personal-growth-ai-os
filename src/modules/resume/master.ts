@@ -30,6 +30,11 @@ export interface MasterProject {
   repoUrl: string | null;
   /** second repo, for a project entry that merges two repos (e.g. infra + GitOps). */
   repoUrl2?: string | null;
+  /** an external write-up (Notion, PDF, etc.) for a project with no synced
+   *  portfolio page — the Tech-line equivalent of a portfolio link for a
+   *  project that can't get one. Labeled `docLabel`, default "Case study". */
+  docUrl?: string | null;
+  docLabel?: string;
   oneLiner: string;
   bullets: MasterBullet[];
   /** archetype-flavored bullet set — same underlying facts, different emphasis/order.

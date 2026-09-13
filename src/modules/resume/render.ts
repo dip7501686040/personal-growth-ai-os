@@ -36,6 +36,8 @@ export interface ResumeModel {
     tech: string[];
     repoUrl: string | null;
     repoUrl2?: string | null;
+    docUrl?: string | null;
+    docLabel?: string;
   }[];
   education: MasterResume["education"];
   archetypeLabel: string;
@@ -54,12 +56,20 @@ export interface Link {
   url: string;
 }
 
-/** One or two repo links for a project, labeled to distinguish them when a
- *  project entry merges two repos (Platform Infra/GitOps). */
-function repoLinks(p: { repoUrl: string | null; repoUrl2?: string | null }): Link[] {
+/** The Tech-line's link set for a project: one or two repo links (labeled to
+ *  distinguish them when a project entry merges two repos, e.g. Platform
+ *  Infra/GitOps), plus an external write-up for a project with no synced
+ *  portfolio page to link bullets into (e.g. a Notion case study). */
+function repoLinks(p: {
+  repoUrl: string | null;
+  repoUrl2?: string | null;
+  docUrl?: string | null;
+  docLabel?: string;
+}): Link[] {
   const links: Link[] = [];
   if (p.repoUrl) links.push({ label: p.repoUrl2 ? "Infra repo" : "GitHub", url: p.repoUrl });
   if (p.repoUrl2) links.push({ label: "GitOps repo", url: p.repoUrl2 });
+  if (p.docUrl) links.push({ label: p.docLabel ?? "Case study", url: p.docUrl });
   return links;
 }
 
@@ -120,11 +130,20 @@ export function buildResumeModel(
       oneLiner: p.oneLiner,
       bullets: (p.bulletsByArchetype?.[archetype] ?? p.bullets).map((b) => ({
         text: b.text,
-        link: b.link ? { label: "proof", url: `${portfolioBase}/projects/${b.link}` } : null,
+        link: b.link
+          ? {
+              label: "proof",
+              // an absolute URL (e.g. an external doc) is used as-is; a bare
+              // "<slug>#<feature>" is a portfolio card, resolved against the base.
+              url: /^https?:\/\//.test(b.link) ? b.link : `${portfolioBase}/projects/${b.link}`,
+            }
+          : null,
       })),
       tech: hoist(p.tech, jdSkills),
       repoUrl: p.repoUrl,
       repoUrl2: p.repoUrl2,
+      docUrl: p.docUrl,
+      docLabel: p.docLabel,
     }));
 
   const contactLine = [
