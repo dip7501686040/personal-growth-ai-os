@@ -34,7 +34,10 @@ const B_FLAGS = new Set([
  *  match — flag it before scaffolding a folder for it. */
 const NO_SPONSORSHIP_PHRASES =
   /\b(no\s+visa\s+sponsorship|not\s+sponsoring\s+visas?|unable\s+to\s+sponsor|will\s+not\s+sponsor|does\s+not\s+sponsor|without\s+sponsorship|us\s+citizens?\s+only)\b/i;
-const US_ONLY_REMOTE = /\bremote\s*\(\s*us\)/i;
+// "Remote (US)" and "(USA Only, ...)" are both real title phrasings this
+// missed on 2026-09-13 (Close: "Senior Backend Engineer - CRM (USA Only,
+// 100% Remote)" scored 0.82 clean into Group A, no flag at all).
+const US_ONLY_REMOTE = /\bremote\s*\(\s*us\)|\b(us|usa)\s+only\b/i;
 
 /** Sources whose own "Apply" always walls into a signup/login page, not the
  *  real company form — found via real apply-drive attempts (Himalayas
@@ -140,6 +143,15 @@ export function scoreJob(
       flags.push(`hard_skill_gap:${gap}`);
       bump(-0.15);
     }
+  }
+  // Bare "Go" isn't in hardSkillGaps — too common an English word ("go
+  // beyond", "goals") for a blanket word-boundary match. These narrow
+  // phrases are how a real Go-backend JD actually says it (Spacelift:
+  // "On the backend we're using 100% Go" — surfaced clean two days
+  // running), so they're safe without the false-positive risk.
+  if (/\b100%\s*go\b|\bwritten\s+in\s+go\b|\bgo\s+backend\b/i.test(hay)) {
+    flags.push("hard_skill_gap:Go");
+    bump(-0.15);
   }
 
   const replyLikelihood = Math.max(0, Math.min(1, reply));

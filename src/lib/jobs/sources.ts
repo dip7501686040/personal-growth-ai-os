@@ -39,11 +39,22 @@ const stripHtml = (s: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+// Seniority/scope modifiers that appear in almost every professional job
+// title regardless of domain — "senior" alone let "Senior People & Talent
+// Operations Partner" pass as a match on cfg.titles' "Senior Backend
+// Engineer" (real occurrence: 2026-09-13 search, a non-engineering HR role
+// scored into Group A). Only a domain word (engineer, backend, devops, ...)
+// should count as a real match.
+const GENERIC_TITLE_WORDS = new Set(["senior", "full"]);
+
 const titleMatches = (title: string, cfg: JobSearchConfig) => {
   const t = title.toLowerCase();
   if (cfg.excludeTitles.some((x) => t.includes(x.toLowerCase()))) return false;
   return cfg.titles.some((wanted) => {
-    const words = wanted.toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+    const words = wanted
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 2 && !GENERIC_TITLE_WORDS.has(w));
     return words.some((w) => t.includes(w));
   });
 };
