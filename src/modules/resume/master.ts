@@ -11,6 +11,19 @@ export interface MasterExperience {
   tech: string[];
 }
 
+export interface MasterBullet {
+  text: string;
+  /** "<project-slug>#<feature-slug>" of the real, synced portfolio card that
+   *  backs this specific claim — verified against the actual projectFeatures
+   *  table, not guessed from the bullet text. Omit when no shipped feature
+   *  backs it (e.g. a project that was never synced to the portfolio) —
+   *  never invent one just to fill the field. The project-slug prefix lets a
+   *  bullet point at a different sub-project than the résumé entry's own
+   *  `slug` (needed for the merged Platform Infra/GitOps entry, whose
+   *  bullets are drawn from two separately-synced portfolio projects). */
+  link?: string;
+}
+
 export interface MasterProject {
   name: string;
   slug: string;
@@ -18,10 +31,10 @@ export interface MasterProject {
   /** second repo, for a project entry that merges two repos (e.g. infra + GitOps). */
   repoUrl2?: string | null;
   oneLiner: string;
-  bullets: string[];
+  bullets: MasterBullet[];
   /** archetype-flavored bullet set — same underlying facts, different emphasis/order.
    *  Falls back to `bullets` for any archetype not covered here. */
-  bulletsByArchetype?: Partial<Record<ArchetypeKey, string[]>>;
+  bulletsByArchetype?: Partial<Record<ArchetypeKey, MasterBullet[]>>;
   tech: string[];
 }
 
@@ -49,6 +62,11 @@ export interface MasterResume {
   phone: string;
   github: string;
   linkedin: string;
+  /** base URL for resolving each bullet's `link` ("<slug>#<feature>") into a
+   *  full portfolio-card URL — so a recruiter who never sees a cover letter
+   *  or proof-bundle (most portals don't ask) still lands on real proof for
+   *  the specific claim, not just the résumé's own words. */
+  portfolioUrl: string;
   yearsExperience: number;
   summary: Record<string, string>;
   skills: { label: string; items: string[] }[];

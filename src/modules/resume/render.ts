@@ -27,7 +27,10 @@ export interface ResumeModel {
   projects: {
     name: string;
     oneLiner: string;
-    bullets: string[];
+    /** each bullet with its resolved portfolio-card URL (null when no real
+     *  shipped feature backs it) — so the claim right next to it is
+     *  verifiable, not just asserted. */
+    bullets: { text: string; url: string | null }[];
     tech: string[];
     repoUrl: string | null;
     repoUrl2?: string | null;
@@ -93,12 +96,16 @@ export function buildResumeModel(
   // with irrelevant work; a JD that strongly matches most of the catalog →
   // show 5 instead of dropping a genuinely relevant one to a fixed cap.
   const count = matched.length === 0 ? 3 : matched.length >= 4 ? 5 : 4;
+  const portfolioBase = master.portfolioUrl.replace(/\/$/, "");
   const projects = [...matched, ...ordered.filter((p) => !has(jdProjects, p.name))]
     .slice(0, count)
     .map((p) => ({
       name: p.name,
       oneLiner: p.oneLiner,
-      bullets: p.bulletsByArchetype?.[archetype] ?? p.bullets,
+      bullets: (p.bulletsByArchetype?.[archetype] ?? p.bullets).map((b) => ({
+        text: b.text,
+        url: b.link ? `${portfolioBase}/projects/${b.link}` : null,
+      })),
       tech: hoist(p.tech, jdSkills),
       repoUrl: p.repoUrl,
       repoUrl2: p.repoUrl2,
@@ -146,7 +153,7 @@ export function toMarkdown(m: ResumeModel): string {
     L.push(``);
     L.push(`### ${p.name}`);
     L.push(p.oneLiner);
-    for (const b of p.bullets) L.push(`- ${b}`);
+    for (const b of p.bullets) L.push(`- ${b.text}${b.url ? `  — ${b.url}` : ""}`);
     const links = repoLinks(p);
     L.push(`*Tech: ${p.tech.join(", ")}*${links ? `  ·  ${links}` : ""}`);
   }
@@ -187,7 +194,14 @@ export function toHtml(m: ResumeModel): string {
   for (const pr of m.projects) {
     parts.push(`<h3>${esc(pr.name)}</h3>`);
     parts.push(`<p>${esc(pr.oneLiner)}</p>`);
-    parts.push(`<ul>${pr.bullets.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>`);
+    parts.push(
+      `<ul>${pr.bullets
+        .map(
+          (b) =>
+            `<li>${esc(b.text)}${b.url ? ` — <a href="${esc(b.url)}">${esc(b.url)}</a>` : ""}</li>`,
+        )
+        .join("")}</ul>`,
+    );
     const links = repoLinks(pr);
     parts.push(
       `<p class="tech">Tech: ${esc(pr.tech.join(", "))}${links ? `  ·  ${esc(links)}` : ""}</p>`,
@@ -290,7 +304,7 @@ export async function toDocxBuffer(m: ResumeModel): Promise<Buffer> {
   for (const pr of m.projects) {
     children.push(new Paragraph({ heading: HeadingLevel.HEADING_3, text: pr.name }));
     children.push(p(pr.oneLiner));
-    for (const b of pr.bullets) children.push(bullet(b));
+    for (const b of pr.bullets) children.push(bullet(`${b.text}${b.url ? `  — ${b.url}` : ""}`));
     const links = repoLinks(pr);
     children.push(
       p(`Tech: ${pr.tech.join(", ")}${links ? `  ·  ${links}` : ""}`, {
