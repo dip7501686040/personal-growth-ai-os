@@ -135,7 +135,7 @@ async function emailCmd() {
 
   console.log(
     `draft created — ${id}\n` +
-      `  to: ${to}\n  subject: ${subject}\n  attach: ${attachments.length ? "resume.pdf" : "(none)"}\n` +
+      `  to: ${to}\n  subject: ${subject}\n  attach: ${attachments.length ? resumeFile : "(none)"}\n` +
       `  review: https://mail.google.com/mail/u/0/#drafts\n` +
       `  send:   pnpm outreach send ${id}`,
   );

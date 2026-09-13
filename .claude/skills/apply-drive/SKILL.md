@@ -7,8 +7,8 @@ description: Claude-driven application form-fill. Walks any portal's form field 
 
 Tier 2 of the apply automation. `pnpm apply-fill` is faster for Greenhouse /
 Lever / Ashby — use this for every other portal, or when apply-fill left too
-many fields for the user. `apply-fill` throws if `resume.pdf` is missing, so
-run step 1's `regenerateResume` call (and, if that portal wants one,
+many fields for the user. `apply-fill` throws if the résumé PDF is missing,
+so run step 1's `regenerateResume` call (and, if that portal wants one,
 `ensureWhyFitStub`/write `cover-letter.md`) before invoking it too — it
 doesn't generate those itself.
 

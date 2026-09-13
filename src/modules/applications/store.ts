@@ -2,7 +2,7 @@
  * Cloudflare R2 (S3-compatible) object store — the source of truth for the
  * per-job application folders. Key scheme:
  *
- *     <date>/<company>__<role>/<file>        e.g. 2026-09-09/quill__fullstack-swe/resume.pdf
+ *     <date>/<company>__<role>/<file>        e.g. 2026-09-09/quill__fullstack-swe/Dipankar_Saha_Quill.pdf
  *
  * The bucket itself (default name `applications`) is the applications root, so
  * keys carry no extra prefix. Local `applications/` is a working cache synced

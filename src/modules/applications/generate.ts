@@ -152,8 +152,9 @@ async function resumeModelFor(jdText: string, archetype: string, proof: JdProof)
 }
 
 /** The name a résumé should show up as once it's uploaded to a portal or
- *  attached to an email — that's what the recruiter/ATS file list shows, not
- *  the internal "resume.pdf" convention every tool in this codebase keys off. */
+ *  attached to an email — that's what the recruiter/ATS file list shows, and
+ *  the only PDF a folder ever has (no separate internal "resume.pdf" copy —
+ *  a folder used to carry both, which was just two copies of the same file). */
 export function friendlyResumeFilename(company: string): string {
   const clean = company.replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   return `Dipankar_Saha_${clean}.pdf`;
@@ -170,19 +171,12 @@ async function writeResumeFiles(
   const model = await resumeModelFor(jdText, archetype, proof);
   await persist(date, folder, "resume.md", toMarkdown(model));
   await persist(date, folder, "resume.html", toHtml(model));
+  const pdfName = friendlyResumeFilename(company);
   const pdfOk = htmlToPdf(
     resolve(localPath(date, folder, "resume.html")),
-    resolve(localPath(date, folder, "resume.pdf")),
+    resolve(localPath(date, folder, pdfName)),
   );
-  if (pdfOk) {
-    await persistExistingLocal(date, folder, "resume.pdf");
-    const friendly = friendlyResumeFilename(company);
-    writeFileSync(
-      localPath(date, folder, friendly),
-      readFileSync(localPath(date, folder, "resume.pdf")),
-    );
-    await persistExistingLocal(date, folder, friendly);
-  }
+  if (pdfOk) await persistExistingLocal(date, folder, pdfName);
   return pdfOk;
 }
 
@@ -426,19 +420,22 @@ export async function regenerateResume(
   return { pdfOk };
 }
 
-/** Re-print resume.pdf from resume.html (which may have been hand-edited on R2). */
+/** Re-print the résumé PDF from resume.html (which may have been hand-edited on R2). */
 export async function regeneratePdf(
   date: string,
   folder: string,
 ): Promise<{ pdfOk: boolean }> {
+  const job = await readFolderJson<FolderJob>(date, folder, "job.json");
+  if (!job) throw new Error(`no job.json for ${date}/${folder}`);
   const html = await readFolderFile(date, folder, "resume.html");
   if (html == null) throw new Error(`no resume.html for ${date}/${folder}`);
   await persist(date, folder, "resume.html", html); // mirror R2 → local before Chrome
+  const pdfName = friendlyResumeFilename(job.company);
   const pdfOk = htmlToPdf(
     resolve(localPath(date, folder, "resume.html")),
-    resolve(localPath(date, folder, "resume.pdf")),
+    resolve(localPath(date, folder, pdfName)),
   );
-  if (pdfOk) await persistExistingLocal(date, folder, "resume.pdf");
+  if (pdfOk) await persistExistingLocal(date, folder, pdfName);
   return { pdfOk };
 }
 

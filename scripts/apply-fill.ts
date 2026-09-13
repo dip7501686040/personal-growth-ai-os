@@ -113,7 +113,7 @@ async function main() {
   const resumeFile = existsSync(join(dir, friendlyResume)) ? friendlyResume : "resume.pdf";
   const resumePath = join(process.cwd(), dir, resumeFile);
   if (!existsSync(resumePath)) {
-    throw new Error("resume.pdf missing — regenerate the folder first.");
+    throw new Error(`résumé PDF missing (${resumeFile}) — regenerate the folder first.`);
   }
   const coverLetterPath = existsSync(join(dir, "cover-letter.md"))
     ? join(process.cwd(), dir, "cover-letter.md")

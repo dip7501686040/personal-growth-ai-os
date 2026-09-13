@@ -130,7 +130,7 @@ export async function regenPdfAction(
     const { pdfOk } = await regeneratePdf(parsed.data.date, parsed.data.folder);
     revalidate(parsed.data.date, parsed.data.folder);
     return pdfOk
-      ? { ok: true, message: "resume.pdf re-printed from resume.html." }
+      ? { ok: true, message: "Résumé PDF re-printed from resume.html." }
       : err("No Chrome/Chromium found to print the PDF.");
   } catch (e) {
     return err(e instanceof Error ? e.message : "Print failed.");

@@ -176,7 +176,10 @@ async function uploadResume(
     await resumeEl.setInputFiles(resumePath).catch(() => {});
     report.filled.push({ label: "resume upload", value: basename(resumePath) });
   } else {
-    report.needsYou.push({ label: "resume upload", note: "attach resume.pdf manually" });
+    report.needsYou.push({
+      label: "resume upload",
+      note: `attach ${basename(resumePath)} manually`,
+    });
   }
   if (coverEl && coverLetterPath) {
     await coverEl.setInputFiles(coverLetterPath).catch(() => {});
