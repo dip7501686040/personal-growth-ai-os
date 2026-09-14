@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { MenuIcon, XIcon } from "lucide-react";
+import { Loader2Icon, MenuIcon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -40,10 +40,11 @@ function UserMenu({ email, isDemo }: { email: string; isDemo: boolean }) {
           type="button"
           variant="outline"
           size="sm"
-          className="w-full"
+          className="mb-1 w-full"
           disabled={pending}
           onClick={handleReset}
         >
+          {pending && <Loader2Icon className="size-3.5 animate-spin" />}
           {pending ? "Resetting…" : "Reset demo data"}
         </Button>
       )}
