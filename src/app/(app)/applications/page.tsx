@@ -9,7 +9,9 @@ import {
   queueCounts,
 } from "@/modules/applications/service";
 import {
+  demoFolderName,
   folderName,
+  isDemoFolder,
   listDates,
   listJobFolders,
 } from "@/modules/applications/generate";
@@ -92,14 +94,27 @@ export default async function ApplicationsPage() {
   const gmailReady = !isDemo && tokenExists();
 
   const statusByFolder = new Map(
-    apps.map((a) => [folderName({ company: a.company, role: a.role }), a.status]),
+    apps.map((a) => [
+      isDemo
+        ? demoFolderName({ company: a.company, role: a.role })
+        : folderName({ company: a.company, role: a.role }),
+      a.status,
+    ]),
   );
   // The applications/ tree (résumés, proof bundles) is one shared R2/local
-  // prefix with no per-user partitioning — real company/role names, not
-  // demo data, so the demo account never lists or opens it.
-  const folderSections = isDemo
-    ? []
-    : await Promise.all(dates.map(async (d) => ({ date: d, folders: await listJobFolders(d) })));
+  // prefix with no per-user partitioning — real company/role folders live at
+  // the bucket root. The demo account only ever sees the reserved
+  // "demo-"-prefixed sample folders seeded by resetDemoData(); the real
+  // owner never sees those. See DEMO_FOLDER_PREFIX in modules/applications/generate.ts.
+  const folderSections = (
+    await Promise.all(
+      dates.map(async (d) => {
+        const all = await listJobFolders(d);
+        const folders = all.filter((f) => isDemoFolder(f) === isDemo);
+        return { date: d, folders };
+      }),
+    )
+  ).filter((s) => s.folders.length > 0);
 
   const selectionRows: SelectionRow[] = apps.map((a) => {
     const parts = a.bundleDir?.replace(/^applications[/\\]/, "").split("/") ?? [];
@@ -200,19 +215,15 @@ export default async function ApplicationsPage() {
         <div>
           <h3 className="text-sm font-semibold">Folders</h3>
           <p className="text-xs text-muted-foreground">
-            The per-job bundles.{" "}
+            {isDemo
+              ? "Sample bundles for this demo account — read-only."
+              : "The per-job bundles."}{" "}
             {isR2Configured()
               ? "Source of truth: the R2 applications bucket."
               : "R2 not configured — showing the local cache."}
           </p>
         </div>
-        {isDemo && (
-          <p className="text-sm text-muted-foreground">
-            Not available in the demo — this is shared file storage, not
-            demo-only data.
-          </p>
-        )}
-        {!isDemo && folderSections.length === 0 && (
+        {folderSections.length === 0 && (
           <p className="text-sm text-muted-foreground">No folders yet.</p>
         )}
         {folderSections.map(({ date, folders }) => (

@@ -4,7 +4,9 @@ import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { listApplications } from "@/modules/applications/service";
 import {
+  demoFolderName,
   folderName,
+  isDemoFolder,
   listFolderFiles,
   readFolderFile,
 } from "@/modules/applications/generate";
@@ -28,9 +30,11 @@ export default async function ApplicationFolderPage({
 }) {
   const { date, folder } = await params;
   const userId = await requireUserId();
+  const isDemo = await isDemoUserId(userId);
   // The applications/ tree is one shared R2/local prefix, not per-user — the
-  // demo account must never see or edit real résumé/proof-bundle content.
-  if (await isDemoUserId(userId)) notFound();
+  // demo account may only see the reserved "demo-"-prefixed sample folders,
+  // and the real owner may never see those. See DEMO_FOLDER_PREFIX.
+  if (isDemo !== isDemoFolder(folder)) notFound();
 
   const names = await listFolderFiles(date, folder);
   if (names.length === 0) notFound();
@@ -44,7 +48,10 @@ export default async function ApplicationFolderPage({
 
   const apps = await listApplications(userId);
   const match = apps.find(
-    (a) => folderName({ company: a.company, role: a.role }) === folder,
+    (a) =>
+      (isDemo
+        ? demoFolderName({ company: a.company, role: a.role })
+        : folderName({ company: a.company, role: a.role })) === folder,
   );
 
   return (

@@ -62,6 +62,24 @@ export function folderName(job: Pick<ScoredJob, "company" | "role">): string {
   return `${slug(job.company)}__${slug(job.role)}`;
 }
 
+/** The `applications/` tree is one shared R2 bucket with no per-user
+ *  partitioning (see the header comment in `store.ts`) — real company/role
+ *  folders live at the bucket root. Demo-only sample folders are isolated by
+ *  a reserved name prefix instead: every folder the demo account can see or
+ *  open starts with this, and every folder the real owner can see or open
+ *  does not. Read-gated in the applications page/detail page/file route;
+ *  writes stay fully blocked for the demo account regardless (see
+ *  `blockedForDemo` in `applications/actions.ts`). */
+export const DEMO_FOLDER_PREFIX = "demo-";
+
+export function demoFolderName(job: Pick<ScoredJob, "company" | "role">): string {
+  return `${DEMO_FOLDER_PREFIX}${folderName(job)}`;
+}
+
+export function isDemoFolder(folder: string): boolean {
+  return folder.startsWith(DEMO_FOLDER_PREFIX);
+}
+
 export function jdTextOf(j: Pick<ScoredJob, "role" | "company" | "location" | "salaryText" | "descriptionSnippet" | "url">): string {
   return [
     `${j.role} at ${j.company}`,

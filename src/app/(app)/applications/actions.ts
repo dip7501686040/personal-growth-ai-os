@@ -31,10 +31,12 @@ const err = (message: string): ActionState => ({ ok: false, message });
 /** The `applications/` tree (résumés, proof bundles, job.json) lives in one
  *  shared R2/local filesystem prefix with no per-user partitioning — unlike
  *  every other table in this app, it predates there being a second real
- *  account. Until it's properly namespaced per user, the demo account must
- *  not touch it at all: a write here could corrupt the real owner's actual
- *  résumé/proof-bundle files, and a read would leak real company/role names
- *  that have nothing to do with demo data. */
+ *  account. The demo account can *view* its own reserved "demo-"-prefixed
+ *  sample folders (gated in the applications page / detail page / file
+ *  route by isDemoFolder), but every write action below stays blocked
+ *  regardless of which folder it targets: a write here could corrupt the
+ *  real owner's actual résumé/proof-bundle files, and demo folders are
+ *  static, reseeded content the demo account was never meant to edit. */
 const NOT_IN_DEMO = "Not available in the demo — this touches shared file storage, not demo-only data.";
 async function blockedForDemo(userId: string): Promise<boolean> {
   return isDemoUserId(userId);
