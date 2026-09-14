@@ -23,10 +23,21 @@ export interface JdTailor {
   jdText?: string;
 }
 
+/** One piece of the header contact line — plain text (location, email,
+ *  phone) or a real hyperlink (github/linkedin): `text` is the short label
+ *  shown, `url` (when set) is what it actually links to. Kept structured
+ *  rather than a pre-joined string so every render target (md/html/docx)
+ *  can make github/linkedin genuinely clickable instead of unlinked plain
+ *  text next to it. */
+export interface ContactSegment {
+  text: string;
+  url?: string;
+}
+
 export interface ResumeModel {
   name: string;
   title: string;
-  contactLine: string;
+  contactLine: ContactSegment[];
   summary: string;
   skills: { label: string; items: string[] }[];
   experience: MasterResume["experience"];
@@ -241,13 +252,13 @@ export function buildResumeModel(
     };
   });
 
-  const contactLine = [
-    master.location,
-    master.email,
-    master.phone,
-    master.github.replace(/^https?:\/\//, ""),
-    master.linkedin.replace(/^https?:\/\//, ""),
-  ].join("  |  ");
+  const contactLine: ContactSegment[] = [
+    { text: master.location },
+    { text: master.email },
+    { text: master.phone },
+    { text: master.github.replace(/^https?:\/\//, ""), url: master.github },
+    { text: master.linkedin.replace(/^https?:\/\//, ""), url: master.linkedin },
+  ];
 
   return {
     name: master.name,
@@ -270,7 +281,11 @@ export function toMarkdown(m: ResumeModel): string {
   L.push(`# ${m.name}`);
   L.push(`${m.title}`);
   L.push(``);
-  L.push(m.contactLine);
+  L.push(
+    m.contactLine
+      .map((s) => (s.url ? `[${s.text}](${s.url})` : s.text))
+      .join("  |  "),
+  );
   L.push(``);
   L.push(`## Summary`);
   L.push(m.summary);
@@ -317,7 +332,11 @@ export function toHtml(m: ResumeModel): string {
   const parts: string[] = [];
   parts.push(`<h1>${esc(m.name)}</h1>`);
   parts.push(`<p class="title">${esc(m.title)}</p>`);
-  parts.push(`<p class="contact">${esc(m.contactLine)}</p>`);
+  parts.push(
+    `<p class="contact">${m.contactLine
+      .map((s) => (s.url ? `<a href="${esc(s.url)}">${esc(s.text)}</a>` : esc(s.text)))
+      .join("  |  ")}</p>`,
+  );
   parts.push(`<h2>Summary</h2><p>${esc(m.summary)}</p>`);
   parts.push(`<h2>Skills</h2>`);
   for (const g of m.skills)
@@ -431,6 +450,18 @@ const bulletWithLink = (text: string, link: Link | null) =>
     ],
   });
 
+/** The header contact line, " | "-separated — plain runs for text-only
+ *  segments (location/email/phone), a real ExternalHyperlink for github/
+ *  linkedin so they're clickable in the docx, matching the html/pdf render. */
+const contactParagraph = (segments: ContactSegment[]) =>
+  new Paragraph({
+    spacing: { after: 80 },
+    children: segments.flatMap((s, i) => [
+      ...(i > 0 ? [new TextRun({ text: "  |  " })] : []),
+      s.url ? hyperlink(s.text, s.url) : new TextRun({ text: s.text }),
+    ]),
+  });
+
 export async function toDocxBuffer(m: ResumeModel): Promise<Buffer> {
   const children: Paragraph[] = [];
 
@@ -442,7 +473,7 @@ export async function toDocxBuffer(m: ResumeModel): Promise<Buffer> {
     }),
   );
   children.push(p(m.title));
-  children.push(p(m.contactLine));
+  children.push(contactParagraph(m.contactLine));
 
   children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, text: "Summary" }));
   children.push(p(m.summary));
