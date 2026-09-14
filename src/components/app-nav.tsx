@@ -1,14 +1,82 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { MenuIcon, XIcon } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { NAV_ITEMS } from "@/lib/nav";
+import { resetDemoDataAction } from "@/app/(app)/actions";
 
-export function AppNav({ email }: { email: string }) {
+/** Email trigger → a small menu with Sign out, and (demo account only) a
+ *  Reset button that wipes/reseeds the demo data on demand — the same reset
+ *  logout and the daily cron already do, without needing to sign out first. */
+function UserMenu({ email, isDemo }: { email: string; isDemo: boolean }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  const handleReset = () => {
+    start(async () => {
+      const res = await resetDemoDataAction();
+      if (res?.ok) {
+        toast.success(res.message);
+        setOpen(false);
+        router.refresh();
+      } else {
+        toast.error(res?.message ?? "Reset failed.");
+      }
+    });
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full truncate rounded-md px-1 py-1 text-left text-xs text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+        title={email}
+      >
+        {email}
+      </button>
+      {open && (
+        <div className="absolute bottom-full left-0 mb-1 flex w-full flex-col gap-1 rounded-md border bg-popover p-1.5 shadow-md">
+          {isDemo && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={pending}
+              onClick={handleReset}
+            >
+              {pending ? "Resetting…" : "Reset demo data"}
+            </Button>
+          )}
+          <form action="/auth/signout" method="post">
+            <Button type="submit" variant="outline" size="sm" className="w-full">
+              Sign out
+            </Button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AppNav({ email, isDemo = false }: { email: string; isDemo?: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -98,14 +166,7 @@ export function AppNav({ email }: { email: string }) {
         </nav>
 
         <div className="border-t px-4 py-3">
-          <p className="truncate text-xs text-muted-foreground" title={email}>
-            {email}
-          </p>
-          <form action="/auth/signout" method="post" className="mt-2">
-            <Button type="submit" variant="outline" size="sm" className="w-full">
-              Sign out
-            </Button>
-          </form>
+          <UserMenu email={email} isDemo={isDemo} />
         </div>
       </aside>
     </>
