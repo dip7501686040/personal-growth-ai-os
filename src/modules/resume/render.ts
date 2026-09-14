@@ -375,13 +375,13 @@ export function toHtml(m: ResumeModel): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(m.name)} — Résumé</title>
 <style>
   @page{size:letter;margin:0.45in}
-  body{font-family:Calibri,Arial,Helvetica,sans-serif;font-size:10.3pt;line-height:1.26;color:#111;max-width:7.6in;margin:0.45in auto;padding:0 0.15in}
+  body{font-family:Calibri,Arial,Helvetica,sans-serif;font-size:10.5pt;line-height:1.32;color:#111;max-width:7.6in;margin:0.45in auto;padding:0 0.15in}
   h1{font-size:18pt;margin:0 0 1pt}
-  h2{font-size:11.5pt;margin:9pt 0 3pt;border-bottom:1px solid #ccc;padding-bottom:1pt}
-  h3{font-size:10.6pt;margin:6pt 0 1pt}
-  p{margin:1.5pt 0}
-  ul{margin:1.5pt 0 3pt 16pt;padding:0}
-  li{margin:0.5pt 0}
+  h2{font-size:11.5pt;margin:10pt 0 3.5pt;border-bottom:1px solid #ccc;padding-bottom:1pt}
+  h3{font-size:10.6pt;margin:6.5pt 0 1.5pt}
+  p{margin:2pt 0}
+  ul{margin:2pt 0 3.5pt 16pt;padding:0}
+  li{margin:1pt 0}
   h2,h3{break-after:avoid}
   li,h3+p{break-inside:avoid}
   .title{font-weight:600}
