@@ -20,8 +20,7 @@ import {
 } from "@/modules/resume/master";
 import {
   buildResumeModel,
-  htmlToPdf,
-  toHtml,
+  renderResumePdf,
   toMarkdown,
   type JdTailor,
 } from "@/modules/resume/render";
@@ -83,14 +82,17 @@ async function main() {
 
   const model = buildResumeModel(master, archetype, jd);
   const md = toMarkdown(model);
-  const html = toHtml(model);
 
   mkdirSync(outDir, { recursive: true });
   writeFileSync(join(outDir, "resume.md"), md);
   const htmlPath = join(outDir, "resume.html");
-  writeFileSync(htmlPath, html);
-  const pdf = htmlToPdf(resolve(htmlPath), resolve(join(outDir, "resume.pdf")))
-    ? "resume.pdf"
+  const { pdfOk, pages, density } = renderResumePdf(
+    model,
+    resolve(htmlPath),
+    resolve(join(outDir, "resume.pdf")),
+  );
+  const pdf = pdfOk
+    ? `resume.pdf (density ${density}${pages ? `, ${pages} page(s)` : ""})`
     : "no Chrome found — open resume.html → Print → Save as PDF";
 
   const problems = atsLint(md);

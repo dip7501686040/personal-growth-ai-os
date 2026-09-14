@@ -1,4 +1,5 @@
 import { execSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import { findChrome } from "@/lib/chrome";
 import {
   AlignmentType,
@@ -328,7 +329,24 @@ export function toMarkdown(m: ResumeModel): string {
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-export function toHtml(m: ResumeModel): string {
+/**
+ * Typography presets, loosest first. A JD-tailored résumé can pull in more
+ * projects/bullets than the untailored default (up to 5 projects vs. 3), so
+ * a single fixed density either wastes page 2 on a short résumé or overflows
+ * to a 3rd page on a long one. `renderResumePdf` below tries these in order
+ * and stops at the first one that fits — this is the actual fix; the density
+ * values themselves are just presets it picks from. Preset 0 is intentionally
+ * generous (chosen so a *default*, untailored résumé fills page 2 well
+ * instead of leaving most of it blank); 1 is the original tight baseline;
+ * 2 is a last-resort fallback for a heavily-matched JD with 4-5 projects.
+ */
+const DENSITY_PRESETS = [
+  { fontSize: "10.5pt", lineHeight: "1.32", p: "2pt", ul: "2pt 0 3.5pt 16pt", li: "1pt", h2: "10pt 0 3.5pt", h3: "6.5pt 0 1.5pt" },
+  { fontSize: "10.3pt", lineHeight: "1.26", p: "1.5pt", ul: "1.5pt 0 3pt 16pt", li: "0.5pt", h2: "9pt 0 3pt", h3: "6pt 0 1pt" },
+  { fontSize: "10pt", lineHeight: "1.18", p: "1pt", ul: "1pt 0 2.5pt 16pt", li: "0.3pt", h2: "7pt 0 2pt", h3: "5pt 0 1pt" },
+] as const;
+
+export function toHtml(m: ResumeModel, density = 0): string {
   const parts: string[] = [];
   parts.push(`<h1>${esc(m.name)}</h1>`);
   parts.push(`<p class="title">${esc(m.title)}</p>`);
@@ -372,16 +390,17 @@ export function toHtml(m: ResumeModel): string {
   for (const ed of m.education)
     parts.push(`<p><strong>${esc(ed.degree)}</strong>, ${esc(ed.institution)} — ${esc(ed.period)}</p>`);
 
+  const d = DENSITY_PRESETS[density] ?? DENSITY_PRESETS[0];
   return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(m.name)} — Résumé</title>
 <style>
   @page{size:letter;margin:0.45in}
-  body{font-family:Calibri,Arial,Helvetica,sans-serif;font-size:10.5pt;line-height:1.32;color:#111;max-width:7.6in;margin:0.45in auto;padding:0 0.15in}
+  body{font-family:Calibri,Arial,Helvetica,sans-serif;font-size:${d.fontSize};line-height:${d.lineHeight};color:#111;max-width:7.6in;margin:0.45in auto;padding:0 0.15in}
   h1{font-size:18pt;margin:0 0 1pt}
-  h2{font-size:11.5pt;margin:10pt 0 3.5pt;border-bottom:1px solid #ccc;padding-bottom:1pt}
-  h3{font-size:10.6pt;margin:6.5pt 0 1.5pt}
-  p{margin:2pt 0}
-  ul{margin:2pt 0 3.5pt 16pt;padding:0}
-  li{margin:1pt 0}
+  h2{font-size:11.5pt;margin:${d.h2};border-bottom:1px solid #ccc;padding-bottom:1pt}
+  h3{font-size:10.6pt;margin:${d.h3}}
+  p{margin:${d.p} 0}
+  ul{margin:${d.ul};padding:0}
+  li{margin:${d.li} 0}
   h2,h3{break-after:avoid}
   li,h3+p{break-inside:avoid}
   .title{font-weight:600}
@@ -407,6 +426,56 @@ export function htmlToPdf(htmlPath: string, pdfPath: string): boolean {
     { stdio: "ignore", timeout: 60_000 },
   );
   return true;
+}
+
+/** Best-effort PDF page count off the Pages tree's `/Count` entry — good
+ *  enough for Chrome's print-to-pdf output (the only kind this module ever
+ *  produces), which writes that header uncompressed. Returns null if it
+ *  can't be found, which callers treat as "unknown, stop retrying". */
+function countPdfPages(pdfPath: string): number | null {
+  try {
+    const text = readFileSync(pdfPath, "latin1");
+    const m = text.match(/\/Count\s+(\d+)/);
+    return m ? parseInt(m[1], 10) : null;
+  } catch {
+    return null;
+  }
+}
+
+export interface RenderResumePdfResult {
+  html: string;
+  pdfOk: boolean;
+  pages: number | null;
+  density: number;
+}
+
+/**
+ * Writes resume.html + prints resume.pdf, retrying at increasingly compact
+ * typography (see DENSITY_PRESETS) until the PDF fits within `maxPages` —
+ * this is the fix for a JD-tailored résumé (more projects/bullets than the
+ * untailored default) silently overflowing to a 3rd page. Stops at the
+ * first density that fits, or the last one tried if none do (still the
+ * most compact option available, so never worse than not retrying).
+ */
+export function renderResumePdf(
+  m: ResumeModel,
+  htmlPath: string,
+  pdfPath: string,
+  maxPages = 2,
+): RenderResumePdfResult {
+  let html = "";
+  let pdfOk = false;
+  let pages: number | null = null;
+  let density = 0;
+  for (density = 0; density < DENSITY_PRESETS.length; density++) {
+    html = toHtml(m, density);
+    writeFileSync(htmlPath, html);
+    pdfOk = htmlToPdf(htmlPath, pdfPath);
+    if (!pdfOk) break; // no Chrome found — nothing more retrying can fix
+    pages = countPdfPages(pdfPath);
+    if (pages == null || pages <= maxPages) break;
+  }
+  return { html, pdfOk, pages, density };
 }
 
 // ── DOCX (single column, Calibri 11, Heading styles, no tables/images) ────

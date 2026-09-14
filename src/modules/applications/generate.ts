@@ -27,7 +27,7 @@ import { loadMaster, suggestArchetype } from "@/modules/resume/master";
 import {
   buildResumeModel,
   htmlToPdf,
-  toHtml,
+  renderResumePdf,
   toMarkdown,
   type JdTailor,
   type ResumeModel,
@@ -218,12 +218,16 @@ async function writeResumeFiles(
 ): Promise<boolean> {
   const model = await resumeModelFor(jdText, archetype, proof);
   await persist(date, folder, "resume.md", toMarkdown(model));
-  await persist(date, folder, "resume.html", toHtml(model));
   const pdfName = friendlyResumeFilename(company);
-  const pdfOk = htmlToPdf(
+  // A JD-tailored résumé can pull in more projects/bullets than the
+  // untailored default — renderResumePdf retries at a more compact
+  // typography until it actually fits, instead of silently overflowing.
+  const { html, pdfOk } = renderResumePdf(
+    model,
     resolve(localPath(date, folder, "resume.html")),
     resolve(localPath(date, folder, pdfName)),
   );
+  await persist(date, folder, "resume.html", html);
   if (pdfOk) await persistExistingLocal(date, folder, pdfName);
   return pdfOk;
 }
