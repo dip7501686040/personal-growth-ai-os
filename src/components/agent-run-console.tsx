@@ -1,8 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, Loader2Icon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -107,6 +113,12 @@ export function AgentRunConsole({
 }) {
   const router = useRouter();
 
+  // The run itself finishing isn't the whole story — the page's server data
+  // (the new content items, learning sessions, etc. the run just produced)
+  // still has to be refetched. Without tracking that separately, the button
+  // re-enables and the console says "Completed" while the rest of the page
+  // is still showing stale data, which reads as a bug rather than a load.
+  const [refreshing, startRefresh] = useTransition();
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState(initial?.status ?? "never_run");
@@ -328,7 +340,9 @@ export function AgentRunConsole({
       setSlowStart(false);
       setBusy(false);
       abortRef.current = null;
-      router.refresh();
+      startRefresh(() => {
+        router.refresh();
+      });
     }
   }
 
@@ -344,8 +358,9 @@ export function AgentRunConsole({
           Stop run
         </Button>
       ) : (
-        <Button size={size} onClick={run}>
-          {label}
+        <Button size={size} onClick={run} disabled={refreshing}>
+          {refreshing && <Loader2Icon className="size-3.5 animate-spin" />}
+          {refreshing ? "Updating page…" : label}
         </Button>
       )}
 
