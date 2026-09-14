@@ -14,6 +14,18 @@ import type { ScoredJob } from "@/lib/jobs/types";
 import { getOwnerUserId } from "@/lib/owner";
 import { deriveGraphSearchTerms, makeGraphMatcher } from "@/modules/jobs/graph";
 
+// Normalizes each source's own wording (Adzuna: "contract"/"permanent";
+// Remotive: "contract"/"freelance"/"full_time"/"part_time"; SerpApi:
+// "Contractor"/"Full-time"/...) down to one glance-able marker — contract/
+// freelance work is what's easy to miss scanning a long list otherwise.
+function employmentMarker(t: string | null | undefined): string {
+  if (!t) return "";
+  const s = t.toLowerCase();
+  if (/contract|freelance/.test(s)) return "  ⚡contract/freelance";
+  if (/part.?time/.test(s)) return "  part-time";
+  return "";
+}
+
 function line(j: ScoredJob): string {
   const sal = j.salaryLpa != null ? `${j.salaryLpa}LPA` : "—";
   const flags = j.flags.length ? `  {${j.flags.join(", ")}}` : "";
@@ -24,7 +36,7 @@ function line(j: ScoredJob): string {
   return (
     `  ${j.score.toFixed(2)}  ${(j.company + " — " + j.role).slice(0, 62).padEnd(63)}` +
     ` ${j.remoteKind.padEnd(13)} ${sal.padEnd(8)} reply ${j.replyLikelihood.toFixed(2)}` +
-    ` skill ${j.skillMatch.toFixed(2)}${gm} [${j.seenIn.join("/")}]${flags}\n        ${j.url}`
+    ` skill ${j.skillMatch.toFixed(2)}${gm} [${j.seenIn.join("/")}]${employmentMarker(j.employmentType)}${flags}\n        ${j.url}`
   );
 }
 

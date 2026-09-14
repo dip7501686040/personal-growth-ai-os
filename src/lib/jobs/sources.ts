@@ -108,6 +108,7 @@ export async function remotive(cfg: JobSearchConfig): Promise<RawJob[]> {
         publisher: null,
         descriptionSnippet: stripHtml(String(r.description ?? "")).slice(0, 1200),
         contactEmail: null,
+        employmentType: (r.job_type as string) || null,
       });
     }
   }
@@ -359,39 +360,6 @@ export async function jobicy(cfg: JobSearchConfig): Promise<RawJob[]> {
 
 // ── key-gated sources ────────────────────────────────────────────────────
 
-export async function jsearch(cfg: JobSearchConfig): Promise<RawJob[]> {
-  const key = env.JSEARCH_API_KEY;
-  if (!key) throw new Error("JSEARCH_API_KEY not set");
-  const out: RawJob[] = [];
-  for (const term of queryTerms(cfg, 3)) {
-    const j = await getJson<{ data?: Record<string, unknown>[] }>(
-      `https://jsearch.p.rapidapi.com/search?query=${encodeURIComponent(term + " remote")}&num_pages=1`,
-      { "x-rapidapi-key": key, "x-rapidapi-host": "jsearch.p.rapidapi.com" },
-    );
-    for (const r of j.data ?? []) {
-      out.push({
-        source: "jsearch",
-        company: String(r.employer_name ?? ""),
-        role: String(r.job_title ?? ""),
-        location:
-          [r.job_city, r.job_state, r.job_country].filter(Boolean).join(", ") || null,
-        remote: r.job_is_remote === true,
-        salaryText:
-          r.job_min_salary || r.job_max_salary
-            ? `${r.job_min_salary ?? ""}-${r.job_max_salary ?? ""} ${r.job_salary_currency ?? "USD"} /${r.job_salary_period ?? "year"}`
-            : null,
-        postedAt: (r.job_posted_at_datetime_utc as string) || null,
-        url: String(r.job_apply_link ?? ""),
-        applyUrl: (r.job_apply_link as string) || null,
-        publisher: (r.job_publisher as string) || null,
-        descriptionSnippet: stripHtml(String(r.job_description ?? "")).slice(0, 1400),
-        contactEmail: null,
-      });
-    }
-  }
-  return out.slice(0, cfg.maxPerSource * 2);
-}
-
 export async function adzuna(cfg: JobSearchConfig): Promise<RawJob[]> {
   const id = env.ADZUNA_APP_ID;
   const key = env.ADZUNA_APP_KEY;
@@ -424,6 +392,10 @@ export async function adzuna(cfg: JobSearchConfig): Promise<RawJob[]> {
           publisher: null,
           descriptionSnippet: stripHtml(String(r.description ?? "")).slice(0, 1400),
           contactEmail: null,
+          // `contract_type` (permanent/contract) is the more useful of the
+          // two when present; `contract_time` (full_time/part_time) is the
+          // fallback — Adzuna omits either when a posting doesn't specify it.
+          employmentType: (r.contract_type as string) || (r.contract_time as string) || null,
         });
       }
     }
@@ -460,6 +432,7 @@ export async function serpapi(cfg: JobSearchConfig): Promise<RawJob[]> {
         publisher: (r.via as string)?.replace(/^via\s+/i, "") || null,
         descriptionSnippet: stripHtml(String(r.description ?? "")).slice(0, 1400),
         contactEmail: null,
+        employmentType: (ext.schedule_type as string) || null,
       } satisfies RawJob);
     }
   }
@@ -477,6 +450,3 @@ export const SOURCES = {
   adzuna,
   serpapi,
 } as const;
-
-// `jsearch` is defined above but no longer registered — this key's JSearch
-// subscription exposes only /job-details, not a search endpoint.
