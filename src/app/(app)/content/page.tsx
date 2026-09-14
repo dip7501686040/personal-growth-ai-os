@@ -67,6 +67,15 @@ export default async function ContentPage() {
               format: c.cloudinaryFormat ?? undefined,
             })
         : null,
+    // The real, playable video (previewUrl above is just a still poster
+    // frame) — for the click-to-enlarge lightbox.
+    videoUrl:
+      cloudinaryOk && c.cloudinaryPublicId && c.cloudinaryResourceType === "video"
+        ? mediaUrl(c.cloudinaryPublicId, {
+            resourceType: "video",
+            format: c.cloudinaryFormat ?? undefined,
+          })
+        : null,
   }));
 
   return (
