@@ -45,7 +45,11 @@ const OPEN_STATUSES: ApplicationStatus[] = [
   "interviewing",
 ];
 
-const dedupe = (company: string, role: string) =>
+/** `company|role`, lowercased/trimmed — the same key `recordApplication`
+ *  upserts on, exported so callers (e.g. the job-search panel) can tell a
+ *  freshly-fetched job apart from one already in the ledger without a
+ *  second round-trip. */
+export const dedupe = (company: string, role: string) =>
   `${company.trim().toLowerCase()}|${role.trim().toLowerCase().replace(/\s+/g, " ")}`;
 
 const daysFromNow = (n: number) => new Date(Date.now() + n * 864e5);

@@ -6,6 +6,7 @@ import { listDrafts, tokenExists } from "@/lib/outreach/gmail";
 import {
   applicationsOverview,
   countApplicationsByStatus,
+  dedupe,
   listApplications,
   queueCounts,
 } from "@/modules/applications/service";
@@ -197,6 +198,7 @@ export default async function ApplicationsPage() {
         <SearchJobsPanel
           initialResult={searchRun?.result ?? null}
           savedAt={searchRun?.savedAt ?? null}
+          appliedKeys={apps.map((a) => dedupe(a.company, a.role))}
         />
       )}
 
