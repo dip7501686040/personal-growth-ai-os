@@ -103,9 +103,18 @@ export async function persist(
   file: string,
   body: string | Buffer,
 ): Promise<void> {
-  const abs = localPath(date, folder, file);
-  mkdirSync(dirname(abs), { recursive: true });
-  writeFileSync(abs, body);
+  // The local `applications/` cache is a convenience for CLI runs on a
+  // writable machine — R2 (when configured) is the real source of truth.
+  // Vercel's serverless filesystem is read-only outside /tmp, so a web
+  // request calling this (e.g. the "Prep selected" server action) must not
+  // let that write crash the whole action.
+  try {
+    const abs = localPath(date, folder, file);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, body);
+  } catch (e) {
+    if (!isR2Configured()) throw e;
+  }
   if (isR2Configured()) {
     await putObject(
       keyFor(date, folder, file),
