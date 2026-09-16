@@ -9,7 +9,12 @@
  *
  * Server-only.
  */
-import { getObject, isR2Configured, putObject } from "@/modules/applications/store";
+import {
+  deleteObject,
+  getObject,
+  isR2Configured,
+  putObject,
+} from "@/modules/applications/store";
 import type { JobSearchConfig, JobSearchResult } from "./types";
 
 const KEY = "_job-search/latest.json";
@@ -45,4 +50,12 @@ export async function loadLatestSearchRun(): Promise<PersistedJobSearchRun | nul
   } catch {
     return null;
   }
+}
+
+/** "Done for today" — drop the saved run so it stops showing on the page.
+ *  Picks already made are safe: `prepSearchJobsAction` already wrote them
+ *  into `job_applications` (the ledger), which this never touches. */
+export async function clearLatestSearchRun(): Promise<void> {
+  if (!isR2Configured()) return;
+  await deleteObject(KEY);
 }

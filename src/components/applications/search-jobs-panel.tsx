@@ -4,7 +4,11 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { prepSearchJobsAction, searchJobsAction } from "@/app/(app)/applications/actions";
+import {
+  clearSearchRunAction,
+  prepSearchJobsAction,
+  searchJobsAction,
+} from "@/app/(app)/applications/actions";
 import type { JobSearchResult, ScoredJob } from "@/lib/jobs/types";
 
 const PAGE_SIZE = 20;
@@ -154,6 +158,7 @@ export function SearchJobsPanel({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [prepPending, startPrep] = useTransition();
+  const [donePending, startDone] = useTransition();
   const [result, setResult] = useState<JobSearchResult | null>(initialResult);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(savedAt);
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -195,6 +200,21 @@ export function SearchJobsPanel({
       }
     });
 
+  const done = () =>
+    startDone(async () => {
+      const res = await clearSearchRunAction();
+      if (!res) return;
+      if (!res.ok) {
+        toast.error(res.message);
+        return;
+      }
+      setResult(null);
+      setLastSavedAt(null);
+      setSelected(new Set());
+      toast.success(res.message);
+      router.refresh();
+    });
+
   const savedLabel = useMemo(() => {
     if (!lastSavedAt) return null;
     try {
@@ -212,7 +232,16 @@ export function SearchJobsPanel({
           fetch + score every configured source — deterministic, no judgment needed
           {savedLabel && ` · last saved ${savedLabel}`}
         </span>
-        <Button size="sm" variant="secondary" className="ml-auto" disabled={pending} onClick={run}>
+        <Button
+          size="sm"
+          variant="outline"
+          className="ml-auto"
+          disabled={donePending || !result}
+          onClick={done}
+        >
+          {donePending ? "Clearing…" : "Done for today"}
+        </Button>
+        <Button size="sm" variant="secondary" disabled={pending} onClick={run}>
           {pending ? "Searching…" : "Search jobs"}
         </Button>
       </div>

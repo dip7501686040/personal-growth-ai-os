@@ -63,3 +63,7 @@ export async function listFolders(prefix: string): Promise<string[]> {
 export async function deletePrefix(prefix: string): Promise<number> {
   return r2.deletePrefix(bucket(), prefix);
 }
+
+export async function deleteObject(key: string): Promise<void> {
+  return r2.deleteObject(bucket(), key);
+}

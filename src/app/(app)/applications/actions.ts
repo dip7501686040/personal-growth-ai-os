@@ -5,7 +5,11 @@ import { z } from "zod";
 import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { loadJobSearchConfig, runJobSearch, type RunJobSearchOpts } from "@/lib/jobs/search";
-import { loadLatestSearchRun, saveLatestSearchRun } from "@/lib/jobs/persisted-run";
+import {
+  clearLatestSearchRun,
+  loadLatestSearchRun,
+  saveLatestSearchRun,
+} from "@/lib/jobs/persisted-run";
 import type { JobSearchResult } from "@/lib/jobs/types";
 import { sendDraft } from "@/lib/outreach/gmail";
 import { parseBundleDir, sectionOf } from "@/lib/outreach/parse";
@@ -282,6 +286,17 @@ export async function prepSearchJobsAction(indices: number[]): Promise<ActionSta
       `Prepped ${prepped} job(s) — now in "Select → content → apply" below.` +
       (skipped.length ? ` (${skipped.join(", ")})` : ""),
   };
+}
+
+/** "Done for today" — drops the saved search run so the panel goes back to
+ *  empty until the next `pnpm jobs` / "Search jobs" run. Anything already
+ *  prepped is untouched: those picks live in job_applications, not here. */
+export async function clearSearchRunAction(): Promise<ActionState> {
+  const userId = await requireUserId();
+  if (await blockedForDemo(userId)) return err(NOT_IN_DEMO);
+  await clearLatestSearchRun();
+  revalidatePath("/applications");
+  return { ok: true, message: "Cleared — see you tomorrow." };
 }
 
 // ── J6: outreach & follow-ups, one place per job ────────────────────────────
