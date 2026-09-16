@@ -119,7 +119,7 @@ async function emailCmd() {
 
   // Prefer the friendly-named copy (what the recruiter sees in their file
   // list) — falls back to resume.pdf for a folder scaffolded before it existed.
-  const friendlyResume = friendlyResumeFilename(job.company);
+  const friendlyResume = friendlyResumeFilename();
   const resumeFile = existsSync(join(dir, friendlyResume)) ? friendlyResume : "resume.pdf";
   const attachments = existsSync(join(dir, resumeFile))
     ? [{ path: join(process.cwd(), dir, resumeFile), contentType: "application/pdf" }]

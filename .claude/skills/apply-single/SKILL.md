@@ -77,8 +77,9 @@ await regenerateResume(userId, date, folder);
 ```
 
 This picks the archetype fresh from the (untruncated) JD text, renders
-`resume.md`/`.html`, and prints `Dipankar_Saha_<Company>.pdf` — the file the
-user actually attaches when they apply by hand.
+`resume.md`/`.html`, and prints `Dipankar_Saha_Resume.pdf` (same name every
+time, not per-company) — the file the user actually attaches when they apply
+by hand.
 
 If the application the user is filling out has a free-text field (why this
 role, a cover letter, a "why you" box), generate that too, same discipline

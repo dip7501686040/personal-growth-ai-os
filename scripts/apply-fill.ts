@@ -65,7 +65,7 @@ function resultMd(
     `- submitted: ${new Date().toISOString()}`,
     `- portal: ${finalUrl}`,
     `- ats: ${r.ats}`,
-    `- resume: ${friendlyResumeFilename(job.company)}`,
+    `- resume: ${friendlyResumeFilename()}`,
     `- pre-submit screenshot: ${preShot}`,
     `- confirmation screenshot: ${confirmShot}`,
     ``,
@@ -109,7 +109,7 @@ async function main() {
   }
   // Prefer the friendly-named copy (what the ATS/recruiter file list shows)
   // — falls back to resume.pdf for a folder scaffolded before it existed.
-  const friendlyResume = friendlyResumeFilename(job.company);
+  const friendlyResume = friendlyResumeFilename();
   const resumeFile = existsSync(join(dir, friendlyResume)) ? friendlyResume : "resume.pdf";
   const resumePath = join(process.cwd(), dir, resumeFile);
   if (!existsSync(resumePath)) {
