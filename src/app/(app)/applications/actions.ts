@@ -5,6 +5,7 @@ import { z } from "zod";
 import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { loadJobSearchConfig, runJobSearch, type RunJobSearchOpts } from "@/lib/jobs/search";
+import { loadLatestSearchRun, saveLatestSearchRun } from "@/lib/jobs/persisted-run";
 import type { JobSearchResult } from "@/lib/jobs/types";
 import { sendDraft } from "@/lib/outreach/gmail";
 import { parseBundleDir, sectionOf } from "@/lib/outreach/parse";
@@ -15,10 +16,12 @@ import {
   regeneratePdf,
   regenerateProofBundle,
   regenerateResume,
+  scaffoldJobFolder,
   writeFolderFile,
 } from "@/modules/applications/generate";
 import {
   deleteApplication,
+  recordApplication,
   recordTouchpoint,
   requestApply,
   requestContentProcessing,
@@ -209,10 +212,76 @@ export async function searchJobsAction(): Promise<SearchJobsState> {
       }
     }
     const result = await runJobSearch(cfg, { extraTerms, graphMatch });
+    await saveLatestSearchRun(result, cfg);
     return { ok: true, result };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Search failed." };
   }
+}
+
+/** Scaffold + record one or more jobs picked from the last persisted search
+ *  run (`pnpm jobs` / the "Search jobs" button both save here) — the web
+ *  equivalent of `pnpm apply-prep --pick ...` followed by `pnpm apply
+ *  record`. Re-loads the run server-side rather than trusting whatever the
+ *  client last rendered, so indices always resolve against the same
+ *  groupA-then-groupB array the page/CLI both use. */
+export async function prepSearchJobsAction(indices: number[]): Promise<ActionState> {
+  const userId = await requireUserId();
+  if (await blockedForDemo(userId)) return err(NOT_IN_DEMO);
+  if (indices.length === 0) return err("Nothing selected.");
+
+  const run = await loadLatestSearchRun();
+  if (!run) {
+    return err("No saved search run — click \"Search jobs\" first (or run `pnpm jobs`).");
+  }
+  const all = [...run.result.groupA, ...run.result.groupB];
+  const date = new Date().toISOString().slice(0, 10);
+
+  let prepped = 0;
+  const skipped: string[] = [];
+  for (const i of indices) {
+    const job = all[i];
+    if (!job) {
+      skipped.push(`index ${i} out of range`);
+      continue;
+    }
+    const out = await scaffoldJobFolder({ userId, job, cfg: run.cfg, result: run.result, date });
+    await recordApplication(userId, {
+      company: job.company,
+      role: job.role,
+      jdText: `${job.role} at ${job.company}\n${job.descriptionSnippet ?? ""}`.trim(),
+      jdUrl: job.url,
+      source: job.source,
+      contactName: job.contactName ?? undefined,
+      contactChannel: job.contactEmail ? "email" : undefined,
+      // the "remote_kind" DB enum has no "unknown" (unlike ScoredJob's
+      // RemoteKind, which legitimately returns it) — forwarding it crashes
+      // the insert, so leave the column null instead. Same guard as
+      // scripts/apply.ts's `record` command.
+      remoteKind: (["remote", "onsite_foreign", "onsite_india"] as const).includes(
+        job.remoteKind as never,
+      )
+        ? (job.remoteKind as "remote" | "onsite_foreign" | "onsite_india")
+        : undefined,
+      salaryLpa: job.salaryLpa ?? undefined,
+      companyType: job.companyType,
+      fundingNote: job.funding?.note ?? undefined,
+      replyLikelihood: job.replyLikelihood,
+      skillMatch: job.skillMatch,
+      flags: job.flags,
+      bundleDir: `applications/${out.date}/${out.folder}`,
+    });
+    prepped += 1;
+  }
+
+  revalidatePath("/applications");
+  if (prepped === 0) return err(`Nothing prepped (${skipped.join(", ")}).`);
+  return {
+    ok: true,
+    message:
+      `Prepped ${prepped} job(s) — now in "Select → content → apply" below.` +
+      (skipped.length ? ` (${skipped.join(", ")})` : ""),
+  };
 }
 
 // ── J6: outreach & follow-ups, one place per job ────────────────────────────

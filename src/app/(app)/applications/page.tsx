@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
+import { loadLatestSearchRun } from "@/lib/jobs/persisted-run";
 import { listDrafts, tokenExists } from "@/lib/outreach/gmail";
 import {
   applicationsOverview,
@@ -83,13 +84,14 @@ function draftsFor(
 export default async function ApplicationsPage() {
   const userId = await requireUserId();
   const isDemo = await isDemoUserId(userId);
-  const [apps, counts, overview, dates, queued, allDrafts] = await Promise.all([
+  const [apps, counts, overview, dates, queued, allDrafts, searchRun] = await Promise.all([
     listApplications(userId),
     countApplicationsByStatus(userId),
     applicationsOverview(userId),
     listDates(),
     queueCounts(userId),
     isDemo ? Promise.resolve([]) : loadDraftsSafely(),
+    isDemo ? Promise.resolve(null) : loadLatestSearchRun(),
   ]);
   const gmailReady = !isDemo && tokenExists();
 
@@ -191,7 +193,12 @@ export default async function ApplicationsPage() {
         )}
       </div>
 
-      {!isDemo && <SearchJobsPanel />}
+      {!isDemo && (
+        <SearchJobsPanel
+          initialResult={searchRun?.result ?? null}
+          savedAt={searchRun?.savedAt ?? null}
+        />
+      )}
 
       <section className="flex flex-col gap-3">
         <h3 className="text-sm font-semibold">Select → content → apply</h3>

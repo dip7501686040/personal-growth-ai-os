@@ -10,9 +10,11 @@
  * automatic unless `useGraphMatch: false` there or `--no-graph` here.
  */
 import { loadJobSearchConfig, runJobSearch } from "@/lib/jobs/search";
+import { saveLatestSearchRun } from "@/lib/jobs/persisted-run";
 import type { ScoredJob } from "@/lib/jobs/types";
 import { getOwnerUserId } from "@/lib/owner";
 import { deriveGraphSearchTerms, makeGraphMatcher } from "@/modules/jobs/graph";
+import { isR2Configured } from "@/modules/applications/store";
 
 // Normalizes each source's own wording (Adzuna: "contract"/"permanent";
 // Remotive: "contract"/"freelance"/"full_time"/"part_time"; SerpApi:
@@ -62,6 +64,7 @@ async function main() {
   }
 
   const r = await runJobSearch(cfg, { extraTerms, graphMatch });
+  await saveLatestSearchRun(r, cfg);
 
   if (json) {
     console.log(JSON.stringify(r, null, 2));
@@ -75,7 +78,8 @@ async function main() {
         : ""),
   );
   console.log(
-    `fetched ${r.fetched} → ${r.afterDedupe} after dedupe · USD/INR ${r.usdInr.toFixed(1)}`,
+    `fetched ${r.fetched} → ${r.afterDedupe} after dedupe · USD/INR ${r.usdInr.toFixed(1)}` +
+      (isR2Configured() ? " · saved to /applications" : ""),
   );
   console.log(
     r.graphTerms.length || r.graphMatched

@@ -31,6 +31,14 @@ Show the user the Group A list (and the top of B). Each row: score · company �
 
 If `pnpm jobs` reports skipped sources (missing keys), mention it once — coverage is lower without JSearch/Adzuna/SerpApi.
 
+`pnpm jobs` (either form) also saves this run to R2 automatically (when
+configured) — the `/applications` page's "Search jobs" panel shows the same
+Group A/B list, paginated, with checkboxes and a "Prep selected" button that
+does exactly step 3+4 below for you. Picking here in chat and picking there
+both write the same `job.json`/DB row, so it's fine if the user does one and
+you do the other — mention the page exists, but keep driving the pick
+conversation here unless they say they'd rather do it in the browser.
+
 ## 2. Pick
 
 Ask which to prep — the user names indices, or says "prep the top N of Group A". Target 8–12/day; it's fine to dip into Group B for a flagged one that looks worth it.
