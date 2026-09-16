@@ -124,10 +124,18 @@ await ensureWhyFitStub("<date>", "<folder>");   // no-op if already written
 
 lays down the stub (or does nothing if it's already real prose from an
 earlier pass at this same folder); then write ~150 words into it yourself —
-first person, concrete, leading with the 2–3 strongest points from
-`proof-bundle.md` — via the folder's `writeFolderFile`. `cover-letter.md` has
-no stub (only write one if the form actually asks for it): write it directly,
-~250 words, same grounding rule.
+via the folder's `writeFolderFile`. `cover-letter.md` has no stub (only
+write one if the form actually asks for it): write it directly, ~250 words,
+same grounding rule.
+
+House style for both (and every other pitch this app writes — pitch-recruiter,
+Upwork proposals): **open with a one-sentence hook on the reader's actual
+problem** (what "ongoing," "scale," a pain phrase in the JD implies about
+their real situation), not a recap of the job title or a stack-naming
+sentence ("I noticed your stack requires X" is still just keyword-matching).
+Lead with whichever proof is most differentiating for *this* JD, and
+**attach each claim's real proof link inline, right after that claim** —
+never batch links into a separate section at the end.
 
 Never type a value you can't trace to `apply-answers`, `profile.json`, or a file
 in the folder. Never invent a metric, project, or link — everything in

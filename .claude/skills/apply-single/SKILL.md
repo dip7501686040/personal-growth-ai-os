@@ -95,6 +95,12 @@ then write real prose into the stub via `writeFolderFile`. Skip this
 entirely if the user hasn't mentioned needing it — don't generate prose
 nobody asked for.
 
+Same house style as every other pitch here: open with a one-sentence hook on
+the *company's actual problem* (not a recap of the JD or a stack-naming
+sentence), lead with the most differentiating proof for this JD, and put
+each claim's real proof link inline right after the claim — never a links
+section batched at the end.
+
 ## 5. Hand off
 
 Report: folder path, the PDF filename, ledger status (`draft`), and
