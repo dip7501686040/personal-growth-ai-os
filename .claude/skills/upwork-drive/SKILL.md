@@ -93,10 +93,41 @@ await writeFolderFile(date, folder, "proposal.md", proposalText);
 
 ## 6. Fill the proposal form in the browser
 
-`browser_navigate` to the job's apply page. Field by field: paste the cover
-letter/proposal text, set a bid rate only if the user gave one (never invent
-a number), attach the résumé if the form takes one. `browser_snapshot` +
-`browser_take_screenshot` when filled.
+`browser_navigate` to the job's apply page — a fresh navigation can hit a
+Cloudflare/login redirect ("Just a moment...", 403, or bounced to
+`/ab/account-security/login`) even after step 1's login succeeded elsewhere
+on the site. Check for that here too, not just once: if it happens, stop and
+tell the user, same as step 1 — they log in again in the same browser
+session, then say when they're through.
+
+Field by field: paste the cover letter/proposal text, set a bid rate only if
+the user gave one (Upwork usually pre-fills the bid box to the job's own
+listed budget for a fixed-price job — leave that as-is rather than inventing
+a different number), attach the résumé if the form takes one.
+
+**Known friction points on Upwork's apply form** (all hit and fixed
+2026-09-16 — check for these before treating a stuck click as a dead end):
+
+- **Payment terms default to "By milestone."** For a small fixed-price job,
+  switch to "By project" instead (one total bid, no milestone rows to fill)
+  unless the user specifically wants milestones broken out.
+- **A promo/nudge card (e.g. "Upgrade to Freelancer Plus") can sit on top of
+  the payment-terms radios and intercept clicks** — a `browser_click` on the
+  radio times out with "...intercepts pointer events". Dismiss the card via
+  its own close button first, then retry. Separately, the radio input
+  itself is often a hidden/`sr-only` element — if clicking its own ref still
+  fails, click its visible label text instead (e.g. the "By project" text
+  next to it), which fires the same selection.
+- **Project-length dropdown** — set it to whatever the job's own listing
+  shows ("Project length: 1 to 3 months" etc.), not a guess.
+- **File uploads (attachments, résumé) only accept paths under this
+  project's directory or `.apply-drive/`** — the Playwright sandbox rejects
+  an absolute path like `/tmp/whatever.png` as outside allowed roots. Copy
+  any screenshot or résumé into `.apply-drive/` first, then
+  `browser_file_upload` that copied path. Clean the copy up from
+  `.apply-drive/` once the folder's own copy (step 9) is saved.
+
+`browser_snapshot` + `browser_take_screenshot` when filled.
 
 ## 7. Ask to submit
 

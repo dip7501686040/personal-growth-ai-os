@@ -48,17 +48,57 @@ way as any other shipped project — `/sync-repo` then one `pnpm content
 register` card — never a hand-rolled DB insert, and never more than one card
 per project unless asked.
 
-## 4. Write the proposal
+## 4. Write the proposal — from the client's side of the screen
 
-1. **How I'd approach it** — 2–3 steps specific to *this* JD, not generic
-   platitudes.
-2. **Proof, not just claims** — the repo link(s)/screenshot(s)/live URL from
-   step 2.
-3. **What I bring beyond this** — the user's real broader background.
-4. **Availability / rate** — only if the user gave you a number.
+Upwork shows the client two views, and a generic proposal loses at both:
+
+- **The preview card** — while scrolling 20–50 applicants, the client sees
+  only your name/bid/JSS, the skills tags matched, and your *first line*.
+  That line is the whole pitch at this stage.
+- **The full view** — narrow pane, opened only if the card earned a click.
+  Long dense paragraphs read as a wall of text here and the client's eyes
+  skip past links buried inside them.
+
+So:
+
+1. **Opening line = hook, not a recap.** Never restate their job title,
+   summary, or skill tags back at them ("I'd like to help build and
+   maintain your web application" / "I noticed your stack requires PHP and
+   JavaScript" — both read as generic, and half the other applicants open
+   the same way). Read past the tag list to the actual **problem** the
+   client is trying to solve — what's implied by "ongoing," "maintain,"
+   "improve UX," a specific pain phrase, the project's real shape — not
+   just which languages it's tagged with. Then open with the specific
+   angle on *that* problem plus your single strongest matching proof, in
+   one sentence, so the first line proves you already understand their
+   situation, not just their keyword list. There's no fixed template for
+   this — read the actual JD each time and write the sentence that fits
+   *this* client's real problem; don't reduce it to filling in a stack name
+   and a proof link.
+
+2. **How I'd approach it** — 2–3 short bullets (not a paragraph), specific
+   to *this* JD, not generic platitudes.
+3. **Proof, not just claims** — one bullet block per project: name, a short
+   plain one-line tech-stack summary, then links each on their own line
+   (never buried mid-paragraph). Lead with whichever piece of proof is the
+   most technically differentiating for *this* JD's mandatory skills — the
+   thing that signals senior/advanced, not just "matched" — put that one
+   first, not last.
+4. **What I bring beyond this** — one line, the user's real broader
+   background.
+5. **Availability / rate** — only if the user gave you a number.
+
+Bullets and short lines throughout, not dense paragraphs — write for someone
+skimming a narrow pane on a laptop, comparing you against dozens of other
+cards, not someone reading top to bottom.
 
 Deliver the complete proposal text, ready to paste, and resend any relevant
 screenshots via `SendUserFile` so they're easy to attach.
+
+If the user asks you to actually drive the browser and submit this rather
+than apply by hand (they log in, you fill/submit) — that's `/upwork-drive`'s
+steps 6–9 mechanics, run with the proposal text from this step; same submit
+discipline (explicit `y`), same known-friction fixes documented there.
 
 ## 5. After they submit — record it
 

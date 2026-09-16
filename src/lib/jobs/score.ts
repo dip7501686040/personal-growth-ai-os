@@ -38,6 +38,21 @@ const NO_SPONSORSHIP_PHRASES =
 // missed on 2026-09-13 (Close: "Senior Backend Engineer - CRM (USA Only,
 // 100% Remote)" scored 0.82 clean into Group A, no flag at all).
 const US_ONLY_REMOTE = /\bremote\s*\(\s*us\)|\b(us|usa)\s+only\b/i;
+/** Found via a real apply-drive encounter (Mind Computing, 2026-09-16): a
+ *  federal-contractor (VA) posting whose aggregator snippet plainly said
+ *  "The candidate must reside within the continental US" — a residency
+ *  requirement is the same dead end as an explicit no-sponsorship phrase for
+ *  an India-based candidate, but neither NO_SPONSORSHIP_PHRASES nor
+ *  US_ONLY_REMOTE catches "must reside"/"must be a U.S. citizen" wording. */
+const RESIDENCY_REQUIRED =
+  /\bmust\s+(?:reside|be\s+located|live)\s+(?:within|in)\s+the\s+(?:continental\s+)?(?:u\.?s\.?a?\.?|united\s+states)\b|\brequires?\s+u\.?s\.?\s+citizenship\b|\bmust\s+be\s+a\s+u\.?s\.?\s+citizen\b|\bu\.?s\.?\s+citizens?\s+(?:only|required)\b/i;
+/** Positive signal, not just an absence of red flags — a posting that
+ *  explicitly names India or a genuinely global/worldwide hiring footprint
+ *  is real evidence the company already hires outside the US/EU, which a
+ *  bare "remote" tag doesn't tell you (Mind Computing's location field was
+ *  just "Anywhere" and still turned out to be a hard US-residency job). */
+const INDIA_OR_GLOBAL_FRIENDLY =
+  /\b(india|bengaluru|bangalore|hyderabad|remote[- ]india|hire(?:s|d)?\s+(?:globally|internationally|worldwide)|global(?:ly)?\s+remote|remote[- ]first,?\s+global|distributed\s+team|work\s+from\s+anywhere|worldwide)\b/i;
 
 /** Sources whose own "Apply" always walls into a signup/login page, not the
  *  real company form — found via real apply-drive attempts (Himalayas
@@ -157,9 +172,15 @@ export function scoreJob(
   if (looksTruncated(j.descriptionSnippet)) flags.push("truncated_jd_text");
 
   const hay = `${j.role} ${j.descriptionSnippet ?? ""}`.toLowerCase();
-  if (NO_SPONSORSHIP_PHRASES.test(hay) || US_ONLY_REMOTE.test(hay)) {
+  if (NO_SPONSORSHIP_PHRASES.test(hay) || US_ONLY_REMOTE.test(hay) || RESIDENCY_REQUIRED.test(hay)) {
     flags.push("visa_blocker");
     bump(-0.2);
+  } else if (INDIA_OR_GLOBAL_FRIENDLY.test(hay)) {
+    // Only rewarded when nothing above already flagged a hard blocker — a
+    // posting can still say "worldwide" in its perks section while its
+    // actual screening questions require US residency.
+    flags.push("india_friendly");
+    bump(0.08);
   }
   for (const gap of cfg.hardSkillGaps ?? []) {
     // word-boundary, not substring — "Java" must not match inside "JavaScript"
