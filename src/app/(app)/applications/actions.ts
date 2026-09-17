@@ -31,6 +31,16 @@ import {
   requestContentProcessing,
 } from "@/modules/applications/service";
 
+// searchJobsAction runs all 9 job sources (each internally parallel, but
+// Adzuna/SerpApi's concurrent sub-requests still take up to ~12s each) plus
+// knowledge-graph matching for ~50 jobs — measured at ~140s end-to-end on
+// 2026-09-17 after fixing the sources to stop losing all their results on a
+// single slow request. A Server Action's timeout is governed by this file's
+// own `maxDuration`, not the page's — without it the "Search jobs" button
+// was hitting a much shorter default and rendering blank. Vercel clamps to
+// whatever the plan actually allows, so setting this generously is safe.
+export const maxDuration = 300;
+
 export type ActionState = { ok: boolean; message: string } | null;
 
 const err = (message: string): ActionState => ({ ok: false, message });

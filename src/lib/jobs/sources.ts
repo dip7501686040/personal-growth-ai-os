@@ -364,56 +364,66 @@ export async function adzuna(cfg: JobSearchConfig): Promise<RawJob[]> {
   const id = env.ADZUNA_APP_ID;
   const key = env.ADZUNA_APP_KEY;
   if (!id || !key) throw new Error("ADZUNA_APP_ID / ADZUNA_APP_KEY not set");
-  // Each (country, term) pair is its own request — up to ~18 sequential
-  // calls per run. These used to share one un-caught await: a single slow
-  // or failing pair (a transient timeout, one bad country endpoint) threw
-  // and discarded every result already fetched in the loop, silently
-  // zeroing out the whole source for that run even though most requests
-  // would have succeeded (confirmed live 2026-09-17: a direct Adzuna call
-  // succeeded in <2s right after a `pnpm jobs` run reported Adzuna
-  // "aborted due to timeout" with zero results). Now every pair is
-  // independent — one failure is skipped, not fatal.
+  // Each (country, term) pair is its own request — up to ~18 per run. These
+  // used to run sequentially sharing one un-caught await: a single slow or
+  // failing pair threw and discarded every result already fetched, silently
+  // zeroing out the whole source for that run (confirmed live 2026-09-17: a
+  // direct Adzuna call succeeded in <2s right after a `pnpm jobs` run
+  // reported Adzuna "aborted due to timeout" with zero results). Fixed to
+  // isolate failures per pair — but sequentially that meant up to 18×12s
+  // worst case, which then blew past the `/applications` page's "Search
+  // jobs" server action timeout (confirmed same day: the button started
+  // rendering blank). Fired concurrently instead: same isolation, worst
+  // case is now ~one request's timeout, not eighteen.
+  const pairs = cfg.adzunaCountries
+    .slice(0, cfg.adzunaMaxCountries ?? 6)
+    .flatMap((country) => queryTerms(cfg, 2, 1).map((term) => ({ country, term })));
+
+  const settled = await Promise.allSettled(
+    pairs.map(({ country, term }) =>
+      getJson<{ results?: Record<string, unknown>[] }>(
+        `https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${id}&app_key=${key}` +
+          `&what=${encodeURIComponent(term)}` +
+          `${cfg.remoteOnly ? "&what_and=remote" : ""}` +
+          `&results_per_page=${cfg.maxPerSource}&content-type=application/json`,
+      ).then((j) => ({ country, results: j.results ?? [] })),
+    ),
+  );
+
   const out: RawJob[] = [];
   const errors: string[] = [];
-  for (const country of cfg.adzunaCountries.slice(0, cfg.adzunaMaxCountries ?? 6)) {
-    for (const term of queryTerms(cfg, 2, 1)) {
-      try {
-        const j = await getJson<{ results?: Record<string, unknown>[] }>(
-          `https://api.adzuna.com/v1/api/jobs/${country}/search/1?app_id=${id}&app_key=${key}` +
-            `&what=${encodeURIComponent(term)}` +
-            `${cfg.remoteOnly ? "&what_and=remote" : ""}` +
-            `&results_per_page=${cfg.maxPerSource}&content-type=application/json`,
-        );
-        for (const r of j.results ?? []) {
-          const co = r.company as { display_name?: string } | undefined;
-          const loc = r.location as { display_name?: string } | undefined;
-          out.push({
-            source: "adzuna",
-            company: co?.display_name ?? "",
-            role: String(r.title ?? ""),
-            location: loc?.display_name ?? null,
-            remote: /remote/i.test(String(r.title ?? "") + (loc?.display_name ?? "")),
-            salaryText:
-              r.salary_min || r.salary_max
-                ? `${r.salary_min ?? ""}-${r.salary_max ?? ""} ${country === "in" ? "INR" : "USD"} /year`
-                : null,
-            postedAt: (r.created as string) || null,
-            url: String(r.redirect_url ?? ""),
-            applyUrl: (r.redirect_url as string) || null,
-            publisher: null,
-            descriptionSnippet: stripHtml(String(r.description ?? "")).slice(0, 1400),
-            contactEmail: null,
-            // `contract_type` (permanent/contract) is the more useful of the
-            // two when present; `contract_time` (full_time/part_time) is the
-            // fallback — Adzuna omits either when a posting doesn't specify it.
-            employmentType: (r.contract_type as string) || (r.contract_time as string) || null,
-          });
-        }
-      } catch (e) {
-        errors.push(`${country}/${term}: ${e instanceof Error ? e.message : String(e)}`);
-      }
+  settled.forEach((s, i) => {
+    if (s.status === "rejected") {
+      errors.push(`${pairs[i].country}/${pairs[i].term}: ${s.reason instanceof Error ? s.reason.message : String(s.reason)}`);
+      return;
     }
-  }
+    const { country, results } = s.value;
+    for (const r of results) {
+      const co = r.company as { display_name?: string } | undefined;
+      const loc = r.location as { display_name?: string } | undefined;
+      out.push({
+        source: "adzuna",
+        company: co?.display_name ?? "",
+        role: String(r.title ?? ""),
+        location: loc?.display_name ?? null,
+        remote: /remote/i.test(String(r.title ?? "") + (loc?.display_name ?? "")),
+        salaryText:
+          r.salary_min || r.salary_max
+            ? `${r.salary_min ?? ""}-${r.salary_max ?? ""} ${country === "in" ? "INR" : "USD"} /year`
+            : null,
+        postedAt: (r.created as string) || null,
+        url: String(r.redirect_url ?? ""),
+        applyUrl: (r.redirect_url as string) || null,
+        publisher: null,
+        descriptionSnippet: stripHtml(String(r.description ?? "")).slice(0, 1400),
+        contactEmail: null,
+        // `contract_type` (permanent/contract) is the more useful of the
+        // two when present; `contract_time` (full_time/part_time) is the
+        // fallback — Adzuna omits either when a posting doesn't specify it.
+        employmentType: (r.contract_type as string) || (r.contract_time as string) || null,
+      });
+    }
+  });
   // Only fully fail if literally nothing came back — partial coverage beats
   // none, and the caller (runJobSearch) already reports per-source failures.
   if (out.length === 0 && errors.length > 0) {
@@ -430,38 +440,45 @@ export async function serpapi(cfg: JobSearchConfig): Promise<RawJob[]> {
   const terms = queryTerms(cfg, cfg.serpapiMaxQueries ?? 3);
   if (terms.length === 0) terms.push("software engineer");
 
-  // Same robustness fix as adzuna() above — one slow/failing title query
-  // must not discard results already fetched for the others.
+  // Same robustness fix as adzuna() above, fired concurrently for the same
+  // reason: sequential per-term requests were slow enough (up to N×12s) to
+  // blow past the `/applications` page's "Search jobs" server-action
+  // timeout, even after making each term's failure non-fatal.
+  const settled = await Promise.allSettled(
+    terms.map((term) =>
+      getJson<{ jobs_results?: Record<string, unknown>[] }>(
+        `https://serpapi.com/search.json?engine=google_jobs&q=${encodeURIComponent(term + " remote")}&api_key=${key}`,
+      ),
+    ),
+  );
+
   const out: RawJob[] = [];
   const errors: string[] = [];
-  for (const term of terms) {
-    try {
-      const j = await getJson<{ jobs_results?: Record<string, unknown>[] }>(
-        `https://serpapi.com/search.json?engine=google_jobs&q=${encodeURIComponent(term + " remote")}&api_key=${key}`,
-      );
-      for (const r of (j.jobs_results ?? []).slice(0, cfg.maxPerSource)) {
-        const ext = (r.detected_extensions ?? {}) as Record<string, unknown>;
-        const apply = (r.apply_options as { link?: string }[] | undefined)?.[0]?.link;
-        out.push({
-          source: "serpapi",
-          company: String(r.company_name ?? ""),
-          role: String(r.title ?? ""),
-          location: (r.location as string) || null,
-          remote: ext.work_from_home === true,
-          salaryText: (ext.salary as string) || null,
-          postedAt: null,
-          url: apply ?? String(r.share_link ?? ""),
-          applyUrl: apply ?? null,
-          publisher: (r.via as string)?.replace(/^via\s+/i, "") || null,
-          descriptionSnippet: stripHtml(String(r.description ?? "")).slice(0, 1400),
-          contactEmail: null,
-          employmentType: (ext.schedule_type as string) || null,
-        } satisfies RawJob);
-      }
-    } catch (e) {
-      errors.push(`${term}: ${e instanceof Error ? e.message : String(e)}`);
+  settled.forEach((s, i) => {
+    if (s.status === "rejected") {
+      errors.push(`${terms[i]}: ${s.reason instanceof Error ? s.reason.message : String(s.reason)}`);
+      return;
     }
-  }
+    for (const r of (s.value.jobs_results ?? []).slice(0, cfg.maxPerSource)) {
+      const ext = (r.detected_extensions ?? {}) as Record<string, unknown>;
+      const apply = (r.apply_options as { link?: string }[] | undefined)?.[0]?.link;
+      out.push({
+        source: "serpapi",
+        company: String(r.company_name ?? ""),
+        role: String(r.title ?? ""),
+        location: (r.location as string) || null,
+        remote: ext.work_from_home === true,
+        salaryText: (ext.salary as string) || null,
+        postedAt: null,
+        url: apply ?? String(r.share_link ?? ""),
+        applyUrl: apply ?? null,
+        publisher: (r.via as string)?.replace(/^via\s+/i, "") || null,
+        descriptionSnippet: stripHtml(String(r.description ?? "")).slice(0, 1400),
+        contactEmail: null,
+        employmentType: (ext.schedule_type as string) || null,
+      } satisfies RawJob);
+    }
+  });
   if (out.length === 0 && errors.length > 0) {
     throw new Error(`serpapi: all requests failed — ${errors[0]}`);
   }
