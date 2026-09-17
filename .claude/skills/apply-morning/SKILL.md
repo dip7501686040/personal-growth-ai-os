@@ -6,38 +6,23 @@ description: The morning job run — fetch + score today's matching jobs, let th
 # apply-morning
 
 **Context that shapes every step below:** the user is based in Kolkata,
-India, and wants remote roles — he needs visa sponsorship for every country
-except India, so a company's *actual* hiring geography matters as much as
-skill match. `score.ts` catches what's detectable from JD *text* alone
-(`visa_blocker` for explicit "US citizens only"/"must reside in the US"
-wording, a small `india_friendly` boost for "worldwide"/"hires globally"
-language) — but plenty of real blockers never show up in the posting text at
-all (found live: a ClickUp employee replied on LinkedIn that "ClickUp
-doesn't hire engineers from India," nothing in the JD hinted at that). That
-kind of fact isn't something to hardcode into a maintained list in
-`score.ts`/`job-search.json` — the user explicitly said so. Instead: **hold
-it in memory and apply it by judgment at presentation time**, the same way
-you'd remember any other fact the user told you. When you learn a company
-doesn't hire from India (a LinkedIn reply, the user mentioning it, a rejected
-application), save it via the memory system (`type: reference` or
-`project`, e.g. "ClickUp doesn't hire engineers based in India — told
-directly by a ClickUp employee, 2026-09-16") so the next `/apply-morning`
-run already knows, without any code change. Before presenting Group A/B,
-scan company names against what you already know — this session's memory,
-general knowledge of well-known company hiring-geography reputations, and
-anything the user said earlier in the conversation — and flag or deprioritize
-a company you have real reason to doubt, even if `score.ts` scored it clean.
-Say *why* ("ClickUp — you were told directly they don't hire from India,
-skipping") rather than silently dropping it.
+India. For a genuinely remote role, visa/work-authorization isn't a
+factor — the only thing that matters here is `score.ts`'s `visa_blocker`
+flag: explicit residency/citizenship-required wording in the JD text
+("must reside in the US", "US citizens only") is a real blocker even on a
+role tagged remote, and **must** be filtered/flagged. `india_friendly`
+(JD names India, "worldwide," "hires globally," "work from anywhere") is a
+nice positive signal when present, but its *absence* is not a reason to
+filter or deprioritize — most remote postings just don't mention geography
+at all, which is normal, not a red flag. Blocker check is mandatory;
+accepter check is not.
 
-This also means: when ranking/recommending picks, weigh three things
-together, not just the numeric `score` — skill match, proof relevance (how
-strong the graph-matched project evidence actually is for *this* JD), and
-realistic hireability given the user's India-based location. A 0.55-score
-job at a company that genuinely hires globally is worth more than a
-0.70-score job at a company you have reason to think won't consider an
-India-based candidate — steer the user toward jobs where an interview call
-is actually plausible, not just toward the top of the raw score list.
+Beyond that concrete blocker check, don't speculatively judge or
+deprioritize a job by company reputation — bring the full list of matching
+jobs and let the user decide, including at form-fill time. The one
+exception: a company the user has told you directly doesn't hire from
+India (a LinkedIn reply, etc.) — save that as a memory fact and exclude it
+by name going forward, since that's confirmed, not a guess.
 
 Ties J1–J4 together. Fetch → score → pick → record `job.json` +
 `search-provenance.md` per pick → record in the ledger. Nothing else gets
@@ -61,7 +46,7 @@ The search blends two layers:
 - **Manual** — `resume/job-search.json` (`titles`, `excludeTitles`, `skills` keyword list, filters). Hand-tuned.
 - **Knowledge graph** — automatic (unless `useGraphMatch: false` or `pnpm jobs --no-graph`). Adds a few source-query terms from your implemented/proven skills, and re-scores the top ~50 jobs with the same matcher `get_proof_for_jd` uses. `skillMatch = max(keyword, graph)`, so a job the keyword list misses but your real projects match still rises.
 
-Show the user the Group A list (and the top of B). Each row: score · company — role · remote-kind · LPA · reply-likelihood · skillMatch (with `graph N.NN` when the graph beat the keyword score) · [sources] · flags. The `graph:` header line reports the extra terms + how many jobs were graph-scored. Indices in `/tmp/jobs.json` are `groupA` then `groupB` concatenated (0-based). `visa_blocker` now also covers residency-requirement wording ("must reside in the US", "US citizens only"), not just explicit no-sponsorship phrases; `india_friendly` is a small positive flag for postings that name India or genuinely global hiring. Before presenting, apply the judgment pass from the top of this file — flag/deprioritize anything you have real-world reason to doubt beyond what these text-pattern flags caught.
+Show the user the Group A list (and the top of B). Each row: score · company — role · remote-kind · LPA · reply-likelihood · skillMatch (with `graph N.NN` when the graph beat the keyword score) · [sources] · flags. The `graph:` header line reports the extra terms + how many jobs were graph-scored. Indices in `/tmp/jobs.json` are `groupA` then `groupB` concatenated (0-based). `visa_blocker` covers residency/citizenship-required wording ("must reside in the US", "US citizens only", not just no-sponsorship phrases) — exclude/flag those. `india_friendly` is just a positive nudge for postings that name India or genuinely global hiring; don't read anything into its absence.
 
 If `pnpm jobs` reports skipped sources (missing keys), mention it once — coverage is lower without JSearch/Adzuna/SerpApi.
 
