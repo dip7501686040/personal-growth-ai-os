@@ -346,7 +346,7 @@ export async function getPublicProjects(userId: string): Promise<PublicProject[]
     techByProject.set(r.projectId, arr);
   }
 
-  return rows.map((r) => ({
+  const out = rows.map((r) => ({
     slug: r.slug,
     name: r.name,
     tagline: r.tagline || r.description || "",
@@ -358,4 +358,24 @@ export async function getPublicProjects(userId: string): Promise<PublicProject[]
     liveUrl: r.liveUrl,
     tech: techByProject.get(r.id) ?? [],
   }));
+
+  // Portfolio card order (user preference, 2026-09-17) — not a DB column
+  // since this is a fixed, rarely-changed list for a single-user site.
+  // Anything not named here keeps its original (DB) order, after these.
+  const PORTFOLIO_ORDER = [
+    "personal-growth-ai-os",
+    "ai-notification-system",
+    "platform-infrastructure",
+    "platform-gitops",
+    "portfolio",
+  ];
+  out.sort((a, b) => {
+    const ai = PORTFOLIO_ORDER.indexOf(a.slug);
+    const bi = PORTFOLIO_ORDER.indexOf(b.slug);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+  return out;
 }
