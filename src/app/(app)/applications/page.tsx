@@ -31,7 +31,15 @@ import {
 } from "@/components/applications/outreach-board";
 
 export const metadata = { title: "Applications" };
-export const maxDuration = 90;
+// A Server Action's timeout is governed by the maxDuration of the route
+// segment (page/layout) that invokes it, not the action's own file —
+// `searchJobsAction` runs all 9 job sources plus knowledge-graph matching
+// for ~50 jobs, measured at ~140s end-to-end on 2026-09-17. Vercel clamps
+// this to whatever the plan actually allows, so setting it generously here
+// is safe; a plain non-function export of this in actions.ts is NOT valid
+// (that broke the "use server" file's export table entirely — every action
+// import from it failed at build time).
+export const maxDuration = 300;
 
 const STATUS_ORDER = [
   "draft",
