@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   applyAction,
   deleteApplicationAction,
+  markRejectedAction,
   processContentAction,
 } from "@/app/(app)/applications/actions";
 
@@ -185,9 +186,26 @@ export function SelectionBoard({ rows }: { rows: SelectionRow[] }) {
                     </Link>
                   )}
                   {queueBadge(r)}
+                  {["applied", "screening", "interviewing", "offer"].includes(r.status) && (
+                    <button
+                      type="button"
+                      className="ml-auto underline disabled:opacity-50"
+                      disabled={pending}
+                      onClick={() => {
+                        if (!window.confirm(`Mark ${r.company} — ${r.role} as rejected?`)) return;
+                        run(() => markRejectedAction(r.id));
+                      }}
+                    >
+                      mark rejected
+                    </button>
+                  )}
                   <button
                     type="button"
-                    className="ml-auto text-destructive underline disabled:opacity-50"
+                    className={
+                      ["applied", "screening", "interviewing", "offer"].includes(r.status)
+                        ? "text-destructive underline disabled:opacity-50"
+                        : "ml-auto text-destructive underline disabled:opacity-50"
+                    }
                     disabled={pending}
                     onClick={() => {
                       if (!window.confirm(`Delete ${r.company} — ${r.role}? This removes it and its folder for good.`)) return;

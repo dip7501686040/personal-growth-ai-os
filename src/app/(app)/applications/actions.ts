@@ -29,6 +29,7 @@ import {
   recordTouchpoint,
   requestApply,
   requestContentProcessing,
+  setApplicationStatus,
 } from "@/modules/applications/service";
 
 export type ActionState = { ok: boolean; message: string } | null;
@@ -409,6 +410,24 @@ export async function deleteApplicationAction(id: string): Promise<ActionState> 
     return { ok: true, message: "Deleted." };
   } catch (e) {
     return err(e instanceof Error ? e.message : "Delete failed.");
+  }
+}
+
+/** One-click "I heard back and it's a no" — flips status straight to
+ *  rejected without deleting anything, so the folder/ledger row stays as a
+ *  record. Usable from any post-draft stage (applied/screening/interviewing/
+ *  offer), not just "applied" — a rejection can land at any of those. */
+export async function markRejectedAction(id: string): Promise<ActionState> {
+  const userId = await requireUserId();
+  if (await blockedForDemo(userId)) return err(NOT_IN_DEMO);
+  const parsedId = z.uuid().safeParse(id);
+  if (!parsedId.success) return err("Invalid application id.");
+  try {
+    await setApplicationStatus(userId, parsedId.data, "rejected");
+    revalidatePath("/applications");
+    return { ok: true, message: "Marked rejected." };
+  } catch (e) {
+    return err(e instanceof Error ? e.message : "Update failed.");
   }
 }
 
