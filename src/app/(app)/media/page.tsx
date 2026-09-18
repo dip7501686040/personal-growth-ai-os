@@ -2,9 +2,10 @@ import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { isCloudinaryConfigured, mediaUrl, videoPosterUrl } from "@/lib/media/cloudinary";
 import { allItems, loadManifestFromR2 } from "@/lib/media/manifest";
-import { isR2Configured, listFiles } from "@/modules/files/store";
+import { getFileText, isR2Configured, listFiles } from "@/modules/files/store";
 import { CloudinaryAssets } from "@/components/media/cloudinary-assets";
 import { FilesList } from "@/components/media/files-list";
+import { SocialLinks, type LinkGroup } from "@/components/media/social-links";
 
 export const metadata = { title: "Media" };
 
@@ -27,10 +28,17 @@ export default async function MediaPage() {
     );
   }
 
-  const [manifest, fileKeys] = await Promise.all([
+  const [manifest, fileKeys, linksText] = await Promise.all([
     loadManifestFromR2(),
     isR2Configured() ? listFiles() : Promise.resolve<string[]>([]),
+    isR2Configured() ? getFileText("resume/links.json") : Promise.resolve<string | null>(null),
   ]);
+  let linkGroups: LinkGroup[] = [];
+  try {
+    linkGroups = linksText ? (JSON.parse(linksText).groups ?? []) : [];
+  } catch {
+    linkGroups = [];
+  }
   const cloudinaryOk = isCloudinaryConfigured();
   const assets = allItems(manifest).map(({ projectSlug, featureKey, item }) => ({
     projectSlug,
@@ -53,6 +61,17 @@ export default async function MediaPage() {
           (résumé-domain files).
         </p>
       </div>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h3 className="text-sm font-semibold">Social &amp; app links</h3>
+          <p className="text-xs text-muted-foreground">
+            From <code className="text-xs">resume/links.json</code> — click to
+            open, or copy the URL.
+          </p>
+        </div>
+        <SocialLinks groups={linkGroups} />
+      </section>
 
       <section className="flex flex-col gap-3">
         <div>
