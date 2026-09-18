@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { isDemoUserId } from "@/lib/demo";
 import { requireUserId } from "@/lib/user";
 import { loadLatestSearchRun } from "@/lib/jobs/persisted-run";
@@ -29,6 +28,7 @@ import {
   type OutreachDraft,
   type OutreachRow,
 } from "@/components/applications/outreach-board";
+import { FoldersBoard, type FolderSection } from "@/components/applications/folders-board";
 
 export const metadata = { title: "Applications" };
 // A Server Action's timeout is governed by the maxDuration of the route
@@ -117,15 +117,20 @@ export default async function ApplicationsPage() {
   // the bucket root. The demo account only ever sees the reserved
   // "demo-"-prefixed sample folders seeded by resetDemoData(); the real
   // owner never sees those. See DEMO_FOLDER_PREFIX in modules/applications/generate.ts.
-  const folderSections = (
+  const folderSections: FolderSection[] = (
     await Promise.all(
       dates.map(async (d) => {
         const all = await listJobFolders(d);
-        const folders = all.filter((f) => isDemoFolder(f) === isDemo);
+        const folders = all
+          .filter((f) => isDemoFolder(f) === isDemo)
+          .map((f) => ({ name: f, status: statusByFolder.get(f) ?? null }));
         return { date: d, folders };
       }),
     )
-  ).filter((s) => s.folders.length > 0);
+  )
+    .filter((s) => s.folders.length > 0)
+    // newest first — the section the user actually scrolls to most often
+    .sort((a, b) => b.date.localeCompare(a.date));
 
   const selectionRows: SelectionRow[] = apps.map((a) => {
     const parts = a.bundleDir?.replace(/^applications[/\\]/, "").split("/") ?? [];
@@ -240,38 +245,7 @@ export default async function ApplicationsPage() {
               : "R2 not configured — showing the local cache."}
           </p>
         </div>
-        {folderSections.length === 0 && (
-          <p className="text-sm text-muted-foreground">No folders yet.</p>
-        )}
-        {folderSections.map(({ date, folders }) => (
-          <div key={date} className="flex flex-col gap-1.5">
-            <h4 className="text-xs font-semibold text-muted-foreground">
-              {date} · {folders.length}
-            </h4>
-            <div className="divide-y rounded-lg border">
-              {folders.map((f) => {
-                const st = statusByFolder.get(f);
-                return (
-                  <Link
-                    key={f}
-                    href={`/applications/${date}/${f}`}
-                    className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-accent/50"
-                  >
-                    <span className="truncate">{f}</span>
-                    {st && (
-                      <Badge
-                        variant={STATUS_VARIANT[st] ?? "outline"}
-                        className="ml-auto"
-                      >
-                        {st}
-                      </Badge>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+        <FoldersBoard sections={folderSections} />
       </section>
     </div>
   );

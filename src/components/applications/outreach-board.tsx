@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Pager } from "@/components/ui/pager";
+import { usePaginated } from "@/hooks/use-paginated";
 import { fmtDateTime } from "@/lib/format";
 import {
   loadOutreachContentAction,
@@ -12,6 +14,8 @@ import {
   sendDraftAction,
   type OutreachContent,
 } from "@/app/(app)/applications/actions";
+
+const PAGE_SIZE = 8;
 
 export interface OutreachDraft {
   id: string;
@@ -274,6 +278,12 @@ export function OutreachBoard({
   gmailReady: boolean;
   demoMode?: boolean;
 }) {
+  const sorted = [...rows].sort((a, b) => {
+    if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+    return (b.lastAt ?? "").localeCompare(a.lastAt ?? "");
+  });
+  const { page, pageCount, pageItems, setPage } = usePaginated(sorted, PAGE_SIZE);
+
   if (rows.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -281,15 +291,12 @@ export function OutreachBoard({
       </p>
     );
   }
-  const sorted = [...rows].sort((a, b) => {
-    if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
-    return (b.lastAt ?? "").localeCompare(a.lastAt ?? "");
-  });
   return (
     <div className="flex flex-col gap-2">
-      {sorted.map((r) => (
+      {pageItems.map((r) => (
         <OutreachCard key={r.applicationId} row={r} gmailReady={gmailReady} demoMode={demoMode} />
       ))}
+      <Pager page={page} pageCount={pageCount} onChange={setPage} />
     </div>
   );
 }

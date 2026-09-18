@@ -6,12 +6,16 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Pager } from "@/components/ui/pager";
+import { usePaginated } from "@/hooks/use-paginated";
 import {
   applyAction,
   deleteApplicationAction,
   markRejectedAction,
   processContentAction,
 } from "@/app/(app)/applications/actions";
+
+const GROUP_PAGE_SIZE = 10;
 
 export interface SelectionRow {
   id: string;
@@ -67,6 +71,113 @@ function queueBadge(row: SelectionRow) {
         </Badge>
       )}
     </span>
+  );
+}
+
+function StatusGroup({
+  status,
+  items,
+  selected,
+  toggle,
+  pending,
+  run,
+}: {
+  status: string;
+  items: SelectionRow[];
+  selected: Set<string>;
+  toggle: (id: string) => void;
+  pending: boolean;
+  run: (fn: () => Promise<{ ok: boolean; message: string } | null>) => void;
+}) {
+  const { page, pageCount, pageItems, setPage } = usePaginated(items, GROUP_PAGE_SIZE);
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="text-sm font-semibold text-muted-foreground">
+        {status} · {items.length}
+      </h3>
+      <div className="divide-y rounded-lg border">
+        {pageItems.map((r) => (
+          <div key={r.id} className="flex flex-col gap-1 px-3 py-2.5 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="checkbox"
+                className="accent-primary"
+                checked={selected.has(r.id)}
+                onChange={() => toggle(r.id)}
+              />
+              <span className="font-medium">{r.company}</span>
+              <span className="text-muted-foreground">{r.role}</span>
+              {r.recommended && (
+                <Badge variant="outline" className="border-emerald-400 text-emerald-700 dark:text-emerald-300">
+                  recommended
+                </Badge>
+              )}
+              {r.remoteKind && <Badge variant="outline">{r.remoteKind}</Badge>}
+              {r.companyType && r.companyType !== "product" && (
+                <Badge variant="outline">{r.companyType}</Badge>
+              )}
+              <span className="ml-auto text-xs text-muted-foreground tabular-nums">
+                {r.skillMatch != null && `match ${(r.skillMatch * 100).toFixed(0)}%`}
+                {r.replyLikelihood != null && ` · reply ${(r.replyLikelihood * 100).toFixed(0)}%`}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+              {r.salaryLpa != null && <span>{r.salaryLpa} LPA</span>}
+              {r.folder && r.date && (
+                <Link
+                  href={`/applications/${r.date}/${r.folder}`}
+                  className="underline"
+                >
+                  {r.folder}
+                </Link>
+              )}
+              {queueBadge(r)}
+              {["applied", "screening", "interviewing", "offer"].includes(r.status) && (
+                <button
+                  type="button"
+                  className="ml-auto underline disabled:opacity-50"
+                  disabled={pending}
+                  onClick={() => {
+                    if (!window.confirm(`Mark ${r.company} — ${r.role} as rejected?`)) return;
+                    run(() => markRejectedAction(r.id));
+                  }}
+                >
+                  mark rejected
+                </button>
+              )}
+              <button
+                type="button"
+                className={
+                  ["applied", "screening", "interviewing", "offer"].includes(r.status)
+                    ? "text-destructive underline disabled:opacity-50"
+                    : "ml-auto text-destructive underline disabled:opacity-50"
+                }
+                disabled={pending}
+                onClick={() => {
+                  if (!window.confirm(`Delete ${r.company} — ${r.role}? This removes it and its folder for good.`)) return;
+                  run(() => deleteApplicationAction(r.id));
+                }}
+              >
+                delete
+              </button>
+            </div>
+            {r.flags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {r.flags.map((f) => (
+                  <span
+                    key={f}
+                    className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                  >
+                    {f}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <Pager page={page} pageCount={pageCount} onChange={setPage} />
+    </section>
   );
 }
 
@@ -145,92 +256,15 @@ export function SelectionBoard({ rows }: { rows: SelectionRow[] }) {
       </div>
 
       {grouped.map(({ status, items }) => (
-        <section key={status} className="flex flex-col gap-2">
-          <h3 className="text-sm font-semibold text-muted-foreground">
-            {status} · {items.length}
-          </h3>
-          <div className="divide-y rounded-lg border">
-            {items.map((r) => (
-              <div key={r.id} className="flex flex-col gap-1 px-3 py-2.5 text-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    type="checkbox"
-                    className="accent-primary"
-                    checked={selected.has(r.id)}
-                    onChange={() => toggle(r.id)}
-                  />
-                  <span className="font-medium">{r.company}</span>
-                  <span className="text-muted-foreground">{r.role}</span>
-                  {r.recommended && (
-                    <Badge variant="outline" className="border-emerald-400 text-emerald-700 dark:text-emerald-300">
-                      recommended
-                    </Badge>
-                  )}
-                  {r.remoteKind && <Badge variant="outline">{r.remoteKind}</Badge>}
-                  {r.companyType && r.companyType !== "product" && (
-                    <Badge variant="outline">{r.companyType}</Badge>
-                  )}
-                  <span className="ml-auto text-xs text-muted-foreground tabular-nums">
-                    {r.skillMatch != null && `match ${(r.skillMatch * 100).toFixed(0)}%`}
-                    {r.replyLikelihood != null && ` · reply ${(r.replyLikelihood * 100).toFixed(0)}%`}
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-                  {r.salaryLpa != null && <span>{r.salaryLpa} LPA</span>}
-                  {r.folder && r.date && (
-                    <Link
-                      href={`/applications/${r.date}/${r.folder}`}
-                      className="underline"
-                    >
-                      {r.folder}
-                    </Link>
-                  )}
-                  {queueBadge(r)}
-                  {["applied", "screening", "interviewing", "offer"].includes(r.status) && (
-                    <button
-                      type="button"
-                      className="ml-auto underline disabled:opacity-50"
-                      disabled={pending}
-                      onClick={() => {
-                        if (!window.confirm(`Mark ${r.company} — ${r.role} as rejected?`)) return;
-                        run(() => markRejectedAction(r.id));
-                      }}
-                    >
-                      mark rejected
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className={
-                      ["applied", "screening", "interviewing", "offer"].includes(r.status)
-                        ? "text-destructive underline disabled:opacity-50"
-                        : "ml-auto text-destructive underline disabled:opacity-50"
-                    }
-                    disabled={pending}
-                    onClick={() => {
-                      if (!window.confirm(`Delete ${r.company} — ${r.role}? This removes it and its folder for good.`)) return;
-                      run(() => deleteApplicationAction(r.id));
-                    }}
-                  >
-                    delete
-                  </button>
-                </div>
-                {r.flags.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {r.flags.map((f) => (
-                      <span
-                        key={f}
-                        className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                      >
-                        {f}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </section>
+        <StatusGroup
+          key={status}
+          status={status}
+          items={items}
+          selected={selected}
+          toggle={toggle}
+          pending={pending}
+          run={run}
+        />
       ))}
     </div>
   );
