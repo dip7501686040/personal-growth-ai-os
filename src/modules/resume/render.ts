@@ -257,8 +257,9 @@ export function buildResumeModel(
     { text: master.location },
     { text: master.email },
     { text: master.phone },
-    { text: master.github.replace(/^https?:\/\//, ""), url: master.github },
+    { text: master.portfolioUrl.replace(/^https?:\/\//, ""), url: master.portfolioUrl },
     { text: master.linkedin.replace(/^https?:\/\//, ""), url: master.linkedin },
+    { text: master.github.replace(/^https?:\/\//, ""), url: master.github },
   ];
 
   return {

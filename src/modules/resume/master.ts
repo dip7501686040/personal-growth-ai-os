@@ -112,13 +112,14 @@ export async function loadMaster(root = process.cwd()): Promise<MasterResume> {
   ) as MasterResume;
 }
 
-/** Whole-word match so a keyword can't hijack the pick via a substring
- *  collision inside an unrelated word ("rag" inside "leveraging") or a
- *  loose stem match against marketing boilerplate ("agent" inside "agents",
+/** Whole-word match (allowing a simple trailing "s" for plurals — "agent"
+ *  should count against "agents", not just the singular) so a keyword can't
+ *  hijack the pick via a substring collision inside an unrelated word ("rag"
+ *  inside "leveraging") or an unrelated continuation ("agent" inside
  *  "agentic") rather than an actual job requirement. */
 function hasKeyword(lower: string, keyword: string): boolean {
   const escaped = keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`\\b${escaped}\\b`, "i").test(lower);
+  return new RegExp(`\\b${escaped}s?\\b`, "i").test(lower);
 }
 
 /** Pick the archetype whose lead keywords best cover the JD text. */
